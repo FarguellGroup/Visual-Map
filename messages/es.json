@@ -1,3 +1,4 @@
+
 {
   "Header": {
     "title": "Visual Map",
@@ -9,10 +10,7 @@
     "title": "Suelta tu archivo de escaneo Nmap aquí",
     "subtitle": "o haz clic para explorar",
     "caption": "Solo se admiten archivos *.xml",
-    "examplesTitle": "Cómo generar el archivo XML",
-    "subdomainScanTitle": "Escaneo de subdominios",
-    "infraScanTitle": "Escaneo de infraestructura completa",
-    "hostScanTitle": "Escaneo de host completo"
+    "examplesTitle": "Cómo generar el archivo XML"
   },
   "Loader": {
     "analyzing": "Analizando tu archivo de escaneo..."
@@ -104,6 +102,31 @@
     "vulnerableHostsTitle": "Hosts Vulnerables ({count})",
     "lowRisk": "Riesgo Bajo",
     "mediumRisk": "Riesgo Medio",
-    "highRisk": "Riesgo Alto"
+    "highRisk": "Riesgo Alto",
+    "threats": "Amenazas",
+    "networkGraph": "Grafo de Red",
+    "api": "API"
+  },
+  "ApiPage": {
+    "title": "Configuración de API",
+    "description": "Verifica tu clave de API de Gemini y consulta los modelos disponibles.",
+    "checkButton": "Verificar Conexión de API",
+    "status": "Estado",
+    "checking": "Verificando...",
+    "validKey": "La clave de API es válida y está conectada.",
+    "invalidKey": "La clave de API no es válida o tiene algún problema.",
+    "invalidKeyDescription": "La clave API no es válida. Por favor, introduce una API válida.",
+    "noKey": "Clave de API no configurada.",
+    "noKeyDescription": "Por favor, añade tu NEXT_PUBLIC_GOOGLE_GENAI_API_KEY al archivo .env.",
+    "errorPrefix": "Error",
+    "availableModels": "Modelos Disponibles",
+    "modelName": "Nombre del Modelo",
+    "modelDisplayName": "Nombre a Mostrar",
+    "currentModel": "Modelo actual",
+    "howToChangeModelTitle": "Cómo Cambiar el Modelo de IA",
+    "howToChangeModelDescription": "<p>Para cambiar el modelo de IA en toda la aplicación, sigue estos pasos:</p><ol><li>Abre el archivo <code>src/ai/config.ts</code> en tu editor de código.</li><li>Localiza la línea: <code>export const AI_MODEL_NAME = ...</code></li><li>Reemplaza el nombre del modelo actual por uno de la lista de arriba. Mantén las comillas simples.</li><li>Guarda el archivo. El cambio se aplicará automáticamente.</li></ol>",
+    "getApiKeyTitle": "Obtén tu clave de API",
+    "getApiKeyDescription": "Necesitas una clave de API de Gemini válida para usar las funciones de IA.",
+    "getApiKeyButton": "Obtener Clave API"
   }
 }

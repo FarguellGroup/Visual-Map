@@ -1,3 +1,4 @@
+
 {
   "Header": {
     "title": "Visual Map",
@@ -9,10 +10,7 @@
     "title": "Drop your Nmap scan file here",
     "subtitle": "or click to browse",
     "caption": "Only *.xml files are supported",
-    "examplesTitle": "How to generate the XML file",
-    "subdomainScanTitle": "Subdomain scan",
-    "infraScanTitle": "Full infrastructure scan",
-    "hostScanTitle": "Full host scan"
+    "examplesTitle": "How to generate the XML file"
   },
   "Loader": {
     "analyzing": "Analyzing your scan file..."
@@ -104,6 +102,31 @@
     "vulnerableHostsTitle": "Vulnerable Hosts ({count})",
     "lowRisk": "Low Risk",
     "mediumRisk": "Medium Risk",
-    "highRisk": "High Risk"
+    "highRisk": "High Risk",
+    "threats": "Threats",
+    "networkGraph": "Network Graph",
+    "api": "API"
+  },
+  "ApiPage": {
+    "title": "API Configuration",
+    "description": "Verify your Gemini API key and see the available models.",
+    "checkButton": "Check API Connection",
+    "status": "Status",
+    "checking": "Checking...",
+    "validKey": "API Key is valid and connected.",
+    "invalidKey": "API Key is invalid or has an issue.",
+    "invalidKeyDescription": "The API key is not valid. Please enter a valid API key.",
+    "noKey": "API Key not configured.",
+    "noKeyDescription": "Please add your NEXT_PUBLIC_GOOGLE_GENAI_API_KEY to the .env file.",
+    "errorPrefix": "Error",
+    "availableModels": "Available Models",
+    "modelName": "Model Name",
+    "modelDisplayName": "Display Name",
+    "currentModel": "In Use",
+    "howToChangeModelTitle": "How to Change the AI Model",
+    "howToChangeModelDescription": "<p>To change the AI model for the entire application, follow these steps:</p><ol><li>Open the file <code>src/ai/config.ts</code> in your code editor.</li><li>Locate the line: <code>export const AI_MODEL_NAME = ...</code></li><li>Replace the current model name with one from the list above. Keep the single quotes.</li><li>Save the file. The change will be applied automatically.</li></ol>",
+    "getApiKeyTitle": "Get your API Key",
+    "getApiKeyDescription": "You need a valid Gemini API key to use the AI features.",
+    "getApiKeyButton": "Get API Key"
   }
 }
