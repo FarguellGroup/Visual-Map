@@ -170,7 +170,6 @@ export default function AppSidebar() {
   };
 
   const captureChartAsBase64 = async (elementId: string, options?: { backgroundColor?: string | null }) => {
-    // We will look for the element inside the main page and the export container
     const element = document.getElementById(elementId) as HTMLElement;
     if (!element) {
         console.warn(`Chart element with id '${elementId}' not found on the page.`);
@@ -180,7 +179,7 @@ export default function AppSidebar() {
       const canvas = await html2canvas(element, { 
           scale: 2, 
           useCORS: true,
-          logging: false, // Turn off logging for cleaner console
+          logging: false,
           backgroundColor: options?.backgroundColor,
         });
       return canvas.toDataURL('image/png');
@@ -877,7 +876,7 @@ export default function AppSidebar() {
                             </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
-                                <Label htmlFor="cve-weight" className='text-xs'>{tDetails('vulnerabilities')}</Label>
+                                <Label htmlFor="cve-weight" className='text-xs'>{locale === 'es' ? 'CVEs y Vulnerabilidades' : 'CVEs & Vulnerabilities'}</Label>
                                 <span className="text-xs text-muted-foreground">{riskWeights.cveScore}/100</span>
                                 </div>
                                 <Slider defaultValue={[riskWeights.cveScore]} max={100} step={1} onValueCommit={(v) => handleWeightChange('cveScore', v)} id="cve-weight"/>
