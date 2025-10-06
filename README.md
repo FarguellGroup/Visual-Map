@@ -75,15 +75,23 @@ Una vez procesado, obtendrás una vista general con tarjetas resumen, la lista d
 ### 3. Explora las Vistas Detalladas
 Usa el menú lateral para navegar por las distintas secciones y profundizar en la información de tu escaneo.
 
-#### Hosts, Puertos y Servicios
-Consulta tablas detalladas y ordenables para cada una de estas categorías, acompañadas de gráficos interactivos.
+#### Hosts descubiertos
+Un listado de todos los hosts descubiertos en el escaneo de Nmap, incluyendo la IP, nombre del host, sistema operativo, puertos abiertos y puntaje de crédito.
 
 <img width="3456" height="1928" alt="visual-hosts" src="https://github.com/user-attachments/assets/7762b562-18a4-4750-9064-75136dc69ae5" />
+
+#### Puertos abiertos
+Consulta todos los puertos abiertos en el objetivo, con una gráfica de los 15 puertos abiertos más comunes.
+
 <img width="3456" height="1928" alt="visual-ports" src="https://github.com/user-attachments/assets/3f628d40-1cec-4201-afb1-f6181a508f6e" />
+
+#### Servicios expuestos
+Consulta todos los servicios expuestos en la infraestructura, con una gráfica de distribución de servicios.
+
 <img width="3456" height="1924" alt="visual-services" src="https://github.com/user-attachments/assets/1aeaa139-75d7-4797-bd8a-0106ea6cd07a" />
 
 #### Hosts más vulnerables
-Visualiza de manera rápida los hosts más vulnerables de una infraestructura, con un gráfico de distribución de riesgo:
+Visualiza de manera rápida los hosts más vulnerables de una infraestructura, con un gráfico de distribución de riesgo.
 
 <img width="3456" height="1926" alt="visual-vuln-hosts" src="https://github.com/user-attachments/assets/cf7dac13-3948-47be-b31b-77494de8661f" />
 
@@ -93,7 +101,7 @@ Escanea todos los servicios expuestos y detecta todos los CVEs asociados, con su
 <img width="3456" height="1924" alt="visual-cves" src="https://github.com/user-attachments/assets/b4d8ffb9-6bb0-4f0c-a735-04dc8956c3a9" />
 
 #### Grafo de red
-Visualiza un esquema de la red y las relaciones entre los hosts de manera super simple:
+Visualiza un esquema de la red y las relaciones entre los hosts de manera super simple.
 
 <img width="3456" height="1928" alt="visual-network" src="https://github.com/user-attachments/assets/ecbbb12d-a532-4f9f-be47-2a132652b149" />
 
