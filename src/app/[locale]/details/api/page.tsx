@@ -67,18 +67,21 @@ export default function ApiPage() {
 
 
   const checkApiConnection = async (key?: string) => {
-    setApiStatus('loading');
     setIsChecking(true);
+    setApiStatus('loading');
     setError(null);
     setModels([]);
     
     const keyToCheck = key || storedApiKey;
 
     if (!keyToCheck) {
-      setApiStatus('error');
-      setError(t('noKeyDescription'));
-      setIsChecking(false);
-      return false;
+        setApiStatus('error');
+        const errorMessage = locale === 'es'
+            ? "No hay ninguna API válida vinculada, por favor introdúcela para utilizar las funciones de IA."
+            : "No valid API key is linked. Please enter it to use the AI features.";
+        setError(errorMessage);
+        setIsChecking(false);
+        return false;
     }
     
     try {
@@ -448,3 +451,5 @@ export default function ApiPage() {
     </div>
   );
 }
+
+    
