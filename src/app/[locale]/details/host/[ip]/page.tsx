@@ -3,9 +3,8 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from '@/navigation';
+import { useParams } from 'next/navigation';
 import { useScanStore } from '@/store/use-scan-store';
-import AppHeader from '@/components/layout/header';
-import AppFooter from '@/components/layout/footer';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Server, ArrowUpDown } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -17,6 +16,7 @@ import { VulnerabilityExplanation } from '@/components/dashboard/vulnerability-e
 import { PentestingNextSteps } from '@/components/details/pentesting-next-steps';
 import { NseSummary } from '@/components/details/nse-summary';
 import { cn } from '@/lib/utils';
+import { CveDetails } from '@/components/details/cve-details';
 
 const getScripts = (item: Port | Host): Script[] => {
     const scriptsSource = 'hostscript' in item ? item.hostscript : item.script;
@@ -114,23 +114,41 @@ const getRiskColorClass = (score: number): string => {
 type SortableKeys = 'port' | 'service' | 'version';
 type SortDirection = 'ascending' | 'descending';
 
-export default function HostDetailPage({ params }: { params: { ip: string } }) {
-  const { ip } = React.use(params);
+export default function HostDetailPage() {
+  const params = useParams();
+  const ip = params.ip as string;
   const router = useRouter();
-  const { scanResult, clearScanResult, setSelectedHost } = useScanStore();
+  const { 
+    scanResult, 
+    setSelectedHost,
+    fetchVulnerabilityExplanation,
+    fetchPentestingNextSteps,
+    fetchNseSummary,
+  } = useScanStore();
   const t = useTranslations('HostDetail');
   const tDetails = useTranslations('DetailsPage');
   const locale = useLocale();
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: SortDirection } | null>(null);
 
+  const host = useMemo(() => scanResult?.hosts.find(h => h.address[0].addr === ip), [scanResult, ip]);
+
   useEffect(() => {
     if (!scanResult) {
       router.push('/');
+      return;
     }
+    
     setSelectedHost(null);
-  }, [scanResult, router, setSelectedHost]);
+
+    if (host) {
+      // Trigger all AI generations for this host (except CVEs)
+      fetchVulnerabilityExplanation(host, locale);
+      fetchPentestingNextSteps(host, locale);
+      fetchNseSummary(host, locale);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanResult, router, setSelectedHost, ip, locale]);
   
-  const host = useMemo(() => scanResult?.hosts.find(h => h.address[0].addr === ip), [scanResult, ip]);
 
   const openPorts = useMemo(() => getPorts(host), [host]);
 
@@ -184,20 +202,9 @@ export default function HostDetailPage({ params }: { params: { ip: string } }) {
     return <ArrowUpDown className="ml-2 h-4 w-4" />;
   };
 
-  const handleUploadNew = () => {
-    clearScanResult();
-    router.push('/');
-  };
-
   if (!host) {
     return (
-      <div className="flex flex-col min-h-screen">
-        <AppHeader onUploadNew={handleUploadNew} showUploadNew={true} />
-        <main className="flex-1 w-full p-4 md:p-6 lg:p-8">
-            <p className="text-center">{tDetails('pageNotFound')}</p>
-        </main>
-        <AppFooter />
-      </div>
+        <p className="text-center">{tDetails('pageNotFound')}</p>
     );
   }
 
@@ -208,48 +215,46 @@ export default function HostDetailPage({ params }: { params: { ip: string } }) {
   const osName = getOsName(host);
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <AppHeader onUploadNew={handleUploadNew} showUploadNew={true} />
-      <main className="flex-1 w-full p-4 md:p-6 lg:p-8">
-        <div className="container mx-auto">
-          <div className="flex items-center gap-4 mb-6">
-            <Button variant="outline" size="icon" onClick={() => router.back()}>
-              <ArrowLeft className="h-4 w-4" />
-              <span className="sr-only">Go back</span>
-            </Button>
-            <div className='flex items-center gap-4'>
-                <Server className="h-8 w-8" />
-                <div>
-                    {hasHostname ? (
-                        <h1 className="text-3xl font-bold flex items-baseline gap-2">
-                            {hostname} 
-                            <span className="text-2xl text-muted-foreground font-mono">({host.address[0].addr})</span>
-                        </h1>
-                    ) : (
-                        <h1 className="text-3xl font-bold font-mono">{host.address[0].addr}</h1>
-                    )}
-                </div>
+    <>
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="outline" size="icon" onClick={() => router.back()}>
+          <ArrowLeft className="h-4 w-4" />
+          <span className="sr-only">Go back</span>
+        </Button>
+        <div className='flex items-center gap-4'>
+            <Server className="h-8 w-8" />
+            <div>
+                {hasHostname ? (
+                    <h1 className="text-xl md:text-3xl font-bold flex items-baseline gap-2">
+                        {hostname} 
+                        <span className="text-lg md:text-2xl text-muted-foreground font-mono">({host.address[0].addr})</span>
+                    </h1>
+                ) : (
+                    <h1 className="text-xl md:text-3xl font-bold font-mono">{host.address[0].addr}</h1>
+                )}
             </div>
-          </div>
-          
-          <div className="grid gap-8 lg:grid-cols-3">
-            <div className="lg:col-span-2 space-y-8">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t('openPorts')} ({openPorts.length})</CardTitle>
-                    </CardHeader>
-                    <CardContent>
+        </div>
+      </div>
+      
+      <div className="grid gap-8 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-8">
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t('openPorts')} ({openPorts.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
                                 <TableHead onClick={() => requestSort('port')} className="cursor-pointer">
-                                  <div className="flex items-center">{t('port')} {getSortIcon('port')}</div>
+                                <div className="flex items-center">{t('port')} {getSortIcon('port')}</div>
                                 </TableHead>
                                 <TableHead onClick={() => requestSort('service')} className="cursor-pointer">
-                                  <div className="flex items-center">{t('service')} {getSortIcon('service')}</div>
+                                <div className="flex items-center">{t('service')} {getSortIcon('service')}</div>
                                 </TableHead>
                                 <TableHead onClick={() => requestSort('version')} className="cursor-pointer">
-                                  <div className="flex items-center">{t('version')} {getSortIcon('version')}</div>
+                                <div className="flex items-center">{t('version')} {getSortIcon('version')}</div>
                                 </TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -260,96 +265,109 @@ export default function HostDetailPage({ params }: { params: { ip: string } }) {
                                     <Badge variant="secondary">{port.portid}/{port.protocol}</Badge>
                                     </TableCell>
                                     <TableCell>{port.service?.name || 'unknown'}</TableCell>
-                                    <TableCell className="truncate max-w-[200px]">{port.service?.product}{port.service?.version ? ` (${port.service.version})` : ''}</TableCell>
+                                    <TableCell className="truncate max-w-[150px] sm:max-w-[200px]">{port.service?.product}{port.service?.version ? ` (${port.service.version})` : ''}</TableCell>
                                 </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
-                    </CardContent>
-                </Card>
+                    </div>
+                </CardContent>
+            </Card>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{locale === 'es' ? 'Scripts NSE' : 'NSE Scripts'} ({hostScripts.length})</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                    {hostScripts.length > 0 ? (
-                        <div className="space-y-4">
-                            {hostScripts.map((script, index) => (
-                                <div key={`${script.id}-${index}`}>
-                                    <h4 className="font-semibold">{script.id}</h4>
-                                    <pre className="mt-2 rounded-md bg-muted p-4 text-xs font-code overflow-x-auto">
-                                        <code>{script.output.replace(/&#xa;/g, '\n')}</code>
-                                    </pre>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-sm text-muted-foreground text-center">{t('noNseScripts')}</p>
-                    )}
-                    </CardContent>
-                </Card>
-                
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{locale === 'es' ? 'Resumen de Scripts NSE' : 'AI-Powered NSE Script Summary'}</CardTitle>
-                        <CardDescription>
-                            {locale === 'es' 
-                                ? 'Resumen con IA de la información recopilada' 
-                                : 'AI summary of the collected information'
-                            }
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <NseSummary host={host} />
-                    </CardContent>
-                </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>CVEs</CardTitle>
+                    <CardDescription>
+                        {locale === 'es' ? 'Vulnerabilidades y Exposiciones Comunes identificadas para este host.' : 'Common Vulnerabilities and Exposures identified for this host.'}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <CveDetails host={host} />
+                </CardContent>
+            </Card>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t('nextStepsTitle')}</CardTitle>
-                         <CardDescription>
-                            {locale === 'es' 
-                                ? "Sugerencias generadas por IA para pruebas de penetración."
-                                : "AI-generated suggestions for penetration testing."
-                            }
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <PentestingNextSteps host={host} />
-                    </CardContent>
-                </Card>
-            </div>
-            <div className="lg:col-span-1 space-y-8">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t('riskAnalysisTitle')}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex justify-between items-baseline">
-                            <span className="text-sm text-muted-foreground">{t('riskScore')}</span>
-                             <Badge variant="default" className={cn('border-transparent text-lg', getRiskColorClass(riskScore))}>
-                                {riskScore.toFixed(0)} / 100
-                            </Badge>
-                        </div>
-                        <VulnerabilityExplanation host={host} />
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{tDetails('os')}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm">{osName}</p>
-                    </CardContent>
-                </Card>
-            </div>
-          </div>
+            <Card>
+                <CardHeader>
+                     <CardTitle>{locale === 'es' ? 'Scripts NSE' : 'NSE Scripts'} ({hostScripts.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                {hostScripts.length > 0 ? (
+                    <div className="space-y-4">
+                        {hostScripts.map((script, index) => (
+                            <div key={`${script.id}-${index}`}>
+                                <h4 className="font-semibold">{script.id}</h4>
+                                <pre className="mt-2 rounded-md bg-muted p-4 text-xs font-code overflow-x-auto">
+                                    <code>{script.output.replace(/&#xa;/g, '\n')}</code>
+                                </pre>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-sm text-muted-foreground text-center">{t('noNseScripts')}</p>
+                )}
+                </CardContent>
+            </Card>
+            
+            <Card>
+                <CardHeader>
+                    <CardTitle>
+                        {locale === 'es' 
+                            ? 'Resumen de Scripts NSE' 
+                            : 'AI-Powered NSE Script Summary'
+                        }
+                    </CardTitle>
+                    <CardDescription>
+                        {locale === 'es' 
+                            ? 'Resumen con IA de la información recopilada' 
+                            : 'AI summary of the collected information'
+                        }
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <NseSummary host={host} />
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t('nextStepsTitle')}</CardTitle>
+                     <CardDescription>
+                        {locale === 'es' 
+                            ? "Sugerencias generadas por IA para pruebas de penetración."
+                            : "AI-generated suggestions for penetration testing."
+                        }
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <PentestingNextSteps host={host} />
+                </CardContent>
+            </Card>
         </div>
-      </main>
-      <AppFooter />
-    </div>
+        <div className="lg:col-span-1 space-y-8">
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t('riskAnalysisTitle')}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex justify-between items-baseline">
+                        <span className="text-sm text-muted-foreground">{t('riskScore')}</span>
+                         <Badge variant="default" className={cn('border-transparent text-lg', getRiskColorClass(riskScore))}>
+                            {riskScore.toFixed(0)} / 100
+                        </Badge>
+                    </div>
+                    <VulnerabilityExplanation host={host} />
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>{tDetails('os')}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm">{osName}</p>
+                </CardContent>
+            </Card>
+        </div>
+      </div>
+    </>
   );
 }
-
-    
