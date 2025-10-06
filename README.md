@@ -2,7 +2,8 @@
 
 Visual Map es una plataforma web Next.js que te permite subir escaneos XML de Nmap y visualizar hosts, puertos abiertos y servicios de una manera gráfica y amigable. Esta aplicación incluye un módulo de inteligencia artificial con la API de Gemini para priorizar los hosts más vulnerables, facilitar la identificación de riesgos de seguridad, buscar vulnerabilidades (CVEs) y generar resúmenes y recomendaciones de pentesting.
 
-<img width="3799" height="1724" alt="image" src="https://github.com/user-attachments/assets/cfe8f3c9-42eb-4fdb-8321-15068aae8443" />
+![Visual-Map Banner](https://github.com/user-attachments/assets/f076ab1b-34e0-4440-bab2-0a2e0d12ad6e)
+
 
 ## Características
 
@@ -42,8 +43,7 @@ Esta herramienta utiliza un módulo de inteligencia artificial a través de la A
 
 Para importar la API solamente debemos dirigirnos al apartado "Configuración de la API" en el menú lateral e introducir la clave API generada. Automáticamente se verificará la autenticidad de la API y podrás elegir entre distintos modelos de Gemini:
 
-<img width="3456" height="1926" alt="visual-api" src="https://github.com/user-attachments/assets/b5cca0eb-ee1b-46dc-9791-2003553f4e04" />
-
+<img width="3456" height="1928" alt="visual-api-true" src="https://github.com/user-attachments/assets/f91a480e-d2bf-494d-a4a1-2c78903f1207" />
 
 ## Generación del XML con Nmap
 
@@ -70,7 +70,7 @@ Arrastra y suelta tu archivo XML de Nmap en la zona de carga, o haz clic para se
 ### 2. Analiza el Dashboard Principal
 Una vez procesado, obtendrás una vista general con tarjetas resumen, la lista de los hosts más vulnerables y una tabla con todos los dispositivos.
 
-<img width="3456" height="1926" alt="visual-dashboard" src="https://github.com/user-attachments/assets/bc89362f-8d8b-4677-9550-26c3858a31a6" />
+<img width="3456" height="1928" alt="visual-dashboard" src="https://github.com/user-attachments/assets/02f1fa55-0af7-4170-b94e-b5aaf36785fe" />
 
 ### 3. Explora las Vistas Detalladas
 Usa el menú lateral para navegar por las distintas secciones y profundizar en la información de tu escaneo.
@@ -91,6 +91,11 @@ Visualiza de manera rápida los hosts más vulnerables de una infraestructura, c
 Escanea todos los servicios expuestos y detecta todos los CVEs asociados, con su puntuación CVSS. Puedes iniciar la búsqueda de CVEs para todos los hosts desde esta vista.
 
 <img width="3456" height="1924" alt="visual-cves" src="https://github.com/user-attachments/assets/b4d8ffb9-6bb0-4f0c-a735-04dc8956c3a9" />
+
+#### Grafo de red
+Visualiza un esquema de la red y las relaciones entre los hosts de manera super simple:
+
+<img width="3456" height="1928" alt="visual-network" src="https://github.com/user-attachments/assets/ecbbb12d-a532-4f9f-be47-2a132652b149" />
 
 ### 4. Profundiza en cada Host
 Haz clic en cualquier host para acceder a su página de detalle, donde encontrarás:
