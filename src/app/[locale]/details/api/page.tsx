@@ -54,7 +54,7 @@ export default function ApiPage() {
   const t = useTranslations('ApiPage');
   const locale = useLocale();
   const { toast } = useToast();
-  const { apiStatus, setApiStatus, aiModel, setAiModel, apiKey: storedApiKey, setApiKey } = useScanStore();
+  const { apiStatus, setApiStatus, aiModel, setAiModel, apiKey: storedApiKey, setApiKey: setApiKeyStore } = useScanStore();
   const [models, setModels] = useState<Model[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -136,7 +136,7 @@ export default function ApiPage() {
         
       setModels(availableModels);
       setApiStatus('success');
-      setApiKey(apiKey);
+      setApiKeyStore(apiKey);
     } catch (err) {
       setApiStatus('error');
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -169,7 +169,7 @@ export default function ApiPage() {
             description: locale === 'es' ? 'La clave ha sido guardada en tu archivo .env.' : 'The key has been saved to your .env file.',
         });
         
-        setApiKey(apiKeyInput);
+        setApiKeyStore(apiKeyInput);
         setApiKeyInput('');
         await checkApiConnection(apiKeyInput);
 
@@ -235,7 +235,7 @@ export default function ApiPage() {
   const rateLimitHintTitleText = locale === 'es' ? 'Consejo sobre el Límite de la API' : 'API Rate Limit Tip';
   const rateLimitHintDescriptionText = locale === 'es' ? 'Si alcanzas el límite de peticiones (rate limit) de la API para un modelo, prueba a cambiar a uno diferente para seguir utilizando la plataforma.' : 'If you reach the API rate limit for a model, try switching to a different one to continue using the platform.';
 
-  const shouldShowApiKeyInput = (apiStatus === 'error') || (apiStatus !== 'success' && !storedApiKey);
+  const shouldShowApiKeyInput = apiStatus === 'error' || (apiStatus !== 'success' && !storedApiKey);
 
   return (
     <div className="container mx-auto p-0 space-y-8">
