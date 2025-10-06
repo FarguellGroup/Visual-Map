@@ -137,7 +137,9 @@ export default function ApiPage() {
         
       setModels(availableModels);
       setApiStatus('success');
-      setApiKey(apiKey);
+      if (key && key !== storedApiKey) {
+        setApiKey(key);
+      }
     } catch (err) {
       setApiStatus('error');
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -153,6 +155,7 @@ export default function ApiPage() {
   const handleSaveApiKey = async () => {
     if (!apiKeyInput) return;
     setIsSaving(true);
+    
     try {
         const response = await fetch('/api/save-api-key', {
             method: 'POST',
@@ -171,15 +174,15 @@ export default function ApiPage() {
         });
         
         setApiKey(apiKeyInput);
-        setApiKeyInput('');
         await checkApiConnection(apiKeyInput);
+        setApiKeyInput('');
 
     } catch (error) {
-        setError(error instanceof Error ? error.message : 'Failed to save API key.');
+        const saveError = error instanceof Error ? error.message : 'Failed to save API key.';
         toast({
             variant: 'destructive',
             title: 'Error',
-            description: error instanceof Error ? error.message : 'Failed to save API key.',
+            description: saveError,
         });
     } finally {
         setIsSaving(false);
