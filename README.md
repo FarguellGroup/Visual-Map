@@ -42,6 +42,7 @@ Esta herramienta utiliza un módulo de inteligencia artificial a través de la A
 
 Para importar la API solamente debemos dirigirnos al apartado "Configuración de la API" en el menú lateral e introducir la clave API generada. Automáticamente se verificará la autenticidad de la API y podrás elegir entre distintos modelos de Gemini:
 
+<img width="3450" height="1536" alt="visual-api-false" src="https://github.com/user-attachments/assets/ed3eb56e-4469-479f-905e-7e3810dc20a5" />
 <img width="3456" height="1928" alt="visual-api-true" src="https://github.com/user-attachments/assets/f91a480e-d2bf-494d-a4a1-2c78903f1207" />
 
 ## Generación del XML con Nmap
