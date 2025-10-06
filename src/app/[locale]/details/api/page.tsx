@@ -144,7 +144,7 @@ export default function ApiPage() {
       setIsChecking(false);
       return true;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      const errorMessage = err instanceof Error ? err.message : t('invalidKey');
       setApiStatus('error');
       setError(errorMessage);
       setIsChecking(false);
@@ -253,7 +253,7 @@ export default function ApiPage() {
   const rateLimitHintTitleText = locale === 'es' ? 'Consejo sobre el Límite de la API' : 'API Rate Limit Tip';
   const rateLimitHintDescriptionText = locale === 'es' ? 'Si alcanzas el límite de peticiones (rate limit) de la API para un modelo, prueba a cambiar a uno diferente para seguir utilizando la plataforma.' : 'If you reach the API rate limit for a model, try switching to a different one to continue using the platform.';
 
-  const shouldShowApiKeyInput = apiStatus !== 'success' || !storedApiKey;
+  const shouldShowApiKeyInput = apiStatus === 'error' || (!storedApiKey && apiStatus !== 'loading');
 
   return (
     <div className="container mx-auto p-0 space-y-8">
@@ -448,5 +448,3 @@ export default function ApiPage() {
     </div>
   );
 }
-
-    
