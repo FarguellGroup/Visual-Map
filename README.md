@@ -40,13 +40,10 @@ npm run dev
 ## Configuración de la API de Gemini
 Esta herramienta utiliza un módulo de inteligencia artificial a través de la API de Gemini que permite hacer una descripción avanzada de cada host encontrado, buscando vulnerabilidades y dándonos los pasos de explotación de la máquina. Puedes conseguir tu API de Gemini gratis aqui: https://aistudio.google.com/
 
-Crea un archivo llamado `.env` en la raíz del proyecto y añade tu clave API:
+Para importar la API solamente debemos dirigirnos al apartado "Configuración de la API" en el menú lateral e introducir la clave API generada. Automáticamente se verificará la autenticidad de la API y podrás elegir entre distintos modelos de Gemini:
 
-```bash
-# .env
-NEXT_PUBLIC_GOOGLE_GENAI_API_KEY="AIza..."
-```
-También puedes configurar o cambiar la clave API directamente desde la interfaz de la aplicación en la sección de "API".
+<img width="3456" height="1926" alt="visual-api" src="https://github.com/user-attachments/assets/b5cca0eb-ee1b-46dc-9791-2003553f4e04" />
+
 
 ## Generación del XML con Nmap
 
@@ -73,22 +70,27 @@ Arrastra y suelta tu archivo XML de Nmap en la zona de carga, o haz clic para se
 ### 2. Analiza el Dashboard Principal
 Una vez procesado, obtendrás una vista general con tarjetas resumen, la lista de los hosts más vulnerables y una tabla con todos los dispositivos.
 
-<img width="3799" height="1724" alt="image" src="https://github.com/user-attachments/assets/d96b135b-549f-4626-a35f-136e7eacd0b3" />
+<img width="3456" height="1926" alt="visual-dashboard" src="https://github.com/user-attachments/assets/bc89362f-8d8b-4677-9550-26c3858a31a6" />
 
 ### 3. Explora las Vistas Detalladas
 Usa el menú lateral para navegar por las distintas secciones y profundizar en la información de tu escaneo.
 
-<img width="3796" height="1724" alt="image" src="https://github.com/user-attachments/assets/356fd4a6-3b54-46ab-947d-44134d4defd6" />
-
 #### Hosts, Puertos y Servicios
 Consulta tablas detalladas y ordenables para cada una de estas categorías, acompañadas de gráficos interactivos.
 
-<img width="3798" height="1725" alt="image" src="https://github.com/user-attachments/assets/45ee819a-fb73-4f2d-910a-ed5f629b1c74" />
+<img width="3456" height="1928" alt="visual-hosts" src="https://github.com/user-attachments/assets/7762b562-18a4-4750-9064-75136dc69ae5" />
+<img width="3456" height="1928" alt="visual-ports" src="https://github.com/user-attachments/assets/3f628d40-1cec-4201-afb1-f6181a508f6e" />
+<img width="3456" height="1924" alt="visual-services" src="https://github.com/user-attachments/assets/1aeaa139-75d7-4797-bd8a-0106ea6cd07a" />
 
-#### Vulnerabilidades (Threats)
-Visualiza los hosts con mayor riesgo y accede a un desglose de las vulnerabilidades (CVEs) encontradas, con su puntuación CVSS. Puedes iniciar la búsqueda de CVEs para todos los hosts desde esta vista.
+#### Hosts más vulnerables
+Visualiza de manera rápida los hosts más vulnerables de una infraestructura, con un gráfico de distribución de riesgo:
 
-<img width="3805" height="1715" alt="image" src="https://github.com/user-attachments/assets/212a6d01-6eee-4787-aeb7-b7f15c913a59" />
+<img width="3456" height="1926" alt="visual-vuln-hosts" src="https://github.com/user-attachments/assets/cf7dac13-3948-47be-b31b-77494de8661f" />
+
+#### CVEs y Vulnerabilidades
+Escanea todos los servicios expuestos y detecta todos los CVEs asociados, con su puntuación CVSS. Puedes iniciar la búsqueda de CVEs para todos los hosts desde esta vista.
+
+<img width="3456" height="1924" alt="visual-cves" src="https://github.com/user-attachments/assets/b4d8ffb9-6bb0-4f0c-a735-04dc8956c3a9" />
 
 ### 4. Profundiza en cada Host
 Haz clic en cualquier host para acceder a su página de detalle, donde encontrarás:
@@ -97,13 +99,13 @@ Haz clic en cualquier host para acceder a su página de detalle, donde encontrar
 -   Tablas de puertos y scripts NSE.
 -   Resumen de scripts NSE y recomendaciones de pentesting con IA.
 
-<img width="3802" height="1713" alt="image" src="https://github.com/user-attachments/assets/32b59ca0-46bc-45a7-a274-0ecc84c75c70" />
-
-<img width="2166" height="1046" alt="image" src="https://github.com/user-attachments/assets/d116e7a0-ef7e-4e2a-b35f-bb75ed871131" />
+<img width="3456" height="1926" alt="visual-host" src="https://github.com/user-attachments/assets/52760d3e-1552-48ca-bb82-8f1cd76556b8" />
+<img width="3456" height="1924" alt="visual-host-2" src="https://github.com/user-attachments/assets/aec5efba-29a1-442c-baf5-e6d4115b239b" />
 
 ### 5. Configura y Personaliza
 -   **Ajusta los Pesos de Riesgo**: Modifica la importancia que se le da a cada factor (CVEs, puertos críticos, etc.) en el cálculo del riesgo.
 -   **Gestiona tu API**: Desde la sección API, verifica tu clave de Gemini, cámbiala si es necesario y selecciona el modelo de IA que prefieras usar.
 -   **Exporta los Resultados**: Genera informes profesionales en formato JSON, PDF o HTML con un solo clic.
 
-<img width="3840" height="1808" alt="image" src="https://github.com/user-attachments/assets/b18400f0-e482-485c-a1c5-b9a66e54abd4" />
+<img width="3456" height="1924" alt="visual-ponderation" src="https://github.com/user-attachments/assets/988677d1-9b75-4ae2-aeb0-60ef14966df3" />
+<img width="3456" height="2096" alt="visual-reports" src="https://github.com/user-attachments/assets/594fa34f-f42e-4bc0-9a92-a4dd4c0db242" />
