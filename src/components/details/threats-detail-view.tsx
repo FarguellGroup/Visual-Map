@@ -35,7 +35,7 @@ const ipToNumber = (ip: string) => {
     return ip.split('.').reduce((acc, octet, index) => acc + parseInt(octet) * Math.pow(256, 3 - index), 0);
 };
 
-export default function ThreatsDetailView({ hosts, pdfMode = false }: { hosts: Host[], pdfMode?: boolean }) {
+export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: { hosts: Host[], pdfMode?: boolean, forceId?: string }) {
     const t = useTranslations('DetailsPage');
     const router = useRouter();
     const locale = useLocale();
@@ -170,7 +170,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false }: { hosts: H
         router.push(`/details/host/${hostIp}`);
     };
 
-    const cvesTitle = 'CVEs';
+    const cvesTitle = locale === 'es' ? 'CVEs' : 'CVEs';
     const cvesDescription = locale === 'es' ? 'Busca vulnerabilidades y CVEs en los hosts descubiertos mediante IA.' : 'Search for vulnerabilities and CVEs on discovered hosts using AI.';
     const vulnerableServicesTitle = locale === 'es' ? 'Principales Servicios Vulnerables' : 'Top Vulnerable Services';
     const serviceTitle = t('service');
@@ -184,6 +184,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false }: { hosts: H
         : (locale === 'es' ? 'Preparando análisis...' : 'Preparing analysis...');
     
     const showGlobalScanButton = hasUnscannedHosts && !isCveScanRunning;
+    const chartId = forceId || (pdfMode ? 'pdf-threat-service-dist-chart' : 'threat-service-dist-chart');
 
 
   return (
@@ -276,7 +277,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false }: { hosts: H
                     <CardTitle>{vulnerableServicesDistributionTitle}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div id={pdfMode ? 'pdf-threat-service-dist-chart' : 'threat-service-dist-chart'}>
+                        <div id={chartId} className={pdfMode ? 'w-[800px] h-[300px]' : ''}>
                             <ResponsiveContainer width="100%" height={200}>
                                 <PieChart>
                                     <Pie data={serviceDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label>
@@ -323,5 +324,3 @@ export default function ThreatsDetailView({ hosts, pdfMode = false }: { hosts: H
     </div>
   );
 }
-
-    

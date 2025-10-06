@@ -45,7 +45,7 @@ const getRiskColorClass = (score: number): string => {
     return 'bg-gray-400 hover:bg-gray-500 text-white';
 };
 
-export default function ServicesDetailView({ hosts, pdfMode = false, forceId }: { hosts: Host[], pdfMode?: boolean, forceId?: string }) {
+export default function ServicesDetailView({ hosts }: { hosts: Host[] }) {
   const t = useTranslations('DetailsPage');
   const locale = useLocale();
   const { riskWeights } = useScanStore();
@@ -148,8 +148,6 @@ export default function ServicesDetailView({ hosts, pdfMode = false, forceId }: 
     router.push(`/details/host/${hostIp}`);
   };
 
-  const chartId = forceId ? forceId : (pdfMode ? "pdf-service-distribution-chart" : "service-distribution-chart");
-
   return (
     <div className="space-y-8">
       <Card>
@@ -157,7 +155,7 @@ export default function ServicesDetailView({ hosts, pdfMode = false, forceId }: 
           <CardTitle>{t('serviceDistributionTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div id={chartId} className={pdfMode ? 'w-[800px] h-[300px]' : ''}>
+          <div id="service-distribution-chart">
             <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                     <Pie data={serviceDistribution.slice(0, 10)} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>

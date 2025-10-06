@@ -32,7 +32,7 @@ const ipToNumber = (ip: string) => {
     return ip.split('.').reduce((acc, octet, index) => acc + parseInt(octet) * Math.pow(256, 3 - index), 0);
 };
 
-export default function PortsDetailView({ hosts, pdfMode = false, forceId }: { hosts: Host[], pdfMode?: boolean, forceId?: string }) {
+export default function PortsDetailView({ hosts }: { hosts: Host[]}) {
   const t = useTranslations('DetailsPage');
   const locale = useLocale();
   const { riskWeights } = useScanStore();
@@ -134,8 +134,6 @@ export default function PortsDetailView({ hosts, pdfMode = false, forceId }: { h
     router.push(`/details/host/${hostIp}`);
   };
 
-  const chartId = forceId ? forceId : (pdfMode ? "pdf-top-ports-chart" : "top-ports-chart");
-
   return (
     <div className="space-y-8">
       <Card>
@@ -143,7 +141,7 @@ export default function PortsDetailView({ hosts, pdfMode = false, forceId }: { h
           <CardTitle>{t('topPortsTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
-            <div id={chartId} className={pdfMode ? 'w-[800px] h-[300px]' : ''}>
+            <div id="top-ports-chart">
               <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={portDistribution}>
                       <CartesianGrid strokeDasharray="3 3" />

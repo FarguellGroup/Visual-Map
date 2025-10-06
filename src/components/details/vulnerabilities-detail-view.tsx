@@ -108,11 +108,11 @@ const ipToNumber = (ip: string) => {
     return ip.split('.').reduce((acc, octet, index) => acc + parseInt(octet) * Math.pow(256, 3 - index), 0);
 };
 
-export default function VulnerabilitiesDetailView({ hosts, pdfMode = false, forceId }: { hosts: Host[], pdfMode?: boolean, forceId?: string }) {
+export default function VulnerabilitiesDetailView({ hosts }: { hosts: Host[] }) {
     const t = useTranslations('DetailsPage');
     const tHostsTable = useTranslations('HostsTable');
     const router = useRouter();
-    const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: SortDirection } | null>({ key: 'riskScore', direction: 'descending' });
+    const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: SortDirection }>({ key: 'riskScore', direction: 'descending' });
     const locale = useLocale();
 
     const vulnerableHosts = useMemo(() => 
@@ -196,8 +196,6 @@ export default function VulnerabilitiesDetailView({ hosts, pdfMode = false, forc
       router.push(`/details/host/${host.address[0].addr}`);
     };
 
-    const chartId = forceId ? forceId : (pdfMode ? "pdf-risk-distribution-chart" : "risk-distribution-chart");
-
   return (
     <div className="space-y-8">
       <Card>
@@ -205,7 +203,7 @@ export default function VulnerabilitiesDetailView({ hosts, pdfMode = false, forc
           <CardTitle>{t('hostRiskDistributionTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div id={chartId} className={pdfMode ? 'w-[800px] h-[300px]' : ''}>
+          <div id="risk-distribution-chart">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart layout="vertical" data={riskDistribution} margin={{left: 20}}>
                 <CartesianGrid strokeDasharray="3 3" />

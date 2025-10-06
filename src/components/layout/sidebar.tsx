@@ -1,3 +1,4 @@
+
 'use client';
 
 import { SidebarContent, SidebarGroup, SidebarSeparator, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroupLabel, useSidebar } from '@/components/ui/sidebar';
@@ -168,26 +169,39 @@ export default function AppSidebar() {
     link.click();
   };
 
+  const captureChartAsBase64 = async (elementId: string, options?: { backgroundColor?: string | null }) => {
+    // We will look for the element inside the main page and the export container
+    const element = document.getElementById(elementId) as HTMLElement;
+    if (!element) {
+        console.warn(`Chart element with id '${elementId}' not found on the page.`);
+        return null;
+    }
+    try {
+      const canvas = await html2canvas(element, { 
+          scale: 2, 
+          useCORS: true,
+          logging: false, // Turn off logging for cleaner console
+          backgroundColor: options?.backgroundColor,
+        });
+      return canvas.toDataURL('image/png');
+    } catch (error) {
+      console.error(`Error capturing chart '${elementId}':`, error);
+      return null;
+    }
+  };
+
   const handleExportHtml = async () => {
     if (!scanResult) return;
     setIsExportingHtml(true);
     try {
         const { fileName, hosts, summary } = scanResult;
         
-        const getChartAsBase64 = async (elementId: string) => {
-            const element = document.getElementById(elementId);
-            if (!element) return null;
-            const canvas = await html2canvas(element, { 
-              scale: 2, 
-              backgroundColor: theme === 'dark' ? 'hsl(220, 56%, 8%)' : 'hsl(210, 40%, 98%)',
-              useCORS: true 
-            });
-            return canvas.toDataURL('image/png');
-        };
-        
-        const riskChart = await getChartAsBase64('pdf-risk-distribution-chart');
-        const portsChart = await getChartAsBase64('pdf-top-ports-chart');
-        const servicesChart = await getChartAsBase64('pdf-service-distribution-chart');
+        const currentThemeBg = theme === 'dark' ? '#09090b' : '#ffffff';
+        const riskChart = await captureChartAsBase64('risk-distribution-chart', { backgroundColor: currentThemeBg });
+        const portsChart = await captureChartAsBase64('top-ports-chart', { backgroundColor: currentThemeBg });
+        const servicesChart = await captureChartAsBase64('service-distribution-chart', { backgroundColor: currentThemeBg });
+        const threatsChart = await captureChartAsBase64('threat-service-dist-chart', { backgroundColor: currentThemeBg });
+
 
         const topVulnerableHosts = [...hosts]
             .filter(h => (h.riskScore ?? 0) >= 60)
@@ -215,8 +229,10 @@ export default function AppSidebar() {
         const visualizationsTitle = locale === 'es' ? 'Visualizaciones' : 'Visualizations';
         const osTitle = tDetails('os');
         const summaryTitle = tSummary('totalHosts').includes('Total') ? 'Summary' : 'Resumen';
-        const cvesTitle = tDetails('vulnerabilities');
+        const cvesTitle = locale === 'es' ? 'CVEs Descubiertos' : 'Discovered CVEs';
         const cvssTitle = locale === 'es' ? 'Puntaje CVSS' : 'CVSS Score';
+
+        const chartNotAvailableText = locale === 'es' ? 'Gráfico no disponible. Navegue a la página correspondiente para incluirlo en el informe.' : 'Chart not available. Navigate to the corresponding page to include it in the report.';
 
         const htmlContent = `
             <!DOCTYPE html>
@@ -226,34 +242,28 @@ export default function AppSidebar() {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Visual Map Scan Report</title>
                 <style>
-                    :root {
-                        --background: 220 56% 8%; --foreground: 210 40% 96%;
-                        --card: 220 56% 10%; --card-border: 220 56% 15%;
-                        --primary: 259 66% 65%; --muted-foreground: 210 40% 65%;
-                        --border: 220 56% 15%;
-                        --badge-red: #EF4444; --badge-orange: #F97316; --badge-yellow: #FBBF24; --badge-gray: #6B7280; --badge-green: #22C55E;
-                    }
-                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; color: hsl(var(--foreground)); background-color: hsl(var(--background)); margin: 0; padding-top: 80px; }
+                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; color: ${theme === 'dark' ? '#f8fafc' : '#020817'}; background-color: ${theme === 'dark' ? '#09090b' : '#ffffff'}; margin: 0; padding-top: 80px; }
                     .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-                    header { position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background-color: hsla(var(--background), 0.8); backdrop-filter: blur(8px); border-bottom: 1px solid hsl(var(--border)); z-index: 1000; }
+                    header { position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background-color: ${theme === 'dark' ? 'rgba(9, 9, 11, 0.8)' : 'rgba(255, 255, 255, 0.8)'}; backdrop-filter: blur(8px); border-bottom: 1px solid ${theme === 'dark' ? '#27272a' : '#e4e4e7'}; z-index: 1000; }
                     nav ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 20px; }
-                    nav a { text-decoration: none; color: hsl(var(--muted-foreground)); font-weight: 500; font-size: 14px; transition: color 0.2s; }
-                    nav a:hover { color: hsl(var(--foreground)); }
-                    h1, h2, h3 { color: hsl(var(--foreground)); font-weight: 600; }
-                    h1 { font-size: 2em; text-align: left; } h2 { font-size: 1.5em; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 10px; margin-top: 40px; } h3 { font-size: 1.2em; }
+                    nav a { text-decoration: none; color: ${theme === 'dark' ? '#a1a1aa' : '#71717a'}; font-weight: 500; font-size: 14px; transition: color 0.2s; }
+                    nav a:hover { color: ${theme === 'dark' ? '#f8fafc' : '#020817'}; }
+                    h1, h2, h3 { color: ${theme === 'dark' ? '#f8fafc' : '#020817'}; font-weight: 600; }
+                    h1 { font-size: 2em; text-align: left; } h2 { font-size: 1.5em; border-bottom: 1px solid ${theme === 'dark' ? '#27272a' : '#e4e4e7'}; padding-bottom: 10px; margin-top: 40px; } h3 { font-size: 1.2em; }
                     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                    th, td { padding: 12px 15px; border: 1px solid hsl(var(--border)); text-align: left; font-size: 14px; }
-                    th { background-color: hsla(var(--card), 0.5); font-weight: 600; }
-                    tr { background-color: hsl(var(--card)); }
-                    tr:hover { background-color: hsla(var(--card-border), 0.5); }
-                    td a { color: hsl(var(--primary)); text-decoration: none; } td a:hover { text-decoration: underline; }
+                    th, td { padding: 12px 15px; border: 1px solid ${theme === 'dark' ? '#27272a' : '#e4e4e7'}; text-align: left; font-size: 14px; }
+                    th { background-color: ${theme === 'dark' ? 'rgba(39, 39, 42, 0.5)' : 'rgba(244, 244, 245, 0.5)'}; font-weight: 600; }
+                    tr { background-color: ${theme === 'dark' ? '#18181b' : '#ffffff'}; }
+                    tr:hover { background-color: ${theme === 'dark' ? 'rgba(39, 39, 42, 0.5)' : 'rgba(244, 244, 245, 0.5)'}; }
+                    td a { color: #8b5cf6; text-decoration: none; } td a:hover { text-decoration: underline; }
                     .badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; color: white; }
-                    .badge-red { background-color: var(--badge-red); } .badge-orange { background-color: var(--badge-orange); } .badge-yellow { background-color: var(--badge-yellow); color: #000; } .badge-gray { background-color: var(--badge-gray); } .badge-green { background-color: var(--badge-green); }
+                    .badge-red { background-color: #EF4444; } .badge-orange { background-color: #F97316; } .badge-yellow { background-color: #FBBF24; color: #000; } .badge-gray { background-color: #6B7280; } .badge-green { background-color: #22C55E; }
                     .grid-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-top: 20px; }
-                    .card { position: relative; padding: 20px; border: 1px solid hsl(var(--border)); border-radius: 8px; background-color: hsl(var(--card)); }
-                    .card-title { font-weight: 500; margin-bottom: 10px; color: hsl(var(--muted-foreground)); } .card-value { font-size: 2.5em; font-weight: bold; }
-                    .chart-container { margin-top: 20px; padding: 20px; border: 1px solid hsl(var(--border)); border-radius: 8px; text-align: center; background-color: hsl(var(--card)); }
+                    .card { position: relative; padding: 20px; border: 1px solid ${theme === 'dark' ? '#27272a' : '#e4e4e7'}; border-radius: 8px; background-color: ${theme === 'dark' ? '#18181b' : '#ffffff'}; }
+                    .card-title { font-weight: 500; margin-bottom: 10px; color: ${theme === 'dark' ? '#a1a1aa' : '#71717a'}; } .card-value { font-size: 2.5em; font-weight: bold; }
+                    .chart-container { margin-top: 20px; padding: 20px; border: 1px solid ${theme === 'dark' ? '#27272a' : '#e4e4e7'}; border-radius: 8px; text-align: center; background-color: ${theme === 'dark' ? '#09090b' : '#ffffff'}; }
                     .chart-container img { max-width: 100%; height: auto; }
+                    .chart-container .unavailable { color: ${theme === 'dark' ? '#a1a1aa' : '#71717a'}; }
                     .table-responsive { overflow-x: auto; }
                     .logo { display: flex; align-items: center; gap: 10px; }
                     .logo svg { width: 24px; height: 24px; }
@@ -264,7 +274,7 @@ export default function AppSidebar() {
             <body>
                 <header>
                     <div class="logo">
-                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--primary))" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" fill="hsl(var(--primary))" /></svg>
+                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" fill="#8b5cf6" /></svg>
                        <span class="logo-text">Visual Map</span>
                     </div>
                     <nav>
@@ -280,7 +290,7 @@ export default function AppSidebar() {
 
                 <div class="container">
                     <h1>Visual Map Report</h1>
-                    <p style="color: hsl(var(--muted-foreground));"><strong>File:</strong> ${fileName} | <strong>Date:</strong> ${new Date().toLocaleString(locale)}</p>
+                    <p style="color: ${theme === 'dark' ? '#a1a1aa' : '#71717a'};"><strong>File:</strong> ${fileName} | <strong>Date:</strong> ${new Date().toLocaleString(locale)}</p>
 
                     <section id="summary">
                         <h2>${summaryTitle}</h2>
@@ -315,7 +325,7 @@ export default function AppSidebar() {
                     
                     ${allCves.length > 0 ? `
                     <section id="cves">
-                        <h2>${cvesTitle} (${allCves.length})</h2>
+                        <h2>${cvesTitle}</h2>
                         <div class="table-responsive">
                             <table>
                                 <thead><tr><th>CVE ID</th><th>${cvssTitle}</th><th>${tDetails('service')}</th><th>${tHostsTable('ipAddress')}</th></tr></thead>
@@ -336,9 +346,10 @@ export default function AppSidebar() {
                     
                     <section id="visualizations">
                         <h2>${visualizationsTitle}</h2>
-                        <div class="chart-container"><h3>${tDetails('hostRiskDistributionTitle')}</h3>${riskChart ? `<img src="${riskChart}">` : 'Chart not available'}</div>
-                        <div class="chart-container"><h3>${tDetails('topPortsTitle')}</h3>${portsChart ? `<img src="${portsChart}">` : 'Chart not available'}</div>
-                        <div class="chart-container"><h3>${tDetails('serviceDistributionTitle')}</h3>${servicesChart ? `<img src="${servicesChart}">` : 'Chart not available'}</div>
+                        <div class="chart-container"><h3>${tDetails('hostRiskDistributionTitle')}</h3>${riskChart ? `<img src="${riskChart}">` : `<p class="unavailable">${chartNotAvailableText}</p>`}</div>
+                        <div class="chart-container"><h3>${tDetails('topPortsTitle')}</h3>${portsChart ? `<img src="${portsChart}">` : `<p class="unavailable">${chartNotAvailableText}</p>`}</div>
+                        <div class="chart-container"><h3>${tDetails('serviceDistributionTitle')}</h3>${servicesChart ? `<img src="${servicesChart}">` : `<p class="unavailable">${chartNotAvailableText}</p>`}</div>
+                        ${threatsChart ? `<div class="chart-container"><h3>${locale === 'es' ? 'Distribución de Servicios Vulnerables' : 'Vulnerable Services Distribution'}</h3><img src="${threatsChart}"></div>` : ''}
                     </section>
 
                     <section id="all-hosts">
@@ -386,7 +397,7 @@ export default function AppSidebar() {
                                 </tbody>
                                 </table>
                             </div>
-                          ` : `<p style="color: hsl(var(--muted-foreground));">${tDetails('openPorts')}: 0</p>`}
+                          ` : `<p style="color: ${theme === 'dark' ? '#a1a1aa' : '#71717a'};">${tDetails('openPorts')}: 0</p>`}
                         </div>
                       `).join('')}
                     </section>
@@ -551,7 +562,7 @@ export default function AppSidebar() {
         if (yPos > pageHeight - 120) { doc.addPage(); yPos = margin; }
         doc.setFontSize(22);
         doc.setFont('Helvetica', 'bold');
-        doc.text(tDetails('vulnerabilities'), margin, yPos);
+        doc.text(locale === 'es' ? 'CVEs Descubiertos' : 'Discovered CVEs', margin, yPos);
         yPos += 25;
         doc.autoTable({
             startY: yPos,
@@ -577,39 +588,48 @@ export default function AppSidebar() {
   
       // -- Visualizations --
       const addChart = async (elementId: string, title: string) => {
-        const element = document.getElementById(elementId);
-        if (!element) return;
-        if (yPos > pageHeight - 150) { doc.addPage(); yPos = margin; }
-        doc.setFontSize(18);
-        doc.setFont('Helvetica', 'bold');
-        doc.setTextColor(headingColor);
-        doc.text(title, margin, yPos);
-        yPos += 15;
-        try {
-          const canvas = await html2canvas(element, { 
-            scale: 2, 
-            backgroundColor: '#ffffff',
-            useCORS: true 
-          });
-          const imgData = canvas.toDataURL('image/png');
-          const imgWidth = pageWidth - (margin * 2);
-          const imgHeight = canvas.height * imgWidth / canvas.width;
-          if (yPos + imgHeight > pageHeight - margin) { doc.addPage(); yPos = margin; doc.setFontSize(18); doc.setFont('Helvetica', 'bold'); doc.text(title, margin, yPos); yPos += 15; }
-          doc.addImage(imgData, 'PNG', margin, yPos, imgWidth, imgHeight);
-          yPos += imgHeight + 25;
-        } catch (chartError) { console.error("Chart export error:", chartError); }
+          if (yPos > pageHeight - 150) { doc.addPage(); yPos = margin; }
+          doc.setFontSize(18);
+          doc.setFont('Helvetica', 'bold');
+          doc.setTextColor(headingColor);
+          doc.text(title, margin, yPos);
+          yPos += 15;
+          try {
+              const imgData = await captureChartAsBase64(elementId, { backgroundColor: '#ffffff'});
+              if (imgData) {
+                  const imgProps = doc.getImageProperties(imgData);
+                  const imgWidth = pageWidth - (margin * 2);
+                  const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+                  if (yPos + imgHeight > pageHeight - margin) { doc.addPage(); yPos = margin; doc.setFontSize(18); doc.setFont('Helvetica', 'bold'); doc.text(title, margin, yPos); yPos += 15; }
+                  doc.addImage(imgData, 'PNG', margin, yPos, imgWidth, imgHeight);
+                  yPos += imgHeight + 25;
+              } else {
+                  doc.setFontSize(11);
+                  doc.setTextColor(mutedTextColor);
+                  doc.text('Chart not available. Navigate to the corresponding page to include it in the report.', margin, yPos);
+                  yPos += 20;
+              }
+          } catch (chartError) { 
+              console.error("Chart export error:", chartError); 
+              doc.setFontSize(11);
+              doc.setTextColor(mutedTextColor);
+              doc.text('Chart could not be generated.', margin, yPos);
+              yPos += 20;
+          }
       };
       
       if (yPos > pageHeight - 50) { doc.addPage(); yPos = margin; }
       doc.setFontSize(22);
       doc.setFont('Helvetica', 'bold');
-      const vulnerabilitiesTitle = locale === 'es' ? 'Visualizaciones' : 'Visualizations';
-      doc.text(vulnerabilitiesTitle, margin, yPos);
+      const visualizationsTitle = locale === 'es' ? 'Visualizaciones' : 'Visualizations';
+      doc.text(visualizationsTitle, margin, yPos);
       yPos += 25;
 
-      await addChart('pdf-risk-distribution-chart', tDetails('hostRiskDistributionTitle'));
-      await addChart('pdf-top-ports-chart', tDetails('topPortsTitle'));
-      await addChart('pdf-service-distribution-chart', tDetails('serviceDistributionTitle'));
+      await addChart('risk-distribution-chart', tDetails('hostRiskDistributionTitle'));
+      await addChart('top-ports-chart', tDetails('topPortsTitle'));
+      await addChart('service-distribution-chart', tDetails('serviceDistributionTitle'));
+      await addChart('threat-service-dist-chart', locale === 'es' ? 'Distribución de Servicios Vulnerables' : 'Vulnerable Services Distribution');
+
 
       // -- All Hosts Table --
       const allHostsSortedByIp = [...scanResult.hosts].sort((a, b) => ipToNumber(a.address[0].addr) - ipToNumber(b.address[0].addr));
@@ -707,7 +727,7 @@ export default function AppSidebar() {
   const servicesTitle = tDetails('services');
   
   const vulnerableHostsTitle = locale === 'es' ? 'Hosts Vulnerables' : 'Vulnerable Hosts';
-  const vulnerabilitiesTitle = tDetails('vulnerabilities');
+  const threatsTitle = locale === 'es' ? 'CVEs y Vulnerabilidades' : 'CVEs & Vulnerabilities';
   
   const networkTitle = tDetails('networkGraph');
   const apiTitle = tApi('title');
@@ -780,9 +800,9 @@ export default function AppSidebar() {
             </SidebarMenuItem>
              <SidebarMenuItem>
                  <Link href="/details/vulnerabilities" className='w-full'>
-                    <SidebarMenuButton isActive={pathname.startsWith('/details/vulnerabilities')} tooltip={vulnerabilitiesTitle}>
+                    <SidebarMenuButton isActive={pathname.startsWith('/details/vulnerabilities')} tooltip={threatsTitle}>
                         <Skull />
-                        <span className="group-data-[collapsible=icon]:hidden">{vulnerabilitiesTitle}</span>
+                        <span className="group-data-[collapsible=icon]:hidden">{threatsTitle}</span>
                     </SidebarMenuButton>
                 </Link>
             </SidebarMenuItem>
@@ -920,7 +940,7 @@ export default function AppSidebar() {
                                 {tSidebar('exportJson')}
                             </Button>
                              <Button variant="outline" size="sm" onClick={handleExportHtml} disabled={isExportingPdf || isExportingHtml} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
-                                <Download />
+                                {isExportingHtml ? <Loader2 className="animate-spin" /> : <Download />}
                                 {tSidebar('exportHtml')}
                             </Button>
                             <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={isExportingPdf || isExportingHtml} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
