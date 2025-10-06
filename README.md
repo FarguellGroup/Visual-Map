@@ -6,22 +6,32 @@ Visual Map es una plataforma web Next.js que te permite subir escaneos XML de Nm
 
 ## Características
 
--   **Carga y Análisis Instantáneo**: Arrastra y suelta archivos XML de Nmap para un análisis y visualización inmediatos.
--   **Dashboard Interactivo**: Visualiza estadísticas clave de tu escaneo, una lista priorizada de los hosts más vulnerables y una tabla completa con todos los dispositivos descubiertos.
--   **Puntuación de Riesgo con IA**: Un sistema avanzado puntúa y clasifica los hosts por su nivel de riesgo, combinando información de puertos críticos, servicios, versiones, scripts NSE y vulnerabilidades (CVEs).
--   **Análisis Detallado de Hosts**: Explora en profundidad cada host con información sobre sus puertos, servicios, sistema operativo, scripts y un análisis de riesgo generado por IA.
--   **Búsqueda de Vulnerabilidades (CVEs)**: Identifica vulnerabilidades conocidas (CVEs) para los servicios y versiones detectados. Realiza búsquedas para un host específico o para todos los hosts del escaneo con un solo clic.
--   **Pentesting con IA**: Obtén un resumen de los hallazgos de los scripts NSE y una lista de los siguientes pasos de pentesting recomendados, todo ello generado por IA.
--   **Visualizaciones Avanzadas**:
-    -   **Gráficos Interactivos**: Analiza la distribución de puertos, servicios y niveles de riesgo en toda tu infraestructura.
-    -   **Grafo de Red**: Visualiza las conexiones y la topología de tu red de una forma gráfica e intuitiva.
--   **Exportación de Informes**: Genera informes completos de tus escaneos en formatos **JSON**, **HTML** navegable y **PDF**.
--   **Controles Personalizables**: Ajusta en tiempo real los pesos del algoritmo de riesgo para adaptar la puntuación a tus prioridades.
--   **Configuración de API desde la UI**: Verifica el estado de tu clave API de Gemini, consulta los modelos disponibles y cambia entre ellos fácilmente, todo desde la interfaz web.
--   **Soporte Multilenguaje**: Interfaz disponible en Español e Inglés.
--   **Modo Claro y Oscuro**: Un selector de tema persistente y fácil de usar para tu comodidad visual.
--   **Diseño Adaptable**: Totalmente adaptable y accesible, diseñado para su uso tanto en escritorio como en dispositivos móviles.
--   **Procesamiento Local**: Todo el procesamiento se realiza en tu navegador. Tus datos de escaneo nunca salen de tu máquina (solo se envían a la API de Gemini los datos necesarios para los análisis de IA).
+**📊 Dashboard Interactivo**
+Estadísticas clave, hosts priorizados por vulnerabilidad y tabla completa de dispositivos descubiertos.
+
+**🤖 Puntuación de Riesgo con IA**
+Evalúa automáticamente los hosts según puertos, servicios, versiones, scripts NSE y vulnerabilidades (CVEs).
+
+**🔍 Análisis Detallado de Hosts**
+Explora cada host con información profunda: servicios, SO, scripts y análisis de riesgo generados por IA.
+
+**🧠 Búsqueda de Vulnerabilidades (CVEs)**
+Identifica CVEs conocidas para servicios detectados y obtén contexto en un clic.
+
+**⚔️ Pentesting con IA**
+Resumen de hallazgos y pasos de explotación sugeridos automáticamente.
+
+**🧾 Exportación de Informes**
+Genera reportes ejecutivos en JSON, HTML y PDF, con más contexto técnico y métricas de riesgo.
+
+**🌍 Soporte Multilenguaje**
+Interfaz disponible en Español e Inglés.
+
+**🌗 Modo Claro / Oscuro**
+Selecciona tu tema favorito con persistencia automática.
+
+**🔒 Procesamiento Local**
+Todo ocurre en tu navegador. Tus datos nunca salen de tu máquina (solo se envía a la IA lo estrictamente necesario).
 
 ## Instalación
 
