@@ -1,7 +1,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import AppFooter from '@/components/layout/footer';
 import AppHeader from '@/components/layout/header';
 import AppSidebar from '@/components/layout/sidebar';
@@ -24,6 +24,11 @@ export default function LocaleLayout({
   const { scanResult, clearScanResult } = useScanStore();
   const pathname = usePathname();
   const { theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   const handleUploadNew = () => {
     clearScanResult();
@@ -52,16 +57,14 @@ export default function LocaleLayout({
         </div>
       </SidebarInset>
        {/* Container for off-screen rendering for exports */}
-      <div id="export-container" className={`${theme} bg-background`} style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '800px', padding: '1rem' }}>
-        {scanResult && (
-          <>
+      {mounted && scanResult && (
+        <div id="export-container" className={`${theme} bg-background`} style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '800px', padding: '1rem' }}>
             <VulnerabilitiesDetailView hosts={scanResult.hosts} />
             <PortsDetailView hosts={scanResult.hosts} />
             <ServicesDetailView hosts={scanResult.hosts} />
             <ThreatsDetailView hosts={scanResult.hosts} />
-          </>
-        )}
-      </div>
+        </div>
+      )}
     </SidebarProvider>
   );
 }
