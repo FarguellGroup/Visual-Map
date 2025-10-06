@@ -63,23 +63,26 @@ export default function ApiPage() {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
 
 
   const checkApiConnection = async (key?: string) => {
     setApiStatus('loading');
+    setIsChecking(true);
     setError(null);
     setModels([]);
     
-    const apiKey = key || storedApiKey;
+    const keyToCheck = key || storedApiKey;
 
-    if (!apiKey) {
+    if (!keyToCheck) {
       setApiStatus('error');
       setError(t('noKeyDescription'));
-      return;
+      setIsChecking(false);
+      return false;
     }
     
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${keyToCheck}`);
       
       if (!response.ok) {
         let errorMsg = `Request failed with status ${response.status}`;
@@ -94,7 +97,6 @@ export default function ApiPage() {
         } else if (errorMsg.toLowerCase().includes('api key not valid')) {
             errorMsg = t('invalidKeyDescription');
         }
-
         throw new Error(errorMsg);
       }
 
@@ -137,18 +139,24 @@ export default function ApiPage() {
         
       setModels(availableModels);
       setApiStatus('success');
-      if (key && key !== storedApiKey) {
-        setApiKey(key);
-      }
+      setIsChecking(false);
+      return true;
     } catch (err) {
       setApiStatus('error');
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      setIsChecking(false);
       console.error("API Connection Error:", err);
+      return false;
     }
   };
 
   useEffect(() => {
-    checkApiConnection();
+    if(!storedApiKey) {
+      setApiStatus('error');
+      setError(t('noKeyDescription'));
+    } else {
+      checkApiConnection();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -156,35 +164,49 @@ export default function ApiPage() {
     if (!apiKeyInput) return;
     setIsSaving(true);
     
-    try {
-        const response = await fetch('/api/save-api-key', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ apiKey: apiKeyInput }),
-        });
+    // 1. First, check if the new key is valid
+    const isValid = await checkApiConnection(apiKeyInput);
 
-        if (!response.ok) {
-            const result = await response.json();
-            throw new Error(result.error || 'Failed to save API key.');
-        }
+    if (isValid) {
+      // 2. If valid, save it to .env
+      try {
+          const response = await fetch('/api/save-api-key', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ apiKey: apiKeyInput }),
+          });
 
-        toast({
-            title: locale === 'es' ? 'Clave API guardada' : 'API Key Saved',
-            description: locale === 'es' ? 'La clave ha sido guardada en tu archivo .env.' : 'The key has been saved to your .env file.',
-        });
-        
-        setApiKey(apiKeyInput);
-        await checkApiConnection(apiKeyInput);
-        setApiKeyInput('');
+          if (!response.ok) {
+              const result = await response.json();
+              throw new Error(result.error || 'Failed to save API key to .env file.');
+          }
 
-    } catch (error) {
-        const saveError = error instanceof Error ? error.message : 'Failed to save API key.';
+          toast({
+              title: locale === 'es' ? 'Clave API guardada' : 'API Key Saved',
+              description: locale === 'es' ? 'La clave ha sido guardada en tu archivo .env.' : 'The key has been saved to your .env file.',
+          });
+          
+          // 3. Update the key in the global store and clear the input
+          setApiKey(apiKeyInput);
+          setApiKeyInput('');
+
+      } catch (error) {
+          const saveError = error instanceof Error ? error.message : 'Failed to save API key.';
+          toast({
+              variant: 'destructive',
+              title: 'Error',
+              description: saveError,
+          });
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+        // If the key is not valid, show the error from checkApiConnection
         toast({
             variant: 'destructive',
-            title: 'Error',
-            description: saveError,
+            title: locale === 'es' ? 'Clave API Inválida' : 'Invalid API Key',
+            description: error || t('invalidKeyDescription'),
         });
-    } finally {
         setIsSaving(false);
     }
   };
@@ -239,7 +261,7 @@ export default function ApiPage() {
   const rateLimitHintTitleText = locale === 'es' ? 'Consejo sobre el Límite de la API' : 'API Rate Limit Tip';
   const rateLimitHintDescriptionText = locale === 'es' ? 'Si alcanzas el límite de peticiones (rate limit) de la API para un modelo, prueba a cambiar a uno diferente para seguir utilizando la plataforma.' : 'If you reach the API rate limit for a model, try switching to a different one to continue using the platform.';
 
-  const shouldShowApiKeyInput = apiStatus === 'error' || (apiStatus !== 'success' && !storedApiKey);
+  const shouldShowApiKeyInput = apiStatus !== 'success' || !storedApiKey;
 
   return (
     <div className="container mx-auto p-0 space-y-8">
@@ -270,8 +292,8 @@ export default function ApiPage() {
         <CardContent className="space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 border rounded-lg">
             <div className="text-sm font-medium">{getStatusContent()}</div>
-            <Button onClick={() => checkApiConnection(apiKeyInput || undefined)} disabled={apiStatus === 'loading'}>
-              {apiStatus === 'loading' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button onClick={() => checkApiConnection(apiKeyInput || storedApiKey || undefined)} disabled={isChecking}>
+              {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {t('checkButton')}
             </Button>
           </div>
@@ -434,3 +456,5 @@ export default function ApiPage() {
     </div>
   );
 }
+
+    
