@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -54,7 +55,7 @@ export default function ApiPage() {
   const t = useTranslations('ApiPage');
   const locale = useLocale();
   const { toast } = useToast();
-  const { apiStatus, setApiStatus, aiModel, setAiModel, apiKey: storedApiKey, setApiKey: setApiKeyStore } = useScanStore();
+  const { apiStatus, setApiStatus, aiModel, setAiModel, apiKey: storedApiKey, setApiKey } = useScanStore();
   const [models, setModels] = useState<Model[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -136,7 +137,7 @@ export default function ApiPage() {
         
       setModels(availableModels);
       setApiStatus('success');
-      setApiKeyStore(apiKey);
+      setApiKey(apiKey);
     } catch (err) {
       setApiStatus('error');
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -169,7 +170,7 @@ export default function ApiPage() {
             description: locale === 'es' ? 'La clave ha sido guardada en tu archivo .env.' : 'The key has been saved to your .env file.',
         });
         
-        setApiKeyStore(apiKeyInput);
+        setApiKey(apiKeyInput);
         setApiKeyInput('');
         await checkApiConnection(apiKeyInput);
 
@@ -430,3 +431,5 @@ export default function ApiPage() {
     </div>
   );
 }
+
+    
