@@ -100,7 +100,7 @@ export default function ApiPage() {
             errorMsg = locale === 'es' ? 'Error de red: No se pudo conectar a la API. Verifica tu conexión a internet.' : 'Network Error: Could not connect to the API. Check your internet connection.';
         } else {
              // Generalize other errors
-            errorMsg = t('invalidKey');
+            errorMsg = locale === 'es' ? 'La clave API no es válida o tiene algún problema.' : 'API Key is invalid or has an issue.';
         }
         throw new Error(errorMsg);
       }
@@ -144,6 +144,7 @@ export default function ApiPage() {
         
       setModels(availableModels);
       setApiStatus('success');
+      setError(null);
       setIsChecking(false);
       return true;
     } catch (err) {
@@ -157,7 +158,9 @@ export default function ApiPage() {
   };
 
   useEffect(() => {
-    checkApiConnection();
+    if(!storedApiKey) {
+        checkApiConnection();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -168,44 +171,41 @@ export default function ApiPage() {
     const isValid = await checkApiConnection(apiKeyInput);
 
     if (isValid) {
-      try {
-          const response = await fetch('/api/save-api-key', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ apiKey: apiKeyInput }),
-          });
-
-          if (!response.ok) {
-              const result = await response.json();
-              throw new Error(result.error || 'Failed to save API key to .env file.');
-          }
-
-          toast({
-              title: locale === 'es' ? 'Clave API guardada' : 'API Key Saved',
-              description: locale === 'es' ? 'La clave ha sido guardada en tu archivo .env.' : 'The key has been saved to your .env file.',
-          });
-          
-          setApiKey(apiKeyInput);
-          setApiKeyInput('');
-
-      } catch (error) {
-          const saveError = error instanceof Error ? error.message : 'Failed to save API key.';
-          toast({
-              variant: 'destructive',
-              title: 'Error',
-              description: saveError,
-          });
-      }
+        try {
+            const response = await fetch('/api/save-api-key', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ apiKey: apiKeyInput }),
+            });
+            if (!response.ok) {
+                const result = await response.json();
+                throw new Error(result.error || 'Failed to save API key.');
+            }
+            toast({
+                title: locale === 'es' ? 'Clave API guardada' : 'API Key Saved',
+                description: locale === 'es' ? 'La clave ha sido guardada en tu archivo .env.' : 'The key has been saved to your .env file.',
+            });
+            setApiKey(apiKeyInput);
+            setApiKeyInput('');
+            // Re-check connection with the new key to refresh the UI smoothly
+            await checkApiConnection(apiKeyInput);
+        } catch (error) {
+            const saveError = error instanceof Error ? error.message : 'Failed to save API key.';
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: saveError,
+            });
+        }
     } else {
         toast({
             variant: 'destructive',
             title: locale === 'es' ? 'Clave API Inválida' : 'Invalid API Key',
-            description: error || t('invalidKeyDescription'),
+            description: error || (locale === 'es' ? 'La clave API no es válida. Por favor, introduce una API válida.' : t('invalidKeyDescription')),
         });
     }
     setIsSaving(false);
   };
-
 
   const getStatusContent = () => {
     switch (apiStatus) {
