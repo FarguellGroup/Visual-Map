@@ -1,4 +1,5 @@
 
+
 import { create } from 'zustand';
 import type { Host, Port, Script, Service, CveData, CveInfo } from '@/types/nmap';
 import type { ExplainVulnerabilityRiskOutput, PentestingNextStepsOutput, NseScriptsSummaryOutput, CveDetailsOutput, CveDetailsInput, ExplainVulnerabilityRiskInput, PentestingNextStepsInput, NseScriptsSummaryInput } from '@/ai/types';
@@ -198,6 +199,7 @@ export const useScanStore = create<ScanState>((set, get) => ({
     
     const cveCache = get().cveCache;
     // When calculating scores, also embed the found CVEs into the host object
+    // This ensures that even on a recalculation, the CVE data is not lost.
     const hostsWithCves = hostsToScore.map(host => ({
         ...host,
         cves: cveCache.get(host.address[0].addr)?.data || [],
@@ -223,7 +225,6 @@ export const useScanStore = create<ScanState>((set, get) => ({
       newState.cveCache = new Map();
       newState.isCveScanRunning = false;
       newState.cveScanProgress = { processed: 0, total: 0, isComplete: false };
-      newState.apiStatus = 'idle';
     }
     set(newState);
   },
@@ -245,10 +246,14 @@ export const useScanStore = create<ScanState>((set, get) => ({
   clearExplanationCache: () => set({ explanationCache: new Map() }),
   clearPentestingStepsCache: () => set({ pentestingStepsCache: new Map() }),
   clearNseSummaryCache: () => set({ nseSummaryCache: new Map() }),
-  setRiskWeights: (weights: RiskWeights) => set({ riskWeights: weights }),
+  setRiskWeights: (weights: RiskWeights) => {
+      const { scanResult } = get();
+      if(scanResult) {
+          get().setScanResult(scanResult.fileName, scanResult.originalHosts, weights, false);
+      }
+  },
+  
   setAiModel: (model: string) => {
-    const { scanResult, riskWeights } = get();
-    
     set({ 
       aiModel: model,
       explanationCache: new Map(),
@@ -259,13 +264,18 @@ export const useScanStore = create<ScanState>((set, get) => ({
       cveScanProgress: { processed: 0, total: 0, isComplete: false },
     });
 
+    const { scanResult, riskWeights } = get();
     if (scanResult) {
+      // After clearing caches, recalculate scores.
+      // This will use the original hosts and re-apply CVE data if it existed.
       get().setScanResult(scanResult.fileName, scanResult.originalHosts, riskWeights, false);
     }
   },
+
   setApiKey: (key: string | null) => {
     set({ apiKey: key });
   },
+
   setApiStatus: (status: ApiStatus) => set({ apiStatus: status }),
 
   hostHasNseScripts: (hostIp: string) => {
@@ -450,5 +460,3 @@ export const useScanStore = create<ScanState>((set, get) => ({
   },
 
 }));
-
-    
