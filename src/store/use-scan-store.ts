@@ -1,5 +1,4 @@
 
-
 import { create } from 'zustand';
 import type { Host, Port, Script, Service, CveData, CveInfo } from '@/types/nmap';
 import type { ExplainVulnerabilityRiskOutput, PentestingNextStepsOutput, NseScriptsSummaryOutput, CveDetailsOutput, CveDetailsInput, ExplainVulnerabilityRiskInput, PentestingNextStepsInput, NseScriptsSummaryInput } from '@/ai/types';
@@ -200,10 +199,13 @@ export const useScanStore = create<ScanState>((set, get) => ({
     const cveCache = get().cveCache;
     // When calculating scores, also embed the found CVEs into the host object
     // This ensures that even on a recalculation, the CVE data is not lost.
-    const hostsWithCves = hostsToScore.map(host => ({
-        ...host,
-        cves: cveCache.get(host.address[0].addr)?.data || [],
-    }));
+    const hostsWithCves = hostsToScore.map(host => {
+        const cachedCves = cveCache.get(host.address[0].addr);
+        return {
+            ...host,
+            cves: cachedCves?.status === 'loaded' ? cachedCves.data : (host.cves || []),
+        }
+    });
 
     const scoredHosts = calculateRiskScores(hostsWithCves, finalWeights);
     scoredHosts.sort((a, b) => (b.riskScore ?? 0) - (a.riskScore ?? 0));
@@ -294,22 +296,24 @@ export const useScanStore = create<ScanState>((set, get) => ({
     const hostsArray = Array.isArray(hosts) ? hosts : [hosts];
     const { cveCache, isCveScanRunning } = get();
 
-    // Prevent starting a new scan if one is already in progress
     if (isCveScanRunning) return;
 
     const hostsToScan = hostsArray.filter(host => {
         const hasScannablePorts = getOpenPortsWithServices(host).length > 0;
         const cacheEntry = cveCache.get(host.address[0].addr);
-        // Scan if it has ports and is not already loaded or loading
         return hasScannablePorts && (!cacheEntry || cacheEntry.status === 'idle' || cacheEntry.status === 'error');
     });
 
     if (hostsToScan.length === 0) return;
+
+    const totalServicesToScan = hostsToScan.reduce((acc, host) => acc + getOpenPortsWithServices(host).length, 0);
+
+    if (totalServicesToScan === 0) return;
     
-    set({ isCveScanRunning: true, cveScanProgress: { processed: 0, total: hostsToScan.length, isComplete: false } });
+    set({ isCveScanRunning: true, cveScanProgress: { processed: 0, total: totalServicesToScan, isComplete: false } });
 
     const BATCH_SIZE = 5;
-    const DELAY_BETWEEN_BATCHES = 4000; // 4 seconds
+    const DELAY_BETWEEN_BATCHES = 4000;
 
     for (let i = 0; i < hostsToScan.length; i += BATCH_SIZE) {
         const batch = hostsToScan.slice(i, i + BATCH_SIZE);
@@ -337,7 +341,10 @@ export const useScanStore = create<ScanState>((set, get) => ({
                         }
                     } catch (error) {
                         console.error(`[CVE Fetch] Failed for port ${port.portid} on host ${hostIp}:`, error);
-                        // Do not fail the entire host scan for a single port error
+                    } finally {
+                        set(state => ({
+                            cveScanProgress: { ...state.cveScanProgress, processed: state.cveScanProgress.processed + 1 }
+                        }));
                     }
                 }
                 
@@ -349,10 +356,6 @@ export const useScanStore = create<ScanState>((set, get) => ({
                  set(state => ({
                     cveCache: new Map(state.cveCache).set(hostIp, { status: 'error', error: error instanceof Error ? error.message : "Unknown CVE scan error" })
                 }));
-            } finally {
-                set(state => ({
-                    cveScanProgress: { ...state.cveScanProgress, processed: state.cveScanProgress.processed + 1 }
-                }));
             }
         });
 
@@ -363,18 +366,16 @@ export const useScanStore = create<ScanState>((set, get) => ({
         }
     }
     
-    // Final state update after all batches are processed
     set(state => ({ 
         cveScanProgress: { ...state.cveScanProgress, isComplete: true },
         isCveScanRunning: false 
     }));
     
-    // Trigger a final risk score recalculation
     const { scanResult, riskWeights } = get();
     if (scanResult) {
       get().setScanResult(scanResult.fileName, scanResult.originalHosts, riskWeights, false);
     }
-},
+  },
 
 
   fetchVulnerabilityExplanation: async (host, locale) => {
