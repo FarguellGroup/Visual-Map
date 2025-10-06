@@ -225,10 +225,10 @@ export default function HostsTable() {
                 <TableHead onClick={() => requestSort('ipAddress')} className="cursor-pointer">
                   <div className="flex items-center">{t('ipAddress')} {getSortIcon('ipAddress')}</div>
                 </TableHead>
-                <TableHead onClick={() => requestSort('hostname')} className="cursor-pointer">
+                <TableHead onClick={() => requestSort('hostname')} className="cursor-pointer hidden md:table-cell">
                   <div className="flex items-center">{t('hostname')} {getSortIcon('hostname')}</div>
                 </TableHead>
-                <TableHead onClick={() => requestSort('os')} className="cursor-pointer">
+                <TableHead onClick={() => requestSort('os')} className="cursor-pointer hidden lg:table-cell">
                   <div className="flex items-center">{tDetails('os')} {getSortIcon('os')}</div>
                 </TableHead>
                 <TableHead onClick={() => requestSort('openPorts')} className="text-center cursor-pointer">
@@ -247,8 +247,8 @@ export default function HostsTable() {
                   className="cursor-pointer"
                 >
                   <TableCell className="font-mono font-medium">{host.address[0].addr}</TableCell>
-                  <TableCell className="truncate max-w-[200px]">{getHostname(host)}</TableCell>
-                  <TableCell className="truncate max-w-[200px]">{getOsName(host)}</TableCell>
+                  <TableCell className="truncate max-w-[200px] hidden md:table-cell">{getHostname(host)}</TableCell>
+                  <TableCell className="truncate max-w-[200px] hidden lg:table-cell">{getOsName(host)}</TableCell>
                   <TableCell className="text-center">{getOpenPortsCount(host)}</TableCell>
                   <TableCell className="text-right">
                     <Badge variant="default" className={cn('border-transparent', getRiskColorClass(host.riskScore ?? 0))}>
@@ -277,5 +277,3 @@ export default function HostsTable() {
     </Card>
   );
 }
-
-    

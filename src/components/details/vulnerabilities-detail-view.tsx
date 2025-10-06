@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo, useState } from 'react';
@@ -109,7 +108,7 @@ const ipToNumber = (ip: string) => {
     return ip.split('.').reduce((acc, octet, index) => acc + parseInt(octet) * Math.pow(256, 3 - index), 0);
 };
 
-export default function VulnerabilitiesDetailView({ hosts, pdfMode = false }: { hosts: Host[], pdfMode?: boolean }) {
+export default function VulnerabilitiesDetailView({ hosts, pdfMode = false, forceId }: { hosts: Host[], pdfMode?: boolean, forceId?: string }) {
     const t = useTranslations('DetailsPage');
     const tHostsTable = useTranslations('HostsTable');
     const router = useRouter();
@@ -197,6 +196,8 @@ export default function VulnerabilitiesDetailView({ hosts, pdfMode = false }: { 
       router.push(`/details/host/${host.address[0].addr}`);
     };
 
+    const chartId = forceId ? forceId : (pdfMode ? "pdf-risk-distribution-chart" : "risk-distribution-chart");
+
   return (
     <div className="space-y-8">
       <Card>
@@ -204,12 +205,12 @@ export default function VulnerabilitiesDetailView({ hosts, pdfMode = false }: { 
           <CardTitle>{t('hostRiskDistributionTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div id={pdfMode ? "pdf-risk-distribution-chart" : "risk-distribution-chart"}>
+          <div id={chartId} className={pdfMode ? 'w-[800px] h-[300px]' : ''}>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart layout="vertical" data={riskDistribution} margin={{left: 20}}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" allowDecimals={false} />
-                <YAxis type="category" dataKey="name" width={80} />
+                <YAxis type="category" dataKey="name" width={80} fontSize={12} />
                 <Tooltip cursor={{fill: 'hsl(var(--muted))'}} />
                 <Bar dataKey="count" name={t('numberOfHosts')} barSize={20} />
               </BarChart>
@@ -222,16 +223,17 @@ export default function VulnerabilitiesDetailView({ hosts, pdfMode = false }: { 
           <CardTitle>{t('vulnerableHostsTitle', {count: vulnerableHosts.length})}</CardTitle>
         </CardHeader>
         <CardContent>
+            <div className="overflow-x-auto">
              <Table>
                 <TableHeader>
                     <TableRow>
                         <TableHead onClick={() => requestSort('ipAddress')} className="cursor-pointer">
                             <div className="flex items-center">{tHostsTable('ipAddress')} {getSortIcon('ipAddress')}</div>
                         </TableHead>
-                        <TableHead onClick={() => requestSort('hostname')} className="cursor-pointer">
+                        <TableHead onClick={() => requestSort('hostname')} className="cursor-pointer hidden md:table-cell">
                             <div className="flex items-center">{tHostsTable('hostname')} {getSortIcon('hostname')}</div>
                         </TableHead>
-                        <TableHead onClick={() => requestSort('os')} className="cursor-pointer">
+                        <TableHead onClick={() => requestSort('os')} className="cursor-pointer hidden lg:table-cell">
                             <div className="flex items-center">{t('os')} {getSortIcon('os')}</div>
                         </TableHead>
                         <TableHead onClick={() => requestSort('openPorts')} className="text-center cursor-pointer">
@@ -246,8 +248,8 @@ export default function VulnerabilitiesDetailView({ hosts, pdfMode = false }: { 
                     {sortedVulnerableHosts.map((host, index) => (
                          <TableRow key={`${host.address[0].addr}-${index}`} onClick={() => handleRowClick(host)} className="cursor-pointer">
                             <TableCell className="font-mono">{host.address[0].addr}</TableCell>
-                            <TableCell>{getHostname(host)}</TableCell>
-                            <TableCell>{getOsName(host)}</TableCell>
+                            <TableCell className="hidden md:table-cell">{getHostname(host)}</TableCell>
+                            <TableCell className="hidden lg:table-cell">{getOsName(host)}</TableCell>
                             <TableCell className="text-center">{getOpenPortsCount(host)}</TableCell>
                             <TableCell className="text-right">
                                 <Badge variant="default" className={cn('border-transparent', getRiskColorClass(host.riskScore ?? 0))}>
@@ -258,10 +260,9 @@ export default function VulnerabilitiesDetailView({ hosts, pdfMode = false }: { 
                     ))}
                 </TableBody>
             </Table>
+            </div>
         </CardContent>
       </Card>
     </div>
   );
 }
-
-    

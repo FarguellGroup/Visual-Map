@@ -1,5 +1,5 @@
 
-import type { Host, Port, Script } from '@/types/nmap';
+import type { Host, Port, Script, Service, CveData } from '@/types/nmap';
 import type { RiskWeights } from '@/store/use-scan-store';
 
 const CRITICAL_PORTS: { [key: number]: number } = {
@@ -132,6 +132,21 @@ export function calculateRiskScore(host: Host, weights: RiskWeights): { score: n
     });
   });
 
+  // Risk from CVEs
+  if (host.cves) {
+      host.cves.forEach(item => {
+          if (item.cve.cvssScore) {
+              // CVSS score is 0-10. Let's scale it. A score of 10 should be very impactful.
+              score += (item.cve.cvssScore * item.cve.cvssScore / 10) * (weights.cveScore / 100);
+              factors.push(`CVE ${item.cve.cveId} found with CVSS score ${item.cve.cvssScore}`);
+          } else {
+              // Add a smaller, fixed score for CVEs without a score
+              score += 2 * (weights.cveScore / 100);
+              factors.push(`CVE ${item.cve.cveId} found (unscored)`);
+          }
+      });
+  }
+
   // Check host-level scripts
   const hostScripts = getScripts(host);
   if(hostScripts.length > 0) {
@@ -171,3 +186,5 @@ export function calculateRiskScores(hosts: Host[], weights: RiskWeights): Host[]
     };
   });
 }
+
+    

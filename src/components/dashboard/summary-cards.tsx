@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useScanStore } from '@/store/use-scan-store';
@@ -86,7 +87,7 @@ export default function SummaryCards() {
           </CardContent>
         </Card>
       </Link>
-      <Link href="/details/vulnerabilities" className="block">
+      <Link href="/details/vulnerable-hosts" className="block">
        <Card className={cardClassName}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">{t('highRiskHosts')}</CardTitle>

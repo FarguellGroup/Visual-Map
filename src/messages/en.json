@@ -10,10 +10,7 @@
     "title": "Drop your Nmap scan file here",
     "subtitle": "or click to browse",
     "caption": "Only *.xml files are supported",
-    "examplesTitle": "How to generate the XML file",
-    "subdomainScanTitle": "Scan from IP list",
-    "infraScanTitle": "Full infrastructure scan",
-    "hostScanTitle": "Full host scan"
+    "examplesTitle": "How to generate the XML file"
   },
   "Loader": {
     "analyzing": "Analyzing your scan file..."
@@ -42,20 +39,17 @@
   },
   "HostDetail": {
     "openPorts": "Open Ports",
-    "nseScripts": "NSE Scripts",
+    "hostScripts": "Host Scripts",
     "port": "Port",
     "service": "Service",
     "version": "Version",
-    "noNseScripts": "No NSE scripts found for this host.",
+    "noHostScripts": "No host scripts found.",
     "riskAnalysisTitle": "Risk Analysis",
     "riskScore": "Risk Score",
     "nextStepsTitle": "Pentesting Next Steps",
-    "nextStepsDescription": "AI-generated suggestions for penetration testing.",
+    "nextStepsDescription": "AI-generated suggestions for further testing.",
     "generatingNextSteps": "Generating next steps...",
-    "noNextSteps": "No specific next steps could be generated for this host.",
-    "nseSummaryTitle": "AI-Powered NSE Script Summary",
-    "nseSummaryDescription": "AI summary of the collected information",
-    "generatingNseSummary": "Generating NSE script summary..."
+    "noNextSteps": "No specific next steps could be generated for this host."
   },
   "VulnerabilityExplanation": {
     "errorTitle": "Error",
@@ -72,7 +66,6 @@
   "Sidebar": {
     "controls": "Controls",
     "riskWeighting": "Risk Weighting",
-    "criticalPorts": "Critical Ports",
     "openPorts": "Open Ports",
     "serviceVersions": "Service Versions",
     "nseScripts": "NSE Scripts",
@@ -102,17 +95,36 @@
     "service": "Service",
     "product": "Product",
     "version": "Version",
-    "riskScore": "Risk Score",
     "serviceDistributionTitle": "Service Distribution",
     "allServicesTitle": "All {count} Detected Services",
     "hostRiskDistributionTitle": "Host Risk Distribution",
     "numberOfHosts": "Number of Hosts",
     "vulnerableHostsTitle": "Vulnerable Hosts ({count})",
-    "veryLowRisk": "Very Low Risk",
     "lowRisk": "Low Risk",
     "mediumRisk": "Medium Risk",
-    "highRisk": "High Risk"
+    "highRisk": "High Risk",
+    "threats": "Threats",
+    "networkGraph": "Network Graph",
+    "api": "API"
+  },
+  "ApiPage": {
+    "title": "API Configuration",
+    "description": "Verify your Gemini API key and see the available models.",
+    "checkButton": "Check API Connection",
+    "status": "Status",
+    "checking": "Checking...",
+    "validKey": "API Key is valid and connected.",
+    "invalidKey": "API Key is invalid or has an issue.",
+    "invalidKeyDescription": "The API key is not valid. Please enter a valid API key.",
+    "noKey": "API Key not configured.",
+    "noKeyDescription": "Please add your NEXT_PUBLIC_GOOGLE_GENAI_API_KEY to the .env file.",
+    "errorPrefix": "Error",
+    "availableModels": "Available Models",
+    "modelName": "Model Name",
+    "modelDisplayName": "Display Name",
+    "currentModel": "In Use",
+    "getApiKeyTitle": "Get your API Key",
+    "getApiKeyDescription": "You need a valid Gemini API key to use the AI features.",
+    "getApiKeyButton": "Get API Key"
   }
 }
-
-    

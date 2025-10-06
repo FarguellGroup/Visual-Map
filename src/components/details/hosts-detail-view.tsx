@@ -185,46 +185,46 @@ export default function HostsDetailView({ hosts }: { hosts: Host[] }) {
                 <CardTitle>{tDetails('hostsDetected', {count: hosts.length})}</CardTitle>
             </CardHeader>
             <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead onClick={() => requestSort('ipAddress')} className="cursor-pointer">
-                                <div className="flex items-center">{t('ipAddress')} {getSortIcon('ipAddress')}</div>
-                            </TableHead>
-                            <TableHead onClick={() => requestSort('hostname')} className="cursor-pointer">
-                                <div className="flex items-center">{t('hostname')} {getSortIcon('hostname')}</div>
-                            </TableHead>
-                            <TableHead onClick={() => requestSort('os')} className="cursor-pointer">
-                                <div className="flex items-center">{tDetails('os')} {getSortIcon('os')}</div>
-                            </TableHead>
-                            <TableHead onClick={() => requestSort('openPorts')} className="text-center cursor-pointer">
-                                <div className="flex items-center justify-center">{t('openPorts')} {getSortIcon('openPorts')}</div>
-                            </TableHead>
-                            <TableHead onClick={() => requestSort('riskScore')} className="text-right cursor-pointer">
-                                <div className="flex items-center justify-end">{t('riskScore')} {getSortIcon('riskScore')}</div>
-                            </TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {sortedHosts.map((host) => (
-                        <TableRow key={host.address[0].addr} onClick={() => handleRowClick(host)} className="cursor-pointer">
-                            <TableCell className="font-mono">{host.address[0].addr}</TableCell>
-                            <TableCell>{getHostname(host)}</TableCell>
-                            <TableCell>{getOsName(host)}</TableCell>
-                            <TableCell className="text-center">{getOpenPortsCount(host)}</TableCell>
-                            <TableCell className="text-right">
-                                <Badge variant="default" className={cn('border-transparent', getRiskColorClass(host.riskScore ?? 0))}>
-                                    {host.riskScore?.toFixed(0)}
-                                </Badge>
-                            </TableCell>
-                        </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead onClick={() => requestSort('ipAddress')} className="cursor-pointer">
+                                    <div className="flex items-center">{t('ipAddress')} {getSortIcon('ipAddress')}</div>
+                                </TableHead>
+                                <TableHead onClick={() => requestSort('hostname')} className="cursor-pointer hidden md:table-cell">
+                                    <div className="flex items-center">{t('hostname')} {getSortIcon('hostname')}</div>
+                                </TableHead>
+                                <TableHead onClick={() => requestSort('os')} className="cursor-pointer hidden lg:table-cell">
+                                    <div className="flex items-center">{tDetails('os')} {getSortIcon('os')}</div>
+                                </TableHead>
+                                <TableHead onClick={() => requestSort('openPorts')} className="text-center cursor-pointer">
+                                    <div className="flex items-center justify-center">{t('openPorts')} {getSortIcon('openPorts')}</div>
+                                </TableHead>
+                                <TableHead onClick={() => requestSort('riskScore')} className="text-right cursor-pointer">
+                                    <div className="flex items-center justify-end">{t('riskScore')} {getSortIcon('riskScore')}</div>
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {sortedHosts.map((host) => (
+                            <TableRow key={host.address[0].addr} onClick={() => handleRowClick(host)} className="cursor-pointer">
+                                <TableCell className="font-mono">{host.address[0].addr}</TableCell>
+                                <TableCell className='hidden md:table-cell'>{getHostname(host)}</TableCell>
+                                <TableCell className='hidden lg:table-cell'>{getOsName(host)}</TableCell>
+                                <TableCell className="text-center">{getOpenPortsCount(host)}</TableCell>
+                                <TableCell className="text-right">
+                                    <Badge variant="default" className={cn('border-transparent', getRiskColorClass(host.riskScore ?? 0))}>
+                                        {host.riskScore?.toFixed(0)}
+                                    </Badge>
+                                </TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
             </CardContent>
         </Card>
     </div>
   );
 }
-
-    

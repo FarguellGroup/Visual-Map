@@ -35,7 +35,7 @@ export default function LanguageSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" className="hover:bg-primary/10 hover:text-primary">
           <Globe className={cn('h-[1.2rem] w-[1.2rem]', isPending && 'hidden')} />
           {isPending && <Loader2 className="h-[1.2rem] w-[1.2rem] animate-spin" />}
           <span className="sr-only">{t('language')}</span>

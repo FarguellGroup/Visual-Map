@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -46,7 +45,7 @@ const getRiskColorClass = (score: number): string => {
     return 'bg-gray-400 hover:bg-gray-500 text-white';
 };
 
-export default function ServicesDetailView({ hosts, pdfMode = false }: { hosts: Host[], pdfMode?: boolean }) {
+export default function ServicesDetailView({ hosts, pdfMode = false, forceId }: { hosts: Host[], pdfMode?: boolean, forceId?: string }) {
   const t = useTranslations('DetailsPage');
   const locale = useLocale();
   const { riskWeights } = useScanStore();
@@ -149,6 +148,8 @@ export default function ServicesDetailView({ hosts, pdfMode = false }: { hosts: 
     router.push(`/details/host/${hostIp}`);
   };
 
+  const chartId = forceId ? forceId : (pdfMode ? "pdf-service-distribution-chart" : "service-distribution-chart");
+
   return (
     <div className="space-y-8">
       <Card>
@@ -156,7 +157,7 @@ export default function ServicesDetailView({ hosts, pdfMode = false }: { hosts: 
           <CardTitle>{t('serviceDistributionTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div id={pdfMode ? "pdf-service-distribution-chart" : "service-distribution-chart"}>
+          <div id={chartId} className={pdfMode ? 'w-[800px] h-[300px]' : ''}>
             <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                     <Pie data={serviceDistribution.slice(0, 10)} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
@@ -165,7 +166,7 @@ export default function ServicesDetailView({ hosts, pdfMode = false }: { hosts: 
                         ))}
                     </Pie>
                     <Tooltip />
-                    <Legend layout="vertical" align="right" verticalAlign="middle" />
+                    <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{fontSize: '12px'}} />
                 </PieChart>
             </ResponsiveContainer>
           </div>
@@ -176,49 +177,51 @@ export default function ServicesDetailView({ hosts, pdfMode = false }: { hosts: 
           <CardTitle>{t('allServicesTitle', {count: allServices.length})}</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead onClick={() => requestSort('hostIp')} className="cursor-pointer">
-                  <div className="flex items-center">{t('hostIp')} {getSortIcon('hostIp')}</div>
-                </TableHead>
-                <TableHead onClick={() => requestSort('port')} className="cursor-pointer">
-                  <div className="flex items-center">{t('port')} {getSortIcon('port')}</div>
-                </TableHead>
-                <TableHead onClick={() => requestSort('service')} className="cursor-pointer">
-                  <div className="flex items-center">{t('service')} {getSortIcon('service')}</div>
-                </TableHead>
-                <TableHead onClick={() => requestSort('product')} className="cursor-pointer">
-                  <div className="flex items-center">{t('product')} {getSortIcon('product')}</div>
-                </TableHead>
-                <TableHead onClick={() => requestSort('version')} className="cursor-pointer">
-                  <div className="flex items-center">{t('version')} {getSortIcon('version')}</div>
-                </TableHead>
-                 <TableHead onClick={() => requestSort('riskScore')} className="text-right cursor-pointer">
-                  <div className="flex items-center justify-end">{riskScoreTitle} {getSortIcon('riskScore')}</div>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedServices.map((service, index) => {
-                const portRisk = calculatePortRiskScore(service.port, riskWeights);
-                return (
-                  <TableRow key={`${service.hostAddress}-${service.port.portid}-${index}`} onClick={() => handleRowClick(service.hostAddress)} className="cursor-pointer">
-                    <TableCell className="font-mono">{service.hostAddress}</TableCell>
-                    <TableCell>{service.port.portid}</TableCell>
-                    <TableCell>{service.name}</TableCell>
-                    <TableCell>{service.product}</TableCell>
-                    <TableCell>{service.version}</TableCell>
-                     <TableCell className="text-right">
-                        <Badge variant="default" className={cn('border-transparent', getRiskColorClass(portRisk))}>
-                            {portRisk.toFixed(0)}
-                        </Badge>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead onClick={() => requestSort('hostIp')} className="cursor-pointer">
+                    <div className="flex items-center">{t('hostIp')} {getSortIcon('hostIp')}</div>
+                  </TableHead>
+                  <TableHead onClick={() => requestSort('port')} className="cursor-pointer hidden sm:table-cell">
+                    <div className="flex items-center">{t('port')} {getSortIcon('port')}</div>
+                  </TableHead>
+                  <TableHead onClick={() => requestSort('service')} className="cursor-pointer">
+                    <div className="flex items-center">{t('service')} {getSortIcon('service')}</div>
+                  </TableHead>
+                  <TableHead onClick={() => requestSort('product')} className="cursor-pointer hidden md:table-cell">
+                    <div className="flex items-center">{t('product')} {getSortIcon('product')}</div>
+                  </TableHead>
+                  <TableHead onClick={() => requestSort('version')} className="cursor-pointer hidden lg:table-cell">
+                    <div className="flex items-center">{t('version')} {getSortIcon('version')}</div>
+                  </TableHead>
+                  <TableHead onClick={() => requestSort('riskScore')} className="text-right cursor-pointer">
+                    <div className="flex items-center justify-end">{riskScoreTitle} {getSortIcon('riskScore')}</div>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedServices.map((service, index) => {
+                  const portRisk = calculatePortRiskScore(service.port, riskWeights);
+                  return (
+                    <TableRow key={`${service.hostAddress}-${service.port.portid}-${index}`} onClick={() => handleRowClick(service.hostAddress)} className="cursor-pointer">
+                      <TableCell className="font-mono">{service.hostAddress}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{service.port.portid}</TableCell>
+                      <TableCell>{service.name}</TableCell>
+                      <TableCell className="hidden md:table-cell">{service.product}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{service.version}</TableCell>
+                      <TableCell className="text-right">
+                          <Badge variant="default" className={cn('border-transparent', getRiskColorClass(portRisk))}>
+                              {portRisk.toFixed(0)}
+                          </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

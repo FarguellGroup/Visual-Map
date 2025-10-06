@@ -37,6 +37,19 @@ export interface Script {
   output: string;
 }
 
+export interface CveInfo {
+  cveId: string;
+  description: string;
+  cvssScore: number | null;
+}
+
+export interface CveData {
+    service: Service;
+    portId: string;
+    cve: CveInfo;
+}
+
+
 export interface Port {
   protocol: string;
   portid: string;
@@ -74,4 +87,7 @@ export interface Host {
   os?: Os;
   riskScore?: number;
   riskFactors?: string[];
+  cves?: CveData[];
 }
+
+    

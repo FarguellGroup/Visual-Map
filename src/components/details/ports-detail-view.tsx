@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -33,7 +32,7 @@ const ipToNumber = (ip: string) => {
     return ip.split('.').reduce((acc, octet, index) => acc + parseInt(octet) * Math.pow(256, 3 - index), 0);
 };
 
-export default function PortsDetailView({ hosts, pdfMode = false }: { hosts: Host[], pdfMode?: boolean }) {
+export default function PortsDetailView({ hosts, pdfMode = false, forceId }: { hosts: Host[], pdfMode?: boolean, forceId?: string }) {
   const t = useTranslations('DetailsPage');
   const locale = useLocale();
   const { riskWeights } = useScanStore();
@@ -135,6 +134,8 @@ export default function PortsDetailView({ hosts, pdfMode = false }: { hosts: Hos
     router.push(`/details/host/${hostIp}`);
   };
 
+  const chartId = forceId ? forceId : (pdfMode ? "pdf-top-ports-chart" : "top-ports-chart");
+
   return (
     <div className="space-y-8">
       <Card>
@@ -142,11 +143,11 @@ export default function PortsDetailView({ hosts, pdfMode = false }: { hosts: Hos
           <CardTitle>{t('topPortsTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
-            <div id={pdfMode ? "pdf-top-ports-chart" : "top-ports-chart"}>
+            <div id={chartId} className={pdfMode ? 'w-[800px] h-[300px]' : ''}>
               <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={portDistribution}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="port" interval={0} />
+                      <XAxis dataKey="port" interval={0} fontSize={12} />
                       <YAxis allowDecimals={false} />
                       <Tooltip />
                       <Legend />
@@ -161,55 +162,57 @@ export default function PortsDetailView({ hosts, pdfMode = false }: { hosts: Hos
           <CardTitle>{t('allPortsTitle', {count: allPorts.length})}</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead onClick={() => requestSort('hostIp')} className="cursor-pointer">
-                    <div className="flex items-center">{t('hostIp')} {getSortIcon('hostIp')}</div>
-                </TableHead>
-                <TableHead onClick={() => requestSort('port')} className="cursor-pointer">
-                    <div className="flex items-center">{t('port')} {getSortIcon('port')}</div>
-                </TableHead>
-                <TableHead onClick={() => requestSort('protocol')} className="cursor-pointer">
-                    <div className="flex items-center">{t('protocol')} {getSortIcon('protocol')}</div>
-                </TableHead>
-                <TableHead onClick={() => requestSort('service')} className="cursor-pointer">
-                    <div className="flex items-center">{t('service')} {getSortIcon('service')}</div>
-                </TableHead>
-                <TableHead onClick={() => requestSort('product')} className="cursor-pointer">
-                    <div className="flex items-center">{t('product')} {getSortIcon('product')}</div>
-                </TableHead>
-                <TableHead onClick={() => requestSort('version')} className="cursor-pointer">
-                    <div className="flex items-center">{t('version')} {getSortIcon('version')}</div>
-                </TableHead>
-                 <TableHead onClick={() => requestSort('riskScore')} className="text-right cursor-pointer">
-                  <div className="flex items-center justify-end">{riskScoreTitle} {getSortIcon('riskScore')}</div>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedPorts.map((port, index) => {
-                const portRisk = calculatePortRiskScore(port, riskWeights);
-                return (
-                  <TableRow key={`${port.hostAddress}-${port.portid}-${index}`} onClick={() => handleRowClick(port.hostAddress)} className="cursor-pointer">
-                    <TableCell className="font-mono">{port.hostAddress}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{port.portid}</Badge>
-                    </TableCell>
-                    <TableCell>{port.protocol}</TableCell>
-                    <TableCell>{port.service?.name}</TableCell>
-                    <TableCell>{port.service?.product}</TableCell>
-                    <TableCell>{port.service?.version}</TableCell>
-                    <TableCell className="text-right">
-                        <Badge variant="default" className={cn('border-transparent', getRiskColorClass(portRisk))}>
-                            {portRisk.toFixed(0)}
-                        </Badge>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead onClick={() => requestSort('hostIp')} className="cursor-pointer">
+                        <div className="flex items-center">{t('hostIp')} {getSortIcon('hostIp')}</div>
+                    </TableHead>
+                    <TableHead onClick={() => requestSort('port')} className="cursor-pointer">
+                        <div className="flex items-center">{t('port')} {getSortIcon('port')}</div>
+                    </TableHead>
+                    <TableHead onClick={() => requestSort('protocol')} className="cursor-pointer hidden sm:table-cell">
+                        <div className="flex items-center">{t('protocol')} {getSortIcon('protocol')}</div>
+                    </TableHead>
+                    <TableHead onClick={() => requestSort('service')} className="cursor-pointer">
+                        <div className="flex items-center">{t('service')} {getSortIcon('service')}</div>
+                    </TableHead>
+                    <TableHead onClick={() => requestSort('product')} className="cursor-pointer hidden md:table-cell">
+                        <div className="flex items-center">{t('product')} {getSortIcon('product')}</div>
+                    </TableHead>
+                    <TableHead onClick={() => requestSort('version')} className="cursor-pointer hidden lg:table-cell">
+                        <div className="flex items-center">{t('version')} {getSortIcon('version')}</div>
+                    </TableHead>
+                    <TableHead onClick={() => requestSort('riskScore')} className="text-right cursor-pointer">
+                      <div className="flex items-center justify-end">{riskScoreTitle} {getSortIcon('riskScore')}</div>
+                    </TableHead>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                </TableHeader>
+                <TableBody>
+                  {sortedPorts.map((port, index) => {
+                    const portRisk = calculatePortRiskScore(port, riskWeights);
+                    return (
+                      <TableRow key={`${port.hostAddress}-${port.portid}-${index}`} onClick={() => handleRowClick(port.hostAddress)} className="cursor-pointer">
+                        <TableCell className="font-mono">{port.hostAddress}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{port.portid}</Badge>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">{port.protocol}</TableCell>
+                        <TableCell>{port.service?.name}</TableCell>
+                        <TableCell className="hidden md:table-cell">{port.service?.product}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{port.service?.version}</TableCell>
+                        <TableCell className="text-right">
+                            <Badge variant="default" className={cn('border-transparent', getRiskColorClass(portRisk))}>
+                                {portRisk.toFixed(0)}
+                            </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
         </CardContent>
       </Card>
     </div>

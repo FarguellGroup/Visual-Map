@@ -1,21 +1,25 @@
-
-
 'use client';
 
-import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarSeparator } from '@/components/ui/sidebar';
+import { SidebarContent, SidebarGroup, SidebarSeparator, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroupLabel, useSidebar } from '@/components/ui/sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '../ui/button';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, Home, Users, Shield, Server, DoorOpen, Network, Skull, SlidersHorizontal, ChevronDown, KeyRound } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useScanStore } from '@/store/use-scan-store';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import html2canvas from 'html2canvas';
-import type { Host, Script } from '@/types/nmap';
+import type { Host, Script, CveData } from '@/types/nmap';
 import { Slider } from '../ui/slider';
 import { VmLogo } from '../icons';
+import { Link, usePathname } from '@/navigation';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
+import { cn } from '@/lib/utils';
+import { useTheme } from 'next-themes';
+
 
 // Extend jsPDF with autoTable
 interface jsPDFWithAutoTable extends jsPDF {
@@ -111,17 +115,39 @@ const ipToNumber = (ip: string) => {
     return ip.split('.').reduce((acc, octet, index) => acc + parseInt(octet) * Math.pow(256, 3 - index), 0);
 };
 
+const getFormattedTimestamp = () => {
+    const now = new Date();
+    const YYYY = now.getFullYear();
+    const MM = String(now.getMonth() + 1).padStart(2, '0');
+    const DD = String(now.getDate()).padStart(2, '0');
+    const HH = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    return `${YYYY}-${MM}-${DD}_${HH}-${mm}-${ss}`;
+};
+
 export default function AppSidebar() {
   const tSidebar = useTranslations('Sidebar');
   const tDetails = useTranslations('DetailsPage');
   const tSummary = useTranslations('SummaryCards');
   const tHostsTable = useTranslations('HostsTable');
   const tRiskRanking = useTranslations('RiskRanking');
+  const tApi = useTranslations('ApiPage');
   
-  const { scanResult, riskWeights, setRiskWeights, setScanResult } = useScanStore();
+  const { scanResult, riskWeights, setRiskWeights, setScanResult, apiStatus } = useScanStore();
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingHtml, setIsExportingHtml] = useState(false);
+  const [accordionValue, setAccordionValue] = useState<string>('');
+  const { state, setOpen } = useSidebar();
   const locale = useLocale();
+  const pathname = usePathname();
+  const { theme } = useTheme();
+
+  useEffect(() => {
+    if (state === 'collapsed' && accordionValue) {
+      setAccordionValue('');
+    }
+  }, [state, accordionValue, setAccordionValue]);
 
   const handleWeightChange = (factor: keyof typeof riskWeights, value: number[]) => {
     if (!scanResult) return;
@@ -138,7 +164,7 @@ export default function AppSidebar() {
     )}`;
     const link = document.createElement("a");
     link.href = jsonString;
-    link.download = `${scanResult.fileName.replace('.xml', '')}_scan.json`;
+    link.download = `visual-map-report-${getFormattedTimestamp()}.json`;
     link.click();
   };
 
@@ -147,11 +173,15 @@ export default function AppSidebar() {
     setIsExportingHtml(true);
     try {
         const { fileName, hosts, summary } = scanResult;
-
+        
         const getChartAsBase64 = async (elementId: string) => {
             const element = document.getElementById(elementId);
             if (!element) return null;
-            const canvas = await html2canvas(element, { scale: 2, backgroundColor: 'transparent', useCORS: true });
+            const canvas = await html2canvas(element, { 
+              scale: 2, 
+              backgroundColor: theme === 'dark' ? 'hsl(220, 56%, 8%)' : 'hsl(210, 40%, 98%)',
+              useCORS: true 
+            });
             return canvas.toDataURL('image/png');
         };
         
@@ -165,6 +195,8 @@ export default function AppSidebar() {
         
         const allHostsSorted = [...hosts].sort((a,b) => ipToNumber(a.address[0].addr) - ipToNumber(b.address[0].addr));
         
+        const allCves = hosts.flatMap(h => (h.cves || []).map(cveItem => ({ ...cveItem, hostIp: h.address[0].addr })));
+
         const getRiskClass = (score: number) => {
             if (score >= 75) return 'badge-red';
             if (score >= 40) return 'badge-orange';
@@ -172,10 +204,19 @@ export default function AppSidebar() {
             return 'badge-gray';
         };
 
+        const getCveRiskClass = (score: number | null) => {
+            if (score === null || isNaN(score)) return 'badge-gray';
+            if (score >= 9.0) return 'badge-red';
+            if (score >= 7.0) return 'badge-orange';
+            if (score >= 4.0) return 'badge-yellow';
+            return 'badge-green';
+        }
+
         const visualizationsTitle = locale === 'es' ? 'Visualizaciones' : 'Visualizations';
         const osTitle = tDetails('os');
         const summaryTitle = tSummary('totalHosts').includes('Total') ? 'Summary' : 'Resumen';
-
+        const cvesTitle = tDetails('vulnerabilities');
+        const cvssTitle = locale === 'es' ? 'Puntaje CVSS' : 'CVSS Score';
 
         const htmlContent = `
             <!DOCTYPE html>
@@ -183,14 +224,14 @@ export default function AppSidebar() {
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Visual Map Scan Report - ${fileName}</title>
+                <title>Visual Map Scan Report</title>
                 <style>
                     :root {
                         --background: 220 56% 8%; --foreground: 210 40% 96%;
                         --card: 220 56% 10%; --card-border: 220 56% 15%;
                         --primary: 259 66% 65%; --muted-foreground: 210 40% 65%;
                         --border: 220 56% 15%;
-                        --badge-red: #EF4444; --badge-orange: #F97316; --badge-yellow: #FBBF24; --badge-gray: #6B7280;
+                        --badge-red: #EF4444; --badge-orange: #F97316; --badge-yellow: #FBBF24; --badge-gray: #6B7280; --badge-green: #22C55E;
                     }
                     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; color: hsl(var(--foreground)); background-color: hsl(var(--background)); margin: 0; padding-top: 80px; }
                     .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
@@ -207,7 +248,7 @@ export default function AppSidebar() {
                     tr:hover { background-color: hsla(var(--card-border), 0.5); }
                     td a { color: hsl(var(--primary)); text-decoration: none; } td a:hover { text-decoration: underline; }
                     .badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; color: white; }
-                    .badge-red { background-color: var(--badge-red); } .badge-orange { background-color: var(--badge-orange); } .badge-yellow { background-color: var(--badge-yellow); color: #000; } .badge-gray { background-color: var(--badge-gray); }
+                    .badge-red { background-color: var(--badge-red); } .badge-orange { background-color: var(--badge-orange); } .badge-yellow { background-color: var(--badge-yellow); color: #000; } .badge-gray { background-color: var(--badge-gray); } .badge-green { background-color: var(--badge-green); }
                     .grid-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-top: 20px; }
                     .card { position: relative; padding: 20px; border: 1px solid hsl(var(--border)); border-radius: 8px; background-color: hsl(var(--card)); }
                     .card-title { font-weight: 500; margin-bottom: 10px; color: hsl(var(--muted-foreground)); } .card-value { font-size: 2.5em; font-weight: bold; }
@@ -229,7 +270,8 @@ export default function AppSidebar() {
                     <nav>
                         <ul>
                             <li><a href="#summary">${summaryTitle}</a></li>
-                            <li><a href="#vulnerable-hosts">${tRiskRanking('title')}</a></li>
+                            ${topVulnerableHosts.length > 0 ? `<li><a href="#vulnerable-hosts">${tRiskRanking('title')}</a></li>` : ''}
+                            ${allCves.length > 0 ? `<li><a href="#cves">${cvesTitle}</a></li>` : ''}
                             <li><a href="#visualizations">${visualizationsTitle}</a></li>
                             <li><a href="#all-hosts">${tHostsTable('title')}</a></li>
                         </ul>
@@ -263,6 +305,27 @@ export default function AppSidebar() {
                                             <td>${getHostname(h)}</td>
                                             <td>${getOsName(h)}</td>
                                             <td><span class="badge ${getRiskClass(h.riskScore ?? 0)}">${h.riskScore?.toFixed(0) ?? '0'}</span></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    ` : ''}
+                    
+                    ${allCves.length > 0 ? `
+                    <section id="cves">
+                        <h2>${cvesTitle} (${allCves.length})</h2>
+                        <div class="table-responsive">
+                            <table>
+                                <thead><tr><th>CVE ID</th><th>${cvssTitle}</th><th>${tDetails('service')}</th><th>${tHostsTable('ipAddress')}</th></tr></thead>
+                                <tbody>
+                                    ${allCves.sort((a,b) => (b.cve.cvssScore ?? -1) - (a.cve.cvssScore ?? -1)).map(cve => `
+                                        <tr>
+                                            <td><a href="https://nvd.nist.gov/vuln/detail/${cve.cve.cveId}" target="_blank">${cve.cve.cveId}</a></td>
+                                            <td><span class="badge ${getCveRiskClass(cve.cve.cvssScore)}">${cve.cve.cvssScore?.toFixed(1) ?? 'N/A'}</span></td>
+                                            <td>${cve.service.product} ${cve.service.version || ''} (Port ${cve.portId})</td>
+                                            <td><a href="#host-${cve.hostIp.replace(/\./g, '-')}">${cve.hostIp}</a></td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -334,7 +397,7 @@ export default function AppSidebar() {
         const blob = new Blob([htmlContent], { type: 'text/html' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = `${scanResult.fileName.replace('.xml', '')}_report.html`;
+        link.download = `visual-map-report-${getFormattedTimestamp()}.html`;
         link.click();
         URL.revokeObjectURL(link.href);
 
@@ -359,8 +422,7 @@ export default function AppSidebar() {
       const primaryColor = '#8b5cf6';
       const headingColor = '#111827';
       const mutedTextColor = '#6b7280';
-      const backgroundColor = '#ffffff';
-
+      
       doc.setFont('Helvetica', 'normal');
       
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -376,26 +438,38 @@ export default function AppSidebar() {
         return [107, 114, 128]; // Gray
       };
       
-      const drawCell = (data: any) => {
+      const drawCell = (data: any, isCve = false) => {
         const scoreText = data.cell.text[0];
         if (scoreText) {
-          const score = Number(scoreText);
-          if (!isNaN(score)) {
-              const riskColor = getRiskColor(score);
-              doc.setFillColor(riskColor[0], riskColor[1], riskColor[2]);
-              const badgeWidth = 25;
-              const badgeHeight = 12;
-              const cell = data.cell;
-              const x = cell.x + (cell.width - badgeWidth) / 2;
-              const y = cell.y + (cell.height - badgeHeight) / 2;
-              doc.roundedRect(x, y, badgeWidth, badgeHeight, 6, 6, 'F');
-              doc.setTextColor(score >= 40 ? '#ffffff' : '#000000');
-              doc.setFontSize(9);
-              doc.text(scoreText, cell.x + cell.width / 2, cell.y + cell.height / 2, {
-                  align: 'center',
-                  baseline: 'middle'
-              });
-          }
+            const score = Number(scoreText);
+            if (!isNaN(score)) {
+                let riskColor: [number, number, number];
+                if (isCve) {
+                    if (score >= 9.0) riskColor = [239, 68, 68];
+                    else if (score >= 7.0) riskColor = [249, 115, 22];
+                    else if (score >= 4.0) riskColor = [251, 191, 36];
+                    else riskColor = [34, 197, 94];
+                } else {
+                    riskColor = getRiskColor(score);
+                }
+                
+                doc.setFillColor(riskColor[0], riskColor[1], riskColor[2]);
+                const badgeWidth = isCve ? 30 : 25;
+                const badgeHeight = 12;
+                const cell = data.cell;
+                const x = cell.x + (cell.width - badgeWidth) / 2;
+                const y = cell.y + (cell.height - badgeHeight) / 2;
+                doc.roundedRect(x, y, badgeWidth, badgeHeight, 6, 6, 'F');
+                
+                const textColor = (isCve && score < 4.0) || (!isCve && score < 40) ? '#000000' : '#ffffff';
+                doc.setTextColor(textColor);
+
+                doc.setFontSize(9);
+                doc.text(scoreText, cell.x + cell.width / 2, cell.y + cell.height / 2, {
+                    align: 'center',
+                    baseline: 'middle'
+                });
+            }
         }
       };
   
@@ -470,6 +544,36 @@ export default function AppSidebar() {
         });
         yPos = doc.lastAutoTable.finalY + 30;
       }
+      
+      // -- Discovered CVEs --
+      const allCves = scanResult.hosts.flatMap(h => (h.cves || []).map(cveItem => ({ ...cveItem, hostIp: h.address[0].addr })));
+      if (allCves.length > 0) {
+        if (yPos > pageHeight - 120) { doc.addPage(); yPos = margin; }
+        doc.setFontSize(22);
+        doc.setFont('Helvetica', 'bold');
+        doc.text(tDetails('vulnerabilities'), margin, yPos);
+        yPos += 25;
+        doc.autoTable({
+            startY: yPos,
+            head: [['CVE ID', 'CVSS', 'Service', 'Host IP']],
+            body: allCves.sort((a,b) => (b.cve.cvssScore ?? -1) - (a.cve.cvssScore ?? -1)).map(cve => [
+                cve.cve.cveId,
+                cve.cve.cvssScore?.toFixed(1) ?? 'N/A',
+                `${cve.service.product} ${cve.service.version || ''}`,
+                cve.hostIp
+            ]),
+            theme: 'striped',
+            headStyles: { fillColor: primaryColor, textColor: '#ffffff' },
+            styles: { font: 'Helvetica', fontSize: 9, cellPadding: 8, halign: 'center' },
+            columnStyles: { 0: { halign: 'left' }, 2: { halign: 'left' }, 3: { halign: 'left' } },
+            didDrawCell: (data) => {
+              if (data.column.index === 1 && data.section === 'body') {
+                drawCell(data, true);
+              }
+            }
+        });
+        yPos = doc.lastAutoTable.finalY + 30;
+      }
   
       // -- Visualizations --
       const addChart = async (elementId: string, title: string) => {
@@ -482,7 +586,11 @@ export default function AppSidebar() {
         doc.text(title, margin, yPos);
         yPos += 15;
         try {
-          const canvas = await html2canvas(element, { scale: 2, backgroundColor: backgroundColor, useCORS: true });
+          const canvas = await html2canvas(element, { 
+            scale: 2, 
+            backgroundColor: '#ffffff',
+            useCORS: true 
+          });
           const imgData = canvas.toDataURL('image/png');
           const imgWidth = pageWidth - (margin * 2);
           const imgHeight = canvas.height * imgWidth / canvas.width;
@@ -585,7 +693,7 @@ export default function AppSidebar() {
         doc.text(`${tHostsTable('page', { currentPage: i, totalPages: pageCount })}`, pageWidth / 2, pageHeight - 15, { align: 'center' });
       }
   
-      doc.save(`${scanResult.fileName.replace('.xml', '')}_report.pdf`);
+      doc.save(`visual-map-report-${getFormattedTimestamp()}.pdf`);
     } catch (error) {
       console.error("Error exporting PDF:", error);
     } finally {
@@ -593,77 +701,238 @@ export default function AppSidebar() {
     }
   };
 
+  const dashboardTitle = locale === 'es' ? 'Dashboard' : 'Dashboard';
+  const hostsTitle = tDetails('hosts');
+  const openPortsTitle = tDetails('openPorts');
+  const servicesTitle = tDetails('services');
+  
+  const vulnerableHostsTitle = locale === 'es' ? 'Hosts Vulnerables' : 'Vulnerable Hosts';
+  const vulnerabilitiesTitle = tDetails('vulnerabilities');
+  
+  const networkTitle = tDetails('networkGraph');
+  const apiTitle = tApi('title');
+
+  const handleAccordionTriggerClick = (value: string) => {
+    if (state === 'collapsed') {
+      setOpen(true);
+    }
+    setAccordionValue(value === accordionValue ? '' : value);
+  }
+
+  const getApiStatusTooltip = () => {
+    switch (apiStatus) {
+      case 'success':
+        return tApi('validKey');
+      case 'error':
+        return tApi('invalidKey');
+      case 'loading':
+        return tApi('checking');
+      default:
+        return apiTitle;
+    }
+  };
+
 
   return (
     <>
-      <SidebarHeader>
-        <h2 className="text-lg font-semibold">{tSidebar('controls')}</h2>
-      </SidebarHeader>
-      <SidebarSeparator />
-      <SidebarContent>
+      <SidebarContent className='pt-6'>
         <SidebarGroup>
-          <SidebarGroupLabel>{tSidebar('riskWeighting')}</SidebarGroupLabel>
-          <Card className="bg-background/50">
-            <CardContent className="p-4 space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="critical-ports-weight">
-                    {tSidebar('criticalPorts')}
-                  </Label>
-                  <span className="text-xs text-muted-foreground">{riskWeights.criticalPorts}/100</span>
-                </div>
-                <Slider defaultValue={[riskWeights.criticalPorts]} max={100} step={1} onValueCommit={(v) => handleWeightChange('criticalPorts', v)} id="critical-ports-weight"/>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="vuln-scripts-weight">{tSidebar('nseScripts')}</Label>
-                   <span className="text-xs text-muted-foreground">{riskWeights.vulnScripts}/100</span>
-                </div>
-                <Slider defaultValue={[riskWeights.vulnScripts]} max={100} step={1} onValueCommit={(v) => handleWeightChange('vulnScripts', v)} id="vuln-scripts-weight"/>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="service-version-weight">{tSidebar('serviceVersions')}</Label>
-                  <span className="text-xs text-muted-foreground">{riskWeights.serviceVersions}/100</span>
-                </div>
-                <Slider defaultValue={[riskWeights.serviceVersions]} max={100} step={1} onValueCommit={(v) => handleWeightChange('serviceVersions', v)} id="service-version-weight" />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="open-ports-weight">{tSidebar('openPorts')}</Label>
-                  <span className="text-xs text-muted-foreground">{riskWeights.openPortsCount}/100</span>
-                </div>
-                <Slider defaultValue={[riskWeights.openPortsCount]} max={100} step={1} onValueCommit={(v) => handleWeightChange('openPortsCount', v)} id="open-ports-weight"/>
-              </div>
-            </CardContent>
-          </Card>
+            <SidebarMenu>
+                <SidebarMenuItem>
+                    <Link href="/" className='w-full'>
+                        <SidebarMenuButton isActive={pathname === '/'} tooltip={dashboardTitle}>
+                            <Home />
+                            <span className="group-data-[collapsible=icon]:hidden">{dashboardTitle}</span>
+                        </SidebarMenuButton>
+                    </Link>
+                </SidebarMenuItem>
+                 <SidebarMenuItem>
+                <Link href="/details/hosts" className='w-full'>
+                    <SidebarMenuButton isActive={pathname.startsWith('/details/hosts')} tooltip={hostsTitle}>
+                        <Server />
+                        <span className="group-data-[collapsible=icon]:hidden">{hostsTitle}</span>
+                    </SidebarMenuButton>
+                </Link>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+                 <Link href="/details/ports" className='w-full'>
+                    <SidebarMenuButton isActive={pathname.startsWith('/details/ports')} tooltip={openPortsTitle}>
+                        <DoorOpen />
+                        <span className="group-data-[collapsible=icon]:hidden">{openPortsTitle}</span>
+                    </SidebarMenuButton>
+                </Link>
+            </SidebarMenuItem>
+             <SidebarMenuItem>
+                 <Link href="/details/services" className='w-full'>
+                    <SidebarMenuButton isActive={pathname.startsWith('/details/services')} tooltip={servicesTitle}>
+                        <Shield />
+                        <span className="group-data-[collapsible=icon]:hidden">{servicesTitle}</span>
+                    </SidebarMenuButton>
+                </Link>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+                 <Link href="/details/vulnerable-hosts" className='w-full'>
+                    <SidebarMenuButton isActive={pathname.startsWith('/details/vulnerable-hosts')} tooltip={vulnerableHostsTitle}>
+                        <Users />
+                        <span className="group-data-[collapsible=icon]:hidden">{vulnerableHostsTitle}</span>
+                    </SidebarMenuButton>
+                </Link>
+            </SidebarMenuItem>
+             <SidebarMenuItem>
+                 <Link href="/details/vulnerabilities" className='w-full'>
+                    <SidebarMenuButton isActive={pathname.startsWith('/details/vulnerabilities')} tooltip={vulnerabilitiesTitle}>
+                        <Skull />
+                        <span className="group-data-[collapsible=icon]:hidden">{vulnerabilitiesTitle}</span>
+                    </SidebarMenuButton>
+                </Link>
+            </SidebarMenuItem>
+             <SidebarMenuItem>
+                 <Link href="/details/network" className='w-full'>
+                    <SidebarMenuButton isActive={pathname.startsWith('/details/network')} tooltip={networkTitle}>
+                        <Network />
+                        <span className="group-data-[collapsible=icon]:hidden">{networkTitle}</span>
+                    </SidebarMenuButton>
+                </Link>
+            </SidebarMenuItem>
+            </SidebarMenu>
         </SidebarGroup>
+        <SidebarSeparator className="my-4" />
         <SidebarGroup>
-            <SidebarGroupLabel>{tSidebar('export')}</SidebarGroupLabel>
-            <div className="flex flex-col gap-2">
-                <Button variant="outline" size="sm" onClick={handleExportJson}>
-                    <Download className="mr-2 h-4 w-4" />
-                    {tSidebar('exportJson')}
-                </Button>
-                 <Button variant="outline" size="sm" onClick={handleExportHtml} disabled={isExportingHtml}>
-                    {isExportingHtml ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4" />}
-                    {tSidebar('exportHtml')}
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={isExportingPdf}>
-                    {isExportingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4" />}
-                    {tSidebar('exportPdf')}
-                </Button>
-            </div>
+            <SidebarMenu>
+                <SidebarMenuItem>
+                    <Link href="/details/api" className='w-full'>
+                        <SidebarMenuButton isActive={pathname.startsWith('/details/api')} tooltip={getApiStatusTooltip()}>
+                            <KeyRound />
+                            <span className="group-data-[collapsible=icon]:hidden flex-1 flex items-center justify-between">
+                                {apiTitle}
+                                {apiStatus !== 'idle' && (
+                                    <span className={cn('h-2 w-2 rounded-full', {
+                                        'bg-green-500': apiStatus === 'success',
+                                        'bg-red-500': apiStatus === 'error',
+                                        'bg-yellow-500': apiStatus === 'loading',
+                                    })} />
+                                )}
+                            </span>
+                        </SidebarMenuButton>
+                    </Link>
+                </SidebarMenuItem>
+            </SidebarMenu>
+        </SidebarGroup>
+        <SidebarSeparator className="my-4" />
+        <SidebarGroup>
+            <Accordion type="single" collapsible value={accordionValue} onValueChange={setAccordionValue}>
+                <AccordionItem value="risk-weighting" className="border-none">
+                     <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <AccordionTrigger 
+                                    className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180"
+                                    onClick={() => handleAccordionTriggerClick('risk-weighting')}
+                                >
+                                     <div className='flex items-center justify-between w-full'>
+                                        <div className='flex items-center gap-2'>
+                                            <SlidersHorizontal className="h-4 w-4" />
+                                            <span className="group-data-[collapsible=icon]:hidden">{tSidebar('riskWeighting')}</span>
+                                        </div>
+                                        <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden" />
+                                    </div>
+                                </AccordionTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" align="center" className="group-data-[collapsible=icon]:block hidden">
+                                <p>{tSidebar('riskWeighting')}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                    <AccordionContent>
+                        <Card className="bg-background/50">
+                            <CardContent className="p-4 space-y-4">
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                <Label htmlFor="critical-ports-weight" className='text-xs'>
+                                    {locale === 'es' ? 'Puertos Críticos' : 'Critical Ports'}
+                                </Label>
+                                <span className="text-xs text-muted-foreground">{riskWeights.criticalPorts}/100</span>
+                                </div>
+                                <Slider defaultValue={[riskWeights.criticalPorts]} max={100} step={1} onValueCommit={(v) => handleWeightChange('criticalPorts', v)} id="critical-ports-weight"/>
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                <Label htmlFor="cve-weight" className='text-xs'>{tDetails('vulnerabilities')}</Label>
+                                <span className="text-xs text-muted-foreground">{riskWeights.cveScore}/100</span>
+                                </div>
+                                <Slider defaultValue={[riskWeights.cveScore]} max={100} step={1} onValueCommit={(v) => handleWeightChange('cveScore', v)} id="cve-weight"/>
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                <Label htmlFor="vuln-scripts-weight" className='text-xs'>{tSidebar('nseScripts')}</Label>
+                                <span className="text-xs text-muted-foreground">{riskWeights.vulnScripts}/100</span>
+                                </div>
+                                <Slider defaultValue={[riskWeights.vulnScripts]} max={100} step={1} onValueCommit={(v) => handleWeightChange('vulnScripts', v)} id="vuln-scripts-weight"/>
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                <Label htmlFor="service-version-weight" className='text-xs'>{tSidebar('serviceVersions')}</Label>
+                                <span className="text-xs text-muted-foreground">{riskWeights.serviceVersions}/100</span>
+                                </div>
+                                <Slider defaultValue={[riskWeights.serviceVersions]} max={100} step={1} onValueCommit={(v) => handleWeightChange('serviceVersions', v)} id="service-version-weight" />
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                <Label htmlFor="open-ports-weight" className='text-xs'>{tSidebar('openPorts')}</Label>
+                                <span className="text-xs text-muted-foreground">{riskWeights.openPortsCount}/100</span>
+                                </div>
+                                <Slider defaultValue={[riskWeights.openPortsCount]} max={100} step={1} onValueCommit={(v) => handleWeightChange('openPortsCount', v)} id="open-ports-weight"/>
+                            </div>
+                            </CardContent>
+                        </Card>
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
+        </SidebarGroup>
+         <SidebarGroup>
+            <Accordion type="single" collapsible value={accordionValue} onValueChange={setAccordionValue}>
+                <AccordionItem value="export" className="border-none">
+                     <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                 <AccordionTrigger 
+                                    className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180"
+                                    onClick={() => handleAccordionTriggerClick('export')}
+                                >
+                                     <div className='flex items-center justify-between w-full'>
+                                        <div className='flex items-center gap-2'>
+                                            <Download className="h-4 w-4" />
+                                            <span className="group-data-[collapsible=icon]:hidden">{tSidebar('export')}</span>
+                                        </div>
+                                        <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden" />
+                                    </div>
+                                </AccordionTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" align="center" className="group-data-[collapsible=icon]:block hidden">
+                                <p>{tSidebar('export')}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                    <AccordionContent>
+                        <div className="mt-4 flex flex-col items-center justify-center gap-2">
+                           <Button variant="outline" size="sm" onClick={handleExportJson} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs" disabled={isExportingPdf || isExportingHtml}>
+                                <Download />
+                                {tSidebar('exportJson')}
+                            </Button>
+                             <Button variant="outline" size="sm" onClick={handleExportHtml} disabled={isExportingPdf || isExportingHtml} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
+                                <Download />
+                                {tSidebar('exportHtml')}
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={isExportingPdf || isExportingHtml} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
+                                {isExportingPdf ? <Loader2 className="animate-spin" /> : <Download />}
+                                {tSidebar('exportPdf')}
+                            </Button>
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
         </SidebarGroup>
       </SidebarContent>
     </>
   );
 }
-
-
-
-
-
-
-
-    
