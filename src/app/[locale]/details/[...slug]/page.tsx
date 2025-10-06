@@ -1,90 +1,92 @@
 
 'use client';
 
+import { useParams } from 'next/navigation';
 import { useRouter } from '@/navigation';
-import AppFooter from '@/components/layout/footer';
-import AppHeader from '@/components/layout/header';
 import { useScanStore } from '@/store/use-scan-store';
 import { useEffect } from 'react';
 import HostsDetailView from '@/components/details/hosts-detail-view';
 import PortsDetailView from '@/components/details/ports-detail-view';
 import ServicesDetailView from '@/components/details/services-detail-view';
 import VulnerabilitiesDetailView from '@/components/details/vulnerabilities-detail-view';
-import { useTranslations } from 'next-intl';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
 import HostDetailDrawer from '@/components/dashboard/host-detail-drawer';
+import NetworkGraphView from '@/components/details/network-graph-view';
+import ThreatsDetailView from '@/components/details/threats-detail-view';
+import ApiPage from '../api/page';
 
-export default function DetailsPage({ params }: { params: { slug: string[], locale: string } }) {
-  const { slug, locale } = params;
+export default function DetailsPage() {
+  const params = useParams();
+  const slug = (params.slug || []) as string[];
   const page = slug[0] || 'hosts';
-  const { scanResult, clearScanResult, setSelectedHost } = useScanStore();
+  const { scanResult, setSelectedHost } = useScanStore();
   const router = useRouter();
   const t = useTranslations('DetailsPage');
+  const locale = useLocale();
 
   useEffect(() => {
-    if (!scanResult) {
+    if (!scanResult && page !== 'api') {
       router.push('/');
     }
-  }, [scanResult, router]);
+  }, [scanResult, router, page]);
   
   useEffect(() => {
     // Close the host detail drawer when navigating between detail pages
     setSelectedHost(null);
   }, [page, setSelectedHost]);
 
-  const handleUploadNew = () => {
-    clearScanResult();
-    router.push('/'); 
-  };
-  
   const getPageTitle = () => {
-    if (page === 'vulnerabilities') {
-      return locale === 'es' ? 'Vulnerabilidades' : 'Vulnerabilities';
+    // Hardcoding titles as requested to fix translation key issue.
+    if (page === 'vulnerable-hosts') {
+        return locale === 'es' ? 'Hosts Vulnerables' : 'Vulnerable Hosts';
     }
+    if (page === 'vulnerabilities') {
+        return locale === 'es' ? 'Vulnerabilidades' : 'Vulnerabilities';
+    }
+
     const pageTitles: { [key: string]: string } = {
-      hosts: t('hosts'),
-      ports: t('openPorts'),
-      services: t('services'),
+        hosts: t('hosts'),
+        ports: t('openPorts'),
+        services: t('services'),
+        network: t('networkGraph'),
+        api: t('api'),
     };
     return pageTitles[page] || t('pageNotFound');
   }
 
   const renderContent = () => {
-    if (!scanResult) {
+    if (!scanResult && page !== 'api') {
         return null;
     }
     switch(page) {
         case 'hosts':
-            return <HostsDetailView hosts={scanResult.hosts} />;
+            return <HostsDetailView hosts={scanResult!.hosts} />;
         case 'ports':
-            return <PortsDetailView hosts={scanResult.hosts} />;
+            return <PortsDetailView hosts={scanResult!.hosts} />;
         case 'services':
-            return <ServicesDetailView hosts={scanResult.hosts} />;
+            return <ServicesDetailView hosts={scanResult!.hosts} />;
+        case 'vulnerable-hosts':
+            return <VulnerabilitiesDetailView hosts={scanResult!.hosts} />;
         case 'vulnerabilities':
-            return <VulnerabilitiesDetailView hosts={scanResult.hosts} />;
+            return <ThreatsDetailView hosts={scanResult!.hosts} />;
+        case 'network':
+            return <NetworkGraphView hosts={scanResult!.hosts} />;
+        case 'api':
+            return <ApiPage />;
         default:
             return <p>{t('pageNotFound')}</p>;
     }
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <AppHeader onUploadNew={handleUploadNew} showUploadNew={true} />
-      <main className="flex-1 w-full p-4 md:p-6 lg:p-8">
-        <div className="container mx-auto">
-          <div className="flex items-center gap-4 mb-4">
-            <Button variant="outline" size="icon" onClick={() => router.back()}>
-              <ArrowLeft className="h-4 w-4" />
-              <span className="sr-only">Go back</span>
-            </Button>
-            <h1 className="text-3xl font-bold capitalize">{getPageTitle()}</h1>
-          </div>
-          {renderContent()}
+    <>
+      <div className="container mx-auto p-0">
+        <div className="flex items-center gap-4 mb-4">
+          <h1 className="text-2xl md:text-3xl font-bold capitalize">{getPageTitle()}</h1>
         </div>
-        <HostDetailDrawer />
-      </main>
-      <AppFooter />
-    </div>
+        {renderContent()}
+      </div>
+      <HostDetailDrawer />
+    </>
   );
 }
