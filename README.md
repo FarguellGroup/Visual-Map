@@ -83,22 +83,22 @@ Un listado de todos los hosts descubiertos en el escaneo de Nmap, incluyendo la 
 #### Puertos abiertos
 Consulta todos los puertos abiertos en el objetivo, con una gráfica de los 15 puertos abiertos más comunes.
 
-<img width="3456" height="1928" alt="visual-ports" src="https://github.com/user-attachments/assets/3f628d40-1cec-4201-afb1-f6181a508f6e" />
+<img width="3456" height="1926" alt="visual-ports" src="https://github.com/user-attachments/assets/85beaf2b-f4a4-4ebe-bfb5-c9eb3cc98de4" />
 
 #### Servicios expuestos
 Consulta todos los servicios expuestos en la infraestructura, con una gráfica de distribución de servicios.
 
-<img width="3456" height="1924" alt="visual-services" src="https://github.com/user-attachments/assets/1aeaa139-75d7-4797-bd8a-0106ea6cd07a" />
+<img width="3456" height="1924" alt="visual-services" src="https://github.com/user-attachments/assets/cbeab12e-e592-46b8-aa40-832cc1470a63" />
 
 #### Hosts más vulnerables
 Visualiza de manera rápida los hosts más vulnerables de una infraestructura, con un gráfico de distribución de riesgo.
 
-<img width="3456" height="1926" alt="visual-vuln-hosts" src="https://github.com/user-attachments/assets/cf7dac13-3948-47be-b31b-77494de8661f" />
+<img width="3456" height="1926" alt="visual-vuln-hosts" src="https://github.com/user-attachments/assets/8af73f66-976a-4f70-a0b2-df157619bf4e" />
 
 #### CVEs y Vulnerabilidades
 Escanea todos los servicios expuestos y detecta todos los CVEs asociados, con su puntuación CVSS. Puedes iniciar la búsqueda de CVEs para todos los hosts desde esta vista.
 
-<img width="3456" height="1924" alt="visual-cves" src="https://github.com/user-attachments/assets/b4d8ffb9-6bb0-4f0c-a735-04dc8956c3a9" />
+<img width="3456" height="1924" alt="visual-cves" src="https://github.com/user-attachments/assets/9eed556a-eb49-4529-9e6f-f24c500718e1" />
 
 #### Grafo de red
 Visualiza un esquema de la red y las relaciones entre los hosts de manera super simple.
