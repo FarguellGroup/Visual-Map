@@ -57,6 +57,9 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     };
 
     const { allFoundCves, vulnerableServices, serviceDistribution, hasUnscannedHosts } = useMemo(() => {
+        if (!cveCache) {
+             return { allFoundCves: [], vulnerableServices: [], serviceDistribution: [], hasUnscannedHosts: true };
+        }
         let allCves: { host: Host, service: Service, portId: string, cve: any }[] = [];
         let servicesWithCves = new Map<string, { service: Service, cves: any[], hostCount: number, hosts: Set<string> }>();
         let unscannedCount = 0;
@@ -170,7 +173,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
         router.push(`/details/host/${hostIp}`);
     };
 
-    const cvesTitle = locale === 'es' ? 'CVEs' : 'CVEs';
+    const cvesTitle = locale === 'es' ? 'CVEs Descubiertos' : 'Discovered CVEs';
     const cvesDescription = locale === 'es' ? 'Busca vulnerabilidades y CVEs en los hosts descubiertos mediante IA.' : 'Search for vulnerabilities and CVEs on discovered hosts using AI.';
     const vulnerableServicesTitle = locale === 'es' ? 'Principales Servicios Vulnerables' : 'Top Vulnerable Services';
     const serviceTitle = t('service');
