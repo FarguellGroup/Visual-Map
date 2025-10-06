@@ -92,10 +92,12 @@ export default function ApiPage() {
         } catch (e) {
             // Not a JSON response
         }
+        
         if (errorMsg.toLowerCase().includes('fetch')) {
             errorMsg = locale === 'es' ? 'Error de red: No se pudo conectar a la API. Verifica tu conexión a internet.' : 'Network Error: Could not connect to the API. Check your internet connection.';
-        } else if (errorMsg.toLowerCase().includes('api key not valid')) {
-            errorMsg = t('invalidKeyDescription');
+        } else {
+             // Generalize other errors
+            errorMsg = t('invalidKey');
         }
         throw new Error(errorMsg);
       }
@@ -142,8 +144,9 @@ export default function ApiPage() {
       setIsChecking(false);
       return true;
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
       setApiStatus('error');
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      setError(errorMessage);
       setIsChecking(false);
       console.error("API Connection Error:", err);
       return false;
@@ -151,12 +154,7 @@ export default function ApiPage() {
   };
 
   useEffect(() => {
-    if(!storedApiKey) {
-      setApiStatus('error');
-      setError(t('noKeyDescription'));
-    } else {
-      checkApiConnection();
-    }
+    checkApiConnection();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -164,11 +162,9 @@ export default function ApiPage() {
     if (!apiKeyInput) return;
     setIsSaving(true);
     
-    // 1. First, check if the new key is valid
     const isValid = await checkApiConnection(apiKeyInput);
 
     if (isValid) {
-      // 2. If valid, save it to .env
       try {
           const response = await fetch('/api/save-api-key', {
               method: 'POST',
@@ -186,7 +182,6 @@ export default function ApiPage() {
               description: locale === 'es' ? 'La clave ha sido guardada en tu archivo .env.' : 'The key has been saved to your .env file.',
           });
           
-          // 3. Update the key in the global store and clear the input
           setApiKey(apiKeyInput);
           setApiKeyInput('');
 
@@ -197,18 +192,15 @@ export default function ApiPage() {
               title: 'Error',
               description: saveError,
           });
-      } finally {
-        setIsSaving(false);
       }
     } else {
-        // If the key is not valid, show the error from checkApiConnection
         toast({
             variant: 'destructive',
             title: locale === 'es' ? 'Clave API Inválida' : 'Invalid API Key',
             description: error || t('invalidKeyDescription'),
         });
-        setIsSaving(false);
     }
+    setIsSaving(false);
   };
 
 
@@ -273,8 +265,8 @@ export default function ApiPage() {
        <Card>
         <CardContent className="p-4 flex items-center justify-between">
             <div>
-                <h4 className="font-semibold text-base">{locale === 'es' ? 'Obtén tu clave API' : 'Get your API Key'}</h4>
-                <p className="text-sm text-muted-foreground">{locale === 'es' ? 'Necesitas una clave API Gemini válida para usar las funciones de IA.' : 'You need a valid Gemini API key to use the AI features.'}</p>
+                <h4 className="font-semibold text-base">{t('getApiKeyTitle')}</h4>
+                <p className="text-sm text-muted-foreground">{t('getApiKeyDescription')}</p>
             </div>
             <a href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener noreferrer">
                 <Button variant="outline">
@@ -292,7 +284,7 @@ export default function ApiPage() {
         <CardContent className="space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 border rounded-lg">
             <div className="text-sm font-medium">{getStatusContent()}</div>
-            <Button onClick={() => checkApiConnection(apiKeyInput || storedApiKey || undefined)} disabled={isChecking}>
+            <Button onClick={() => checkApiConnection()} disabled={isChecking}>
               {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {t('checkButton')}
             </Button>
