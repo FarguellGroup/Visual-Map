@@ -158,6 +158,7 @@ export default function ApiPage() {
   };
 
   useEffect(() => {
+    // Check connection only once on mount
     checkApiConnection();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -165,9 +166,9 @@ export default function ApiPage() {
   const handleSaveApiKey = async () => {
     if (!apiKeyInput) return;
     setIsSaving(true);
-
+  
     const isValid = await checkApiConnection(apiKeyInput);
-
+  
     if (isValid) {
       try {
         const response = await fetch('/api/save-api-key', {
@@ -181,7 +182,8 @@ export default function ApiPage() {
         }
         setApiKey(apiKeyInput);
         setApiKeyInput('');
-        await checkApiConnection(apiKeyInput); // Re-check connection with new key
+        // Re-check connection with new key to update UI seamlessly
+        await checkApiConnection(apiKeyInput);
       } catch (error) {
         const saveError = error instanceof Error ? error.message : 'Failed to save API key.';
         toast({
@@ -191,7 +193,6 @@ export default function ApiPage() {
         });
       }
     } else {
-      // The error state is already set by checkApiConnection, but we can toast it too.
       toast({
         variant: 'destructive',
         title: locale === 'es' ? 'Clave API Inválida' : 'Invalid API Key',
@@ -445,5 +446,7 @@ export default function ApiPage() {
     </div>
   );
 }
+
+    
 
     
