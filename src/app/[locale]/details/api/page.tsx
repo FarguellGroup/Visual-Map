@@ -69,8 +69,6 @@ export default function ApiPage() {
     setError(null);
     setModels([]);
     
-    // On the client, we can't read process.env directly after it's been set on server.
-    // So we rely on the key passed or the one in the store.
     const apiKey = key || storedApiKey;
 
     if (!apiKey) {
@@ -138,7 +136,6 @@ export default function ApiPage() {
         
       setModels(availableModels);
       setApiStatus('success');
-      // If we successfully connect, update the key in the store
       setApiKey(apiKey);
     } catch (err) {
       setApiStatus('error');
@@ -172,9 +169,9 @@ export default function ApiPage() {
             description: locale === 'es' ? 'La clave ha sido guardada en tu archivo .env.' : 'The key has been saved to your .env file.',
         });
         
-        setApiKey(apiKeyInput); // Update store
-        setApiKeyInput(''); // Clear input
-        await checkApiConnection(apiKeyInput); // Re-check connection with new key
+        setApiKey(apiKeyInput);
+        setApiKeyInput('');
+        await checkApiConnection(apiKeyInput);
 
     } catch (error) {
         setError(error instanceof Error ? error.message : 'Failed to save API key.');
@@ -238,7 +235,7 @@ export default function ApiPage() {
   const rateLimitHintTitleText = locale === 'es' ? 'Consejo sobre el Límite de la API' : 'API Rate Limit Tip';
   const rateLimitHintDescriptionText = locale === 'es' ? 'Si alcanzas el límite de peticiones (rate limit) de la API para un modelo, prueba a cambiar a uno diferente para seguir utilizando la plataforma.' : 'If you reach the API rate limit for a model, try switching to a different one to continue using the platform.';
 
-  const shouldShowApiKeyInput = apiStatus === 'error' && (error === t('noKeyDescription') || error === t('invalidKeyDescription'));
+  const shouldShowApiKeyInput = (apiStatus === 'error') || (apiStatus !== 'success' && !storedApiKey);
 
   return (
     <div className="container mx-auto p-0 space-y-8">
