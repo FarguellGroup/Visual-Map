@@ -264,19 +264,7 @@ export const useScanStore = create<ScanState>((set, get) => ({
     }
   },
   setApiKey: (key: string | null) => {
-    const { scanResult, riskWeights } = get();
-    set({ 
-        apiKey: key,
-        explanationCache: new Map(),
-        pentestingStepsCache: new Map(),
-        nseSummaryCache: new Map(),
-        cveCache: new Map(),
-        isCveScanRunning: false, 
-        cveScanProgress: { processed: 0, total: 0, isComplete: false },
-    });
-    if (scanResult) {
-        get().setScanResult(scanResult.fileName, scanResult.originalHosts, riskWeights, false);
-    }
+    set({ apiKey: key });
   },
   setApiStatus: (status: ApiStatus) => set({ apiStatus: status }),
 
