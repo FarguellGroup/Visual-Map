@@ -68,7 +68,7 @@ export default function UploadZone({ getRootProps, getInputProps, isDragActive }
 
 
   return (
-    <div className="flex flex-col md:flex-row items-stretch justify-center gap-8 w-full h-full p-4 md:p-8 lg:py-20 lg:px-8">
+    <div className="flex flex-col md:flex-row items-stretch justify-center gap-8 w-full h-full p-4 md:p-8 lg:py-12 lg:px-8">
       <div
         {...getRootProps()}
         className={cn(
