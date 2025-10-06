@@ -8,6 +8,11 @@ import AppSidebar from '@/components/layout/sidebar';
 import { SidebarProvider, Sidebar, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { useScanStore } from '@/store/use-scan-store';
 import { usePathname } from '@/navigation';
+import { useTheme } from 'next-themes';
+import VulnerabilitiesDetailView from '@/components/details/vulnerabilities-detail-view';
+import PortsDetailView from '@/components/details/ports-detail-view';
+import ServicesDetailView from '@/components/details/services-detail-view';
+import ThreatsDetailView from '@/components/details/threats-detail-view';
 
 export default function LocaleLayout({
   children,
@@ -18,6 +23,7 @@ export default function LocaleLayout({
 }) {
   const { scanResult, clearScanResult } = useScanStore();
   const pathname = usePathname();
+  const { theme } = useTheme();
   
   const handleUploadNew = () => {
     clearScanResult();
@@ -45,6 +51,17 @@ export default function LocaleLayout({
           <AppFooter />
         </div>
       </SidebarInset>
+       {/* Container for off-screen rendering for exports */}
+      <div id="export-container" className={`${theme} bg-background`} style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '800px', padding: '1rem' }}>
+        {scanResult && (
+          <>
+            <VulnerabilitiesDetailView hosts={scanResult.hosts} />
+            <PortsDetailView hosts={scanResult.hosts} />
+            <ServicesDetailView hosts={scanResult.hosts} />
+            <ThreatsDetailView hosts={scanResult.hosts} />
+          </>
+        )}
+      </div>
     </SidebarProvider>
   );
 }

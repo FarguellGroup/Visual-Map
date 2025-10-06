@@ -11,19 +11,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import HostDetailDrawer from '@/components/dashboard/host-detail-drawer';
-import PortsDetailView from '@/components/details/ports-detail-view';
-import ServicesDetailView from '@/components/details/services-detail-view';
-import VulnerabilitiesDetailView from '@/components/details/vulnerabilities-detail-view';
-import ThreatsDetailView from '@/components/details/threats-detail-view';
-import NetworkGraphView from '@/components/details/network-graph-view';
-import { useTheme } from 'next-themes';
 
 export default function Home() {
   const { scanResult, setScanResult, clearScanResult, riskWeights } = useScanStore();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const t = useTranslations('Loader');
-  const { theme } = useTheme();
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -94,37 +87,6 @@ export default function Home() {
         <div className="space-y-4 md:space-y-8 py-4 md:py-8">
           <SummaryCards />
           <HostsTable />
-          {/* Pre-render elements for PDF/HTML export */}
-          <div className="absolute -left-[9999px] top-[-9999px] opacity-0" aria-hidden="true">
-              {scanResult && (
-                <>
-                <div className={'light'}>
-                  <div className="p-4 bg-background w-[800px]">
-                    <PortsDetailView hosts={scanResult.hosts} pdfMode={true}/>
-                  </div>
-                    <div className="p-4 bg-background w-[800px]">
-                    <ServicesDetailView hosts={scanResult.hosts} pdfMode={true}/>
-                  </div>
-                    <div className="p-4 bg-background w-[800px]">
-                      <VulnerabilitiesDetailView hosts={scanResult.hosts} pdfMode={true}/>
-                  </div>
-                    <div className="p-4 bg-background w-[800px]">
-                    <ThreatsDetailView hosts={scanResult.hosts} pdfMode={true}/>
-                  </div>
-                  <div className="p-4 bg-background w-[800px]">
-                    <NetworkGraphView hosts={scanResult.hosts} pdfMode={true}/>
-                  </div>
-                </div>
-                <div className={theme}>
-                  <div id="html-export-content" className="p-4 bg-background w-[800px]">
-                     <PortsDetailView hosts={scanResult.hosts} pdfMode={true} forceId="html-top-ports-chart"/>
-                     <ServicesDetailView hosts={scanResult.hosts} pdfMode={true} forceId="html-service-distribution-chart"/>
-                     <VulnerabilitiesDetailView hosts={scanResult.hosts} pdfMode={true} forceId="html-risk-distribution-chart"/>
-                  </div>
-                </div>
-                </>
-              )}
-          </div>
         </div>
       )}
       <HostDetailDrawer />
