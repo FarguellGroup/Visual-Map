@@ -8,7 +8,7 @@ import { Button } from '../ui/button';
 import { Download, Loader2, Home, Users, Shield, Server, DoorOpen, Network, Skull, SlidersHorizontal, ChevronDown, KeyRound } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useScanStore } from '@/store/use-scan-store';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import html2canvas from 'html2canvas';
@@ -751,6 +751,8 @@ export default function AppSidebar() {
     }
   };
 
+  const apiStatusTooltip = useMemo(() => getApiStatusTooltip(), [apiStatus, tApi, apiTitle]);
+
 
   return (
     <>
@@ -820,7 +822,7 @@ export default function AppSidebar() {
             <SidebarMenu>
                 <SidebarMenuItem>
                     <Link href="/details/api" className='w-full'>
-                        <SidebarMenuButton isActive={pathname.startsWith('/details/api')} tooltip={getApiStatusTooltip()}>
+                        <SidebarMenuButton isActive={pathname.startsWith('/details/api')} tooltip={apiStatusTooltip}>
                             <KeyRound />
                             <span className="group-data-[collapsible=icon]:hidden flex-1 flex items-center justify-between">
                                 {apiTitle}
