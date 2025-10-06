@@ -158,8 +158,8 @@ export default function ApiPage() {
   };
 
   useEffect(() => {
-    if(!storedApiKey) {
-        checkApiConnection();
+    if (!isChecking) {
+      checkApiConnection();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -451,5 +451,7 @@ export default function ApiPage() {
     </div>
   );
 }
+
+    
 
     
