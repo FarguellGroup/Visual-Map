@@ -6,33 +6,15 @@ Visual Map es una plataforma web Next.js que te permite subir escaneos XML de Nm
 
 ## Características
 
-**📊 Dashboard Interactivo**
-Estadísticas clave, hosts priorizados por vulnerabilidad y tabla completa de dispositivos descubiertos.
-
-**🤖 Puntuación de Riesgo con IA**
-Evalúa automáticamente los hosts según puertos, servicios, versiones, scripts NSE y vulnerabilidades (CVEs).
-
-**🔍 Análisis Detallado de Hosts**
-Explora cada host con información profunda: servicios, SO, scripts y análisis de riesgo generados por IA.
-
-**🧠 Búsqueda de Vulnerabilidades (CVEs)**
-Identifica CVEs conocidas para servicios detectados y obtén contexto en un clic.
-
-**⚔️ Pentesting con IA**
-Resumen de hallazgos y pasos de explotación sugeridos automáticamente.
-
-**🧾 Exportación de Informes**
-Genera reportes ejecutivos en JSON, HTML y PDF, con más contexto técnico y métricas de riesgo.
-
-**🌍 Soporte Multilenguaje**
-Interfaz disponible en Español e Inglés.
-
-**🌗 Modo Claro / Oscuro**
-Selecciona tu tema favorito con persistencia automática.
-
-**🔒 Procesamiento Local**
-Todo ocurre en tu navegador. Tus datos nunca salen de tu máquina (solo se envía a la IA lo estrictamente necesario).
-
+**📊 Dashboard Interactivo** - Estadísticas clave, hosts priorizados por vulnerabilidad y tabla completa de dispositivos descubiertos.
+**🤖 Puntuación de Riesgo con IA** - Evalúa automáticamente los hosts según puertos, servicios, versiones, scripts NSE y vulnerabilidades (CVEs).
+**🔍 Análisis Detallado de Hosts** - Explora cada host con información profunda: servicios, SO, scripts y análisis de riesgo generados por IA.
+**🧠 Búsqueda de Vulnerabilidades (CVEs)** - Identifica CVEs conocidas para servicios detectados y obtén contexto en un clic.
+**⚔️ Pentesting con IA** - Resumen de hallazgos y pasos de explotación sugeridos automáticamente.
+**🧾 Exportación de Informes** - Genera reportes ejecutivos en JSON, HTML y PDF, con más contexto técnico y métricas de riesgo.
+**🌍 Soporte Multilenguaje** - Interfaz disponible en Español e Inglés.
+**🌗 Modo Claro / Oscuro** - Selecciona tu tema favorito con persistencia automática.
+**🔒 Procesamiento Local** - Todo ocurre en tu navegador. Tus datos nunca salen de tu máquina (solo se envía a la IA lo estrictamente necesario).
 ## Instalación
 
 ```bash
