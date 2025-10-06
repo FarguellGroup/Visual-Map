@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -13,6 +12,7 @@ import { useScanStore } from '@/store/use-scan-store';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
 
 type Model = {
   name: string;
@@ -53,28 +53,33 @@ const RateLimitsDescription = ({ locale }: { locale: string }) => {
 export default function ApiPage() {
   const t = useTranslations('ApiPage');
   const locale = useLocale();
-  const { apiStatus, setApiStatus, aiModel, setAiModel } = useScanStore();
+  const { toast } = useToast();
+  const { apiStatus, setApiStatus, aiModel, setAiModel, apiKey: storedApiKey, setApiKey } = useScanStore();
   const [models, setModels] = useState<Model[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const modelsPerPage = 10;
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
 
   const checkApiConnection = async (key?: string) => {
     setApiStatus('loading');
     setError(null);
     setModels([]);
+    
+    // On the client, we can't read process.env directly after it's been set on server.
+    // So we rely on the key passed or the one in the store.
+    const apiKey = key || storedApiKey;
 
+    if (!apiKey) {
+      setApiStatus('error');
+      setError(t('noKeyDescription'));
+      return;
+    }
+    
     try {
-      const apiKey = key || process.env.NEXT_PUBLIC_GOOGLE_GENAI_API_KEY;
-      if (!apiKey) {
-        setApiStatus('error');
-        setError(t('noKeyDescription'));
-        return;
-      }
-      
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
       
       if (!response.ok) {
@@ -133,6 +138,8 @@ export default function ApiPage() {
         
       setModels(availableModels);
       setApiStatus('success');
+      // If we successfully connect, update the key in the store
+      setApiKey(apiKey);
     } catch (err) {
       setApiStatus('error');
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -147,15 +154,40 @@ export default function ApiPage() {
 
   const handleSaveApiKey = async () => {
     if (!apiKeyInput) return;
+    setIsSaving(true);
     try {
-        await checkApiConnection(apiKeyInput);
-        // This is a client-side simulation. The actual .env file is not modified.
-        process.env.NEXT_PUBLIC_GOOGLE_GENAI_API_KEY = apiKeyInput;
+        const response = await fetch('/api/save-api-key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ apiKey: apiKeyInput }),
+        });
+
+        if (!response.ok) {
+            const result = await response.json();
+            throw new Error(result.error || 'Failed to save API key.');
+        }
+
+        toast({
+            title: locale === 'es' ? 'Clave API guardada' : 'API Key Saved',
+            description: locale === 'es' ? 'La clave ha sido guardada en tu archivo .env.' : 'The key has been saved to your .env file.',
+        });
         
+        setApiKey(apiKeyInput); // Update store
+        setApiKeyInput(''); // Clear input
+        await checkApiConnection(apiKeyInput); // Re-check connection with new key
+
     } catch (error) {
-        setError(locale === 'es' ? 'Error al guardar la clave API.' : 'Failed to save API key.');
+        setError(error instanceof Error ? error.message : 'Failed to save API key.');
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: error instanceof Error ? error.message : 'Failed to save API key.',
+        });
+    } finally {
+        setIsSaving(false);
     }
   };
+
 
   const getStatusContent = () => {
     switch (apiStatus) {
@@ -245,12 +277,12 @@ export default function ApiPage() {
           
           {shouldShowApiKeyInput && (
               <div className="space-y-4 pt-4 border-t">
-                  <h4 className="font-semibold">{locale === 'es' ? 'Actualizar Clave API' : 'Update API Key'}</h4>
+                  <h4 className="font-semibold">{locale === 'es' ? 'Añadir Clave API' : 'Add API Key'}</h4>
                    <div className="flex items-center gap-2">
                         <div className="relative w-full">
                            <Input 
                                 type={isApiKeyVisible ? 'text' : 'password'}
-                                placeholder={locale === 'es' ? 'Introduce tu nueva clave API Gemini...' : 'Enter your new Gemini API key...'}
+                                placeholder={locale === 'es' ? 'Introduce tu clave API Gemini...' : 'Enter your Gemini API key...'}
                                 value={apiKeyInput}
                                 onChange={(e) => setApiKeyInput(e.target.value)}
                                 className="pr-10"
@@ -266,8 +298,8 @@ export default function ApiPage() {
                                <span className="sr-only">{isApiKeyVisible ? (locale === 'es' ? 'Ocultar clave API' : 'Hide API key') : (locale === 'es' ? 'Mostrar clave API' : 'Show API key')}</span>
                            </Button>
                         </div>
-                        <Button onClick={handleSaveApiKey} disabled={!apiKeyInput || apiStatus === 'loading'}>
-                           {apiStatus === 'loading' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        <Button onClick={handleSaveApiKey} disabled={!apiKeyInput || isSaving}>
+                           {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                             {locale === 'es' ? 'Guardar' : 'Save'}
                         </Button>
                    </div>
@@ -297,12 +329,12 @@ export default function ApiPage() {
                     </TableHeader>
                     <TableBody>
                         {currentModels.map(model => (
-                        <TableRow key={model.name} className={cn(model.name === `models/${aiModel}` && 'bg-green-500/10 hover:bg-green-500/20')}>
+                        <TableRow key={model.name} className={cn(model.name === `models/${aiModel}` && 'bg-primary/10 hover:bg-primary/20')}>
                             <TableCell className="font-mono text-xs">{model.name.replace('models/', '')}</TableCell>
                             <TableCell>{model.displayName}</TableCell>
                             <TableCell className="flex justify-end">
                                 {model.name === `models/${aiModel}` ? (
-                                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                    <CheckCircle2 className="h-5 w-5 text-primary" />
                                 ) : (
                                     <TooltipProvider>
                                         <Tooltip>
@@ -378,22 +410,16 @@ export default function ApiPage() {
                                 </TableHeader>
                                 <TableBody>
                                     <TableRow>
-                                        <TableCell>Gemini 2.5 Pro</TableCell>
+                                        <TableCell>Gemini 1.5 Pro</TableCell>
                                         <TableCell>5</TableCell>
                                         <TableCell>250,000</TableCell>
                                         <TableCell>100</TableCell>
                                     </TableRow>
                                     <TableRow>
-                                        <TableCell>Gemini 2.5 Flash</TableCell>
+                                        <TableCell>Gemini 1.5 Flash</TableCell>
                                         <TableCell>10</TableCell>
                                         <TableCell>250,000</TableCell>
                                         <TableCell>250</TableCell>
-                                    </TableRow>
-                                     <TableRow>
-                                        <TableCell>Gemini 2.5 Flash-Lite</TableCell>
-                                        <TableCell>15</TableCell>
-                                        <TableCell>250,000</TableCell>
-                                        <TableCell>1,000</TableCell>
                                     </TableRow>
                                 </TableBody>
                             </Table>
@@ -407,5 +433,3 @@ export default function ApiPage() {
     </div>
   );
 }
-
-    
