@@ -105,11 +105,11 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     }, [hosts, cveCache]);
     
     React.useEffect(() => {
-        if (cveScanProgress.isComplete && scanResult) {
+        if (cveScanProgress?.isComplete && scanResult) {
             setScanResult(scanResult.fileName, scanResult.originalHosts, riskWeights, false);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cveScanProgress.isComplete]);
+    }, [cveScanProgress, scanResult, riskWeights]);
 
 
     const sortedCves = useMemo(() => {
@@ -182,7 +182,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     const cvssScoreTitle = locale === 'es' ? 'Puntaje CVSS' : 'CVSS Score';
     const noCvesFound = locale === 'es' ? 'No se encontraron CVEs para los servicios detectados en este escaneo.' : 'No CVEs found for the detected services in this scan.';
     const vulnerableServicesDistributionTitle = locale === 'es' ? 'Distribución de Servicios Vulnerables' : 'Vulnerable Services Distribution';
-    const analyzingText = cveScanProgress.total > 0 
+    const analyzingText = cveScanProgress?.total > 0 
         ? (locale === 'es' ? `Analizando servicios expuestos... ${cveScanProgress.processed} de ${cveScanProgress.total}` : `Analyzing exposed services... ${cveScanProgress.processed} of ${cveScanProgress.total}`)
         : (locale === 'es' ? 'Preparando análisis...' : 'Preparing analysis...');
     
@@ -205,7 +205,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
                      </Button>
                 )}
             </CardHeader>
-             {(isCveScanRunning || cveScanProgress.total > 0) && !cveScanProgress.isComplete && (
+             {(isCveScanRunning || (cveScanProgress && cveScanProgress.total > 0)) && !cveScanProgress?.isComplete && (
                     <CardContent className='pt-2 space-y-2'>
                         <Progress value={(cveScanProgress.processed / (cveScanProgress.total || 1)) * 100} className="w-full" />
                         <p className='text-sm text-muted-foreground text-center'>{analyzingText}</p>
@@ -258,7 +258,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
                     </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center space-y-3 p-4 text-center min-h-[150px]">
-                        {isCveScanRunning ? null : cveScanProgress.isComplete ? (
+                        {isCveScanRunning ? null : cveScanProgress?.isComplete ? (
                            <>
                             <ShieldX className="h-8 w-8 text-muted-foreground" />
                             <p className="text-sm text-muted-foreground">{noCvesFound}</p>
@@ -327,3 +327,5 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     </div>
   );
 }
+
+    
