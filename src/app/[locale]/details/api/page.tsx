@@ -434,5 +434,3 @@ export default function ApiPage() {
     </div>
   );
 }
-
-    
