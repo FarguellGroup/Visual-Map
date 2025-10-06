@@ -5,7 +5,7 @@ import type { ExplainVulnerabilityRiskOutput, PentestingNextStepsOutput, NseScri
 import { calculateRiskScores } from '@/lib/risk-scorer';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export const AI_MODEL_NAME = 'gemini-1.5-flash-latest';
+export const AI_MODEL_NAME = 'gemini-2.5-flash';
 
 export type RiskWeights = {
   criticalPorts: number;
