@@ -69,14 +69,14 @@ export default function Home() {
   });
 
   return (
-    <div className='flex-grow flex flex-col h-full'>
+    <div className='flex-grow flex flex-col'>
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center h-full gap-4">
+        <div className="flex-grow flex flex-col items-center justify-center gap-4">
           <Loader2 className="w-16 h-16 animate-spin text-primary" />
           <p className="text-lg text-muted-foreground">{t('analyzing')}</p>
         </div>
       ) : !scanResult ? (
-        <div className="flex-grow flex items-stretch h-full">
+        <div className="flex-grow flex items-stretch">
           <UploadZone
             getRootProps={getRootProps}
             getInputProps={getInputProps}
