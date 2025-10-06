@@ -19,7 +19,7 @@ const fontCode = Source_Code_Pro({
 
 export const metadata: Metadata = {
   title: 'Visual Map',
-  description: 'Upload, visualize, and analyze Nmap XML scans with AI-powered risk scoring.',
+  description: 'Professional pentesting reporting tool. Upload, visualize, and analyze Nmap XML scans with AI-powered risk scoring.',
   icons: {
     icon: '/favicon.svg',
   },
