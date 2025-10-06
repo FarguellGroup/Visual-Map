@@ -158,51 +158,45 @@ export default function ApiPage() {
   };
 
   useEffect(() => {
-    if (!isChecking) {
-      checkApiConnection();
-    }
+    checkApiConnection();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSaveApiKey = async () => {
     if (!apiKeyInput) return;
     setIsSaving(true);
-    
+
     const isValid = await checkApiConnection(apiKeyInput);
 
     if (isValid) {
-        try {
-            const response = await fetch('/api/save-api-key', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ apiKey: apiKeyInput }),
-            });
-            if (!response.ok) {
-                const result = await response.json();
-                throw new Error(result.error || 'Failed to save API key.');
-            }
-            toast({
-                title: locale === 'es' ? 'Clave API guardada' : 'API Key Saved',
-                description: locale === 'es' ? 'La clave ha sido guardada en tu archivo .env.' : 'The key has been saved to your .env file.',
-            });
-            setApiKey(apiKeyInput);
-            setApiKeyInput('');
-            // Re-check connection with the new key to refresh the UI smoothly
-            await checkApiConnection(apiKeyInput);
-        } catch (error) {
-            const saveError = error instanceof Error ? error.message : 'Failed to save API key.';
-            toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: saveError,
-            });
-        }
-    } else {
-        toast({
-            variant: 'destructive',
-            title: locale === 'es' ? 'Clave API Inválida' : 'Invalid API Key',
-            description: error || (locale === 'es' ? 'La clave API no es válida. Por favor, introduce una API válida.' : t('invalidKeyDescription')),
+      try {
+        const response = await fetch('/api/save-api-key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey: apiKeyInput }),
         });
+        if (!response.ok) {
+          const result = await response.json();
+          throw new Error(result.error || 'Failed to save API key.');
+        }
+        setApiKey(apiKeyInput);
+        setApiKeyInput('');
+        await checkApiConnection(apiKeyInput); // Re-check connection with new key
+      } catch (error) {
+        const saveError = error instanceof Error ? error.message : 'Failed to save API key.';
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: saveError,
+        });
+      }
+    } else {
+      // The error state is already set by checkApiConnection, but we can toast it too.
+      toast({
+        variant: 'destructive',
+        title: locale === 'es' ? 'Clave API Inválida' : 'Invalid API Key',
+        description: error || (locale === 'es' ? 'La clave API no es válida. Por favor, introduce una API válida.' : t('invalidKeyDescription')),
+      });
     }
     setIsSaving(false);
   };
@@ -451,7 +445,5 @@ export default function ApiPage() {
     </div>
   );
 }
-
-    
 
     
