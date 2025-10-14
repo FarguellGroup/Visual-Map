@@ -5,7 +5,7 @@ import { SidebarContent, SidebarGroup, SidebarSeparator, SidebarMenu, SidebarMen
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '../ui/button';
-import { Download, Loader2, Home, Users, Shield, Server, DoorOpen, Network, Skull, SlidersHorizontal, ChevronDown, KeyRound } from 'lucide-react';
+import { Download, Loader2, Home, Users, Shield, Server, DoorOpen, Network, Skull, SlidersHorizontal, ChevronDown, KeyRound, Circle } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useScanStore } from '@/store/use-scan-store';
 import { useState, useEffect, useMemo } from 'react';
@@ -135,7 +135,7 @@ export default function AppSidebar() {
   const tRiskRanking = useTranslations('RiskRanking');
   const tApi = useTranslations('ApiPage');
   
-  const { scanResult, riskWeights, setRiskWeights, setScanResult, apiStatus } = useScanStore();
+  const { scanResult, riskWeights, setRiskWeights, setScanResult, apiStatus, isCveScanRunning, cveScanProgress } = useScanStore();
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingHtml, setIsExportingHtml] = useState(false);
   const [accordionValue, setAccordionValue] = useState<string>('');
@@ -254,7 +254,7 @@ export default function AppSidebar() {
                     th { background-color: ${theme === 'dark' ? 'rgba(39, 39, 42, 0.5)' : 'rgba(244, 244, 245, 0.5)'}; font-weight: 600; }
                     tr { background-color: ${theme === 'dark' ? '#18181b' : '#ffffff'}; }
                     tr:hover { background-color: ${theme === 'dark' ? 'rgba(39, 39, 42, 0.5)' : 'rgba(244, 244, 245, 0.5)'}; }
-                    td a { color: #8b5cf6; text-decoration: none; } td a:hover { text-decoration: underline; }
+                    td a { color: #906BE1; text-decoration: none; } td a:hover { text-decoration: underline; }
                     .badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; color: white; }
                     .badge-red { background-color: #EF4444; } .badge-orange { background-color: #F97316; } .badge-yellow { background-color: #FBBF24; color: #000; } .badge-gray { background-color: #6B7280; } .badge-green { background-color: #22C55E; }
                     .grid-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-top: 20px; }
@@ -273,7 +273,7 @@ export default function AppSidebar() {
             <body>
                 <header>
                     <div class="logo">
-                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" fill="#8b5cf6" /></svg>
+                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#906BE1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" fill="#906BE1" /></svg>
                        <span class="logo-text">Visual Map</span>
                     </div>
                     <nav>
@@ -429,7 +429,7 @@ export default function AppSidebar() {
         format: 'a4',
       }) as jsPDFWithAutoTable;
   
-      const primaryColor = '#8b5cf6';
+      const primaryColor = '#906BE1';
       const headingColor = '#111827';
       const mutedTextColor = '#6b7280';
       
@@ -753,6 +753,20 @@ export default function AppSidebar() {
 
   const apiStatusTooltip = useMemo(() => getApiStatusTooltip(), [apiStatus, tApi, apiTitle]);
 
+  const getScanProgressTooltip = () => {
+    if (isCveScanRunning && cveScanProgress.total > 0) {
+        return locale === 'es' 
+            ? `Analizando... (${cveScanProgress.processed}/${cveScanProgress.total})`
+            : `Scanning... (${cveScanProgress.processed}/${cveScanProgress.total})`;
+    }
+    if (cveScanProgress.isComplete) {
+        return locale === 'es' ? 'Escaneo de CVEs completado' : 'CVE Scan Complete';
+    }
+    return threatsTitle;
+  };
+  
+  const threatsTooltip = useMemo(() => getScanProgressTooltip(), [isCveScanRunning, cveScanProgress, threatsTitle, locale]);
+
 
   return (
     <>
@@ -801,9 +815,14 @@ export default function AppSidebar() {
             </SidebarMenuItem>
              <SidebarMenuItem>
                  <Link href="/details/vulnerabilities" className='w-full'>
-                    <SidebarMenuButton isActive={pathname.startsWith('/details/vulnerabilities')} tooltip={threatsTitle}>
+                    <SidebarMenuButton isActive={pathname.startsWith('/details/vulnerabilities')} tooltip={threatsTooltip}>
                         <Skull />
-                        <span className="group-data-[collapsible=icon]:hidden">{threatsTitle}</span>
+                         <span className="group-data-[collapsible=icon]:hidden flex-1 flex items-center justify-between">
+                            {threatsTitle}
+                            {isCveScanRunning && (
+                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                            )}
+                        </span>
                     </SidebarMenuButton>
                 </Link>
             </SidebarMenuItem>
@@ -957,3 +976,5 @@ export default function AppSidebar() {
     </>
   );
 }
+
+    
