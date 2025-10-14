@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { SidebarContent, SidebarGroup, SidebarSeparator, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroupLabel, useSidebar } from '@/components/ui/sidebar';
@@ -348,7 +349,7 @@ export default function AppSidebar() {
                         <div class="chart-container"><h3>${tDetails('hostRiskDistributionTitle')}</h3>${riskChart ? `<img src="${riskChart}">` : `<p class="unavailable">${chartNotAvailableText}</p>`}</div>
                         <div class="chart-container"><h3>${tDetails('topPortsTitle')}</h3>${portsChart ? `<img src="${portsChart}">` : `<p class="unavailable">${chartNotAvailableText}</p>`}</div>
                         <div class="chart-container"><h3>${tDetails('serviceDistributionTitle')}</h3>${servicesChart ? `<img src="${servicesChart}">` : `<p class="unavailable">${chartNotAvailableText}</p>`}</div>
-                        ${threatsChart ? `<div class="chart-container"><h3>${locale === 'es' ? 'Distribución de Servicios Vulnerables' : 'Vulnerable Services Distribution'}</h3><img src="${threatsChart}"></div>` : ''}
+                        ${allCves.length > 0 && threatsChart ? `<div class="chart-container"><h3>${locale === 'es' ? 'Distribución de Servicios Vulnerables' : 'Vulnerable Services Distribution'}</h3><img src="${threatsChart}"></div>` : ''}
                     </section>
 
                     <section id="all-hosts">
@@ -627,7 +628,10 @@ export default function AppSidebar() {
       await addChart('risk-distribution-chart', tDetails('hostRiskDistributionTitle'));
       await addChart('top-ports-chart', tDetails('topPortsTitle'));
       await addChart('service-distribution-chart', tDetails('serviceDistributionTitle'));
-      await addChart('threat-service-dist-chart', locale === 'es' ? 'Distribución de Servicios Vulnerables' : 'Vulnerable Services Distribution');
+      
+      if (allCves.length > 0) {
+        await addChart('threat-service-dist-chart', locale === 'es' ? 'Distribución de Servicios Vulnerables' : 'Vulnerable Services Distribution');
+      }
 
 
       // -- All Hosts Table --
@@ -738,7 +742,7 @@ export default function AppSidebar() {
     setAccordionValue(value === accordionValue ? '' : value);
   }
 
-  const getApiStatusTooltip = () => {
+  const apiStatusTooltip = useMemo(() => {
     switch (apiStatus) {
       case 'success':
         return tApi('validKey');
@@ -749,11 +753,9 @@ export default function AppSidebar() {
       default:
         return apiTitle;
     }
-  };
+  }, [apiStatus, tApi, apiTitle]);
 
-  const apiStatusTooltip = useMemo(() => getApiStatusTooltip(), [apiStatus, tApi, apiTitle]);
-
-  const getScanProgressTooltip = () => {
+  const threatsTooltip = useMemo(() => {
     if (isCveScanRunning && cveScanProgress.total > 0) {
         return locale === 'es' 
             ? `Analizando... (${cveScanProgress.processed}/${cveScanProgress.total})`
@@ -763,9 +765,7 @@ export default function AppSidebar() {
         return locale === 'es' ? 'Escaneo de CVEs completado' : 'CVE Scan Complete';
     }
     return threatsTitle;
-  };
-  
-  const threatsTooltip = useMemo(() => getScanProgressTooltip(), [isCveScanRunning, cveScanProgress, threatsTitle, locale]);
+  }, [isCveScanRunning, cveScanProgress, threatsTitle, locale]);
 
 
   return (
@@ -976,5 +976,7 @@ export default function AppSidebar() {
     </>
   );
 }
+
+    
 
     
