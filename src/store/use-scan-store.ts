@@ -5,7 +5,7 @@ import type { ExplainVulnerabilityRiskOutput, PentestingNextStepsOutput, NseScri
 import { calculateRiskScores } from '@/lib/risk-scorer';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export const AI_MODEL_NAME = 'gemini-2.5-flash';
+export const AI_MODEL_NAME = 'gemini-2.5-flash-lite';
 
 export type RiskWeights = {
   criticalPorts: number;
@@ -197,13 +197,12 @@ export const useScanStore = create<ScanState>((set, get) => ({
     const hostsToScore = resetCache ? hosts : (get().scanResult?.originalHosts || hosts);
     
     const cveCache = get().cveCache;
-    // When calculating scores, also embed the found CVEs into the host object
-    // This ensures that even on a recalculation, the CVE data is not lost.
     const hostsWithCves = hostsToScore.map(host => {
         const cachedCves = cveCache.get(host.address[0].addr);
+        const cachedData = cachedCves?.status === 'loaded' ? cachedCves.data : [];
         return {
             ...host,
-            cves: cachedCves?.status === 'loaded' ? cachedCves.data : (host.cves || []),
+            cves: cachedData,
         }
     });
 
@@ -268,8 +267,6 @@ export const useScanStore = create<ScanState>((set, get) => ({
 
     const { scanResult, riskWeights } = get();
     if (scanResult) {
-      // After clearing caches, recalculate scores.
-      // This will use the original hosts and re-apply CVE data if it existed.
       get().setScanResult(scanResult.fileName, scanResult.originalHosts, riskWeights, false);
     }
   },
@@ -307,7 +304,7 @@ export const useScanStore = create<ScanState>((set, get) => ({
     if (hostsToScan.length === 0) return;
 
     const totalServicesToScan = hostsToScan.reduce((acc, host) => acc + getOpenPortsWithServices(host).length, 0);
-
+    
     if (totalServicesToScan === 0) return;
     
     set({ isCveScanRunning: true, cveScanProgress: { processed: 0, total: totalServicesToScan, isComplete: false } });
