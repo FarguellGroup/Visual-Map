@@ -111,10 +111,7 @@ export default function ApiPage() {
             model.supportedGenerationMethods.includes('generateContent') && 
             model.name.includes('gemini') &&
             !model.name.toLowerCase().includes('preview') &&
-            !model.name.toLowerCase().includes('-exp-') &&
-            !model.name.endsWith('-001') &&
-            !/\d{4}$/.test(model.name.split('-').pop()!) &&
-            !/-(\d{2,}-\d{2,}|\d{4,})$/.test(model.name.split('-').pop()!)
+            !model.name.toLowerCase().includes('-exp-')
         )
         .map((model: any) => ({
             name: model.name,
@@ -158,8 +155,7 @@ export default function ApiPage() {
   };
 
   useEffect(() => {
-    // Check connection only once on mount
-    checkApiConnection();
+      checkApiConnection();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -182,7 +178,6 @@ export default function ApiPage() {
         }
         setApiKey(apiKeyInput);
         setApiKeyInput('');
-        // Re-check connection with new key to update UI seamlessly
         await checkApiConnection(apiKeyInput);
       } catch (error) {
         const saveError = error instanceof Error ? error.message : 'Failed to save API key.';
@@ -422,17 +417,35 @@ export default function ApiPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    <TableRow>
-                                        <TableCell>Gemini 1.5 Pro</TableCell>
+                                     <TableRow>
+                                        <TableCell>Gemini 2.5 Pro</TableCell>
                                         <TableCell>5</TableCell>
-                                        <TableCell>250,000</TableCell>
+                                        <TableCell>125,000</TableCell>
                                         <TableCell>100</TableCell>
                                     </TableRow>
                                     <TableRow>
-                                        <TableCell>Gemini 1.5 Flash</TableCell>
+                                        <TableCell>Gemini 2.5 Flash</TableCell>
                                         <TableCell>10</TableCell>
                                         <TableCell>250,000</TableCell>
                                         <TableCell>250</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell>Gemini 2.5 Flash-Lite</TableCell>
+                                        <TableCell>15</TableCell>
+                                        <TableCell>250,000</TableCell>
+                                        <TableCell>1,000</TableCell>
+                                    </TableRow>
+                                     <TableRow>
+                                        <TableCell>Gemini 2.0 Flash</TableCell>
+                                        <TableCell>15</TableCell>
+                                        <TableCell>1,000,000</TableCell>
+                                        <TableCell>200</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell>Gemini 2.0 Flash-Lite</TableCell>
+                                        <TableCell>30</TableCell>
+                                        <TableCell>1,000,000</TableCell>
+                                        <TableCell>200</TableCell>
                                     </TableRow>
                                 </TableBody>
                             </Table>
@@ -446,7 +459,3 @@ export default function ApiPage() {
     </div>
   );
 }
-
-    
-
-    
