@@ -2,24 +2,23 @@
 
 'use client';
 
-import { SidebarContent, SidebarGroup, SidebarSeparator, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroupLabel, useSidebar } from '@/components/ui/sidebar';
+import { SidebarContent, SidebarGroup, SidebarSeparator, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '../ui/button';
-import { Download, Loader2, Home, Users, Shield, Server, DoorOpen, Network, Skull, SlidersHorizontal, ChevronDown, KeyRound, Circle } from 'lucide-react';
+import { Download, Loader2, Home, Users, Shield, Server, DoorOpen, Network, Skull, SlidersHorizontal, ChevronDown, KeyRound } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useScanStore } from '@/store/use-scan-store';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import type { Host, Script, CveData } from '@/types/nmap';
 import { Slider } from '../ui/slider';
-import { VmLogo } from '../icons';
 import { Link, usePathname } from '@/navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
-import { cn } from '@/lib/utils';
+import { useSidebar } from '@/components/ui/sidebar';
 import { useTheme } from 'next-themes';
 
 
@@ -136,7 +135,7 @@ export default function AppSidebar() {
   const tRiskRanking = useTranslations('RiskRanking');
   const tApi = useTranslations('ApiPage');
   
-  const { scanResult, riskWeights, setRiskWeights, setScanResult, apiStatus, isCveScanRunning, cveScanProgress } = useScanStore();
+  const { scanResult, riskWeights, setRiskWeights, setScanResult, cveCache } = useScanStore();
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingHtml, setIsExportingHtml] = useState(false);
   const [accordionValue, setAccordionValue] = useState<string>('');
@@ -557,7 +556,13 @@ export default function AppSidebar() {
       }
       
       // -- Discovered CVEs --
-      const allCves = scanResult.hosts.flatMap(h => (h.cves || []).map(cveItem => ({ ...cveItem, hostIp: h.address[0].addr })));
+      const allCves = cveCache ? Array.from(cveCache.values())
+        .filter(entry => entry.status === 'loaded' && entry.data)
+        .flatMap(entry => entry.data!.map(cveData => ({
+            ...cveData,
+            hostIp: [...cveCache.entries()].find(([_, val]) => val === entry)?.[0] || 'N/A'
+        }))) : [];
+
       if (allCves.length > 0) {
         if (yPos > pageHeight - 120) { doc.addPage(); yPos = margin; }
         doc.setFontSize(22);
@@ -630,7 +635,7 @@ export default function AppSidebar() {
       await addChart('service-distribution-chart', tDetails('serviceDistributionTitle'));
       
       if (allCves.length > 0) {
-        await addChart('threat-service-dist-chart', locale === 'es' ? 'Distribución de Servicios Vulnerables' : 'Vulnerable Services Distribution');
+        await addChart('pdf-threat-service-dist-chart', locale === 'es' ? 'Distribución de Servicios Vulnerables' : 'Vulnerable Services Distribution');
       }
 
 
@@ -728,10 +733,8 @@ export default function AppSidebar() {
   const hostsTitle = tDetails('hosts');
   const openPortsTitle = tDetails('openPorts');
   const servicesTitle = tDetails('services');
-  
   const vulnerableHostsTitle = locale === 'es' ? 'Hosts Vulnerables' : 'Vulnerable Hosts';
   const threatsTitle = locale === 'es' ? 'CVEs y Vulnerabilidades' : 'CVEs & Vulnerabilities';
-  
   const networkTitle = tDetails('networkGraph');
   const apiTitle = tApi('title');
 
@@ -741,40 +744,14 @@ export default function AppSidebar() {
     }
     setAccordionValue(value === accordionValue ? '' : value);
   }
-
-  const apiStatusTooltip = useMemo(() => {
-    switch (apiStatus) {
-      case 'success':
-        return tApi('validKey');
-      case 'error':
-        return tApi('invalidKey');
-      case 'loading':
-        return tApi('checking');
-      default:
-        return apiTitle;
-    }
-  }, [apiStatus, tApi, apiTitle]);
-
-  const threatsTooltip = useMemo(() => {
-    if (isCveScanRunning && cveScanProgress.total > 0) {
-        return locale === 'es' 
-            ? `Analizando... (${cveScanProgress.processed}/${cveScanProgress.total})`
-            : `Scanning... (${cveScanProgress.processed}/${cveScanProgress.total})`;
-    }
-    if (cveScanProgress.isComplete) {
-        return locale === 'es' ? 'Escaneo de CVEs completado' : 'CVE Scan Complete';
-    }
-    return threatsTitle;
-  }, [isCveScanRunning, cveScanProgress, threatsTitle, locale]);
-
-
+  
   return (
     <>
       <SidebarContent className='pt-6'>
         <SidebarGroup>
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <Link href="/" className='w-full'>
+                     <Link href="/" className='w-full'>
                         <SidebarMenuButton isActive={pathname === '/'} tooltip={dashboardTitle}>
                             <Home />
                             <span className="group-data-[collapsible=icon]:hidden">{dashboardTitle}</span>
@@ -815,13 +792,10 @@ export default function AppSidebar() {
             </SidebarMenuItem>
              <SidebarMenuItem>
                  <Link href="/details/vulnerabilities" className='w-full'>
-                    <SidebarMenuButton isActive={pathname.startsWith('/details/vulnerabilities')} tooltip={threatsTooltip}>
+                    <SidebarMenuButton isActive={pathname.startsWith('/details/vulnerabilities')} tooltip={threatsTitle}>
                         <Skull />
                          <span className="group-data-[collapsible=icon]:hidden flex-1 flex items-center justify-between">
                             {threatsTitle}
-                            {isCveScanRunning && (
-                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                            )}
                         </span>
                     </SidebarMenuButton>
                 </Link>
@@ -841,17 +815,10 @@ export default function AppSidebar() {
             <SidebarMenu>
                 <SidebarMenuItem>
                     <Link href="/details/api" className='w-full'>
-                        <SidebarMenuButton isActive={pathname.startsWith('/details/api')} tooltip={apiStatusTooltip}>
+                        <SidebarMenuButton isActive={pathname.startsWith('/details/api')} tooltip={apiTitle}>
                             <KeyRound />
                             <span className="group-data-[collapsible=icon]:hidden flex-1 flex items-center justify-between">
                                 {apiTitle}
-                                {apiStatus !== 'idle' && (
-                                    <span className={cn('h-2 w-2 rounded-full', {
-                                        'bg-green-500': apiStatus === 'success',
-                                        'bg-red-500': apiStatus === 'error',
-                                        'bg-yellow-500': apiStatus === 'loading',
-                                    })} />
-                                )}
                             </span>
                         </SidebarMenuButton>
                     </Link>
@@ -976,7 +943,3 @@ export default function AppSidebar() {
     </>
   );
 }
-
-    
-
-    
