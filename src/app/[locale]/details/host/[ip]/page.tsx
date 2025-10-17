@@ -139,15 +139,16 @@ export default function HostDetailPage() {
     }
     
     setSelectedHost(null);
-
+    
     if (host) {
       // Trigger all AI generations for this host (except CVEs)
-      fetchVulnerabilityExplanation(host, locale);
-      fetchPentestingNextSteps(host, locale);
-      fetchNseSummary(host, locale);
+      const store = useScanStore.getState();
+      store.fetchVulnerabilityExplanation(host, locale);
+      store.fetchPentestingNextSteps(host, locale);
+      store.fetchNseSummary(host, locale);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scanResult, router, setSelectedHost, ip, locale]);
+  }, [host, locale]);
   
 
   const openPorts = useMemo(() => getPorts(host), [host]);
