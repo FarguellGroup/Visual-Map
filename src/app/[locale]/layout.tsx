@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import AppFooter from '@/components/layout/footer';
 import AppHeader from '@/components/layout/header';
 import AppSidebar from '@/components/layout/sidebar';
-import { SidebarProvider, Sidebar, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import { Sidebar, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { useScanStore } from '@/store/use-scan-store';
 import { usePathname } from '@/navigation';
 import { useTheme } from 'next-themes';
@@ -13,6 +13,7 @@ import VulnerabilitiesDetailView from '@/components/details/vulnerabilities-deta
 import PortsDetailView from '@/components/details/ports-detail-view';
 import ServicesDetailView from '@/components/details/services-detail-view';
 import ThreatsDetailView from '@/components/details/threats-detail-view';
+import { ClientSidebarProvider } from '@/components/layout/sidebar-provider';
 
 export default function LocaleLayout({
   children,
@@ -37,7 +38,7 @@ export default function LocaleLayout({
   const showSidebar = scanResult || pathname.includes('/details');
 
   return (
-    <SidebarProvider>
+    <ClientSidebarProvider>
       {showSidebar && (
         <Sidebar side="left" collapsible="icon">
          <AppSidebar />
@@ -65,7 +66,6 @@ export default function LocaleLayout({
             <ThreatsDetailView hosts={scanResult.hosts} />
         </div>
       )}
-    </SidebarProvider>
+    </ClientSidebarProvider>
   );
 }
-
