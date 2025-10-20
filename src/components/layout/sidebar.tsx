@@ -20,6 +20,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '..
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useTheme } from 'next-themes';
+import { VmLogo } from '../icons';
 
 
 // Extend jsPDF with autoTable
@@ -128,6 +129,7 @@ const getFormattedTimestamp = () => {
 };
 
 export default function AppSidebar() {
+  const tHeader = useTranslations('Header');
   const tSidebar = useTranslations('Sidebar');
   const tDetails = useTranslations('DetailsPage');
   const tSummary = useTranslations('SummaryCards');
@@ -199,16 +201,22 @@ export default function AppSidebar() {
         const riskChart = await captureChartAsBase64('risk-distribution-chart', { backgroundColor: currentThemeBg });
         const portsChart = await captureChartAsBase64('top-ports-chart', { backgroundColor: currentThemeBg });
         const servicesChart = await captureChartAsBase64('service-distribution-chart', { backgroundColor: currentThemeBg });
-        const threatsChart = await captureChartAsBase64('threat-service-dist-chart', { backgroundColor: currentThemeBg });
+        
+        const allCves = Array.from(cveCache.entries())
+            .filter(([, entry]) => entry.status === 'loaded' && entry.data)
+            .flatMap(([hostIp, entry]) => 
+                entry.data!.map(cveData => ({...cveData, hostIp}))
+            );
 
+        const threatsChart = allCves.length > 0 
+            ? await captureChartAsBase64('threat-service-dist-chart', { backgroundColor: currentThemeBg })
+            : null;
 
         const topVulnerableHosts = [...hosts]
             .filter(h => (h.riskScore ?? 0) >= 60)
             .sort((a, b) => (b.riskScore ?? 0) - (a.riskScore ?? 0));
         
         const allHostsSorted = [...hosts].sort((a,b) => ipToNumber(a.address[0].addr) - ipToNumber(b.address[0].addr));
-        
-        const allCves = hosts.flatMap(h => (h.cves || []).map(cveItem => ({ ...cveItem, hostIp: h.address[0].addr })));
 
         const getRiskClass = (score: number) => {
             if (score >= 75) return 'badge-red';
@@ -232,42 +240,69 @@ export default function AppSidebar() {
         const cvssTitle = locale === 'es' ? 'Puntaje CVSS' : 'CVSS Score';
 
         const chartNotAvailableText = locale === 'es' ? 'Gráfico no disponible. Navegue a la página correspondiente para incluirlo en el informe.' : 'Chart not available. Navigate to the corresponding page to include it in the report.';
+        
+        const moonIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`;
+        const sunIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>`;
+
 
         const htmlContent = `
             <!DOCTYPE html>
-            <html lang="${locale}">
+            <html lang="${locale}" class="${theme === 'dark' ? 'dark' : ''}">
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Visual Map Scan Report</title>
+                <title>Visual Map Report</title>
                 <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; color: ${theme === 'dark' ? '#f8fafc' : '#020817'}; background-color: ${theme === 'dark' ? '#09090b' : '#ffffff'}; margin: 0; padding-top: 80px; }
+                    :root {
+                        --background-light: #ffffff; --foreground-light: #020817; --border-light: #e4e4e7;
+                        --card-light: #ffffff; --muted-light: #f4f4f5; --link-light: #906BE1;
+                        --background-dark: #09090b; --foreground-dark: #f8fafc; --border-dark: #27272a;
+                        --card-dark: #18181b; --muted-dark: #27272a; --link-dark: #906BE1;
+                    }
+                    .dark { 
+                        --background: var(--background-dark); --foreground: var(--foreground-dark); 
+                        --border: var(--border-dark); --card-bg: var(--card-dark); --muted-bg: var(--muted-dark);
+                        --link-color: var(--link-dark);
+                    }
+                    html { 
+                        --background: var(--background-light); --foreground: var(--foreground-light); 
+                        --border: var(--border-light); --card-bg: var(--card-light); --muted-bg: var(--muted-light);
+                        --link-color: var(--link-light);
+                    }
+                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; color: var(--foreground); background-color: var(--background); margin: 0; padding-top: 80px; transition: color 0.2s, background-color 0.2s; }
                     .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-                    header { position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background-color: ${theme === 'dark' ? 'rgba(9, 9, 11, 0.8)' : 'rgba(255, 255, 255, 0.8)'}; backdrop-filter: blur(8px); border-bottom: 1px solid ${theme === 'dark' ? '#27272a' : '#e4e4e7'}; z-index: 1000; }
+                    header { position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background-color: color-mix(in srgb, var(--background) 80%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); z-index: 1000; }
+                    nav { display: flex; align-items: center; gap: 20px; }
                     nav ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 20px; }
-                    nav a { text-decoration: none; color: ${theme === 'dark' ? '#a1a1aa' : '#71717a'}; font-weight: 500; font-size: 14px; transition: color 0.2s; }
-                    nav a:hover { color: ${theme === 'dark' ? '#f8fafc' : '#020817'}; }
-                    h1, h2, h3 { color: ${theme === 'dark' ? '#f8fafc' : '#020817'}; font-weight: 600; }
-                    h1 { font-size: 2em; text-align: left; } h2 { font-size: 1.5em; border-bottom: 1px solid ${theme === 'dark' ? '#27272a' : '#e4e4e7'}; padding-bottom: 10px; margin-top: 40px; } h3 { font-size: 1.2em; }
+                    nav a { text-decoration: none; color: color-mix(in srgb, var(--foreground) 60%, transparent); font-weight: 500; font-size: 14px; transition: color 0.2s; }
+                    nav a:hover { color: var(--foreground); }
+                    #theme-toggle { background: none; border: none; cursor: pointer; color: color-mix(in srgb, var(--foreground) 60%, transparent); padding: 5px; }
+                    #theme-toggle:hover { color: var(--foreground); }
+                    #theme-toggle svg { width: 20px; height: 20px; }
+                    .sun-icon { display: none; }
+                    .dark .sun-icon { display: block; }
+                    .dark .moon-icon { display: none; }
+                    h1, h2, h3 { color: var(--foreground); font-weight: 600; }
+                    h1 { font-size: 2em; text-align: left; } h2 { font-size: 1.5em; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-top: 40px; } h3 { font-size: 1.2em; }
                     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                    th, td { padding: 12px 15px; border: 1px solid ${theme === 'dark' ? '#27272a' : '#e4e4e7'}; text-align: left; font-size: 14px; }
-                    th { background-color: ${theme === 'dark' ? 'rgba(39, 39, 42, 0.5)' : 'rgba(244, 244, 245, 0.5)'}; font-weight: 600; }
-                    tr { background-color: ${theme === 'dark' ? '#18181b' : '#ffffff'}; }
-                    tr:hover { background-color: ${theme === 'dark' ? 'rgba(39, 39, 42, 0.5)' : 'rgba(244, 244, 245, 0.5)'}; }
-                    td a { color: #906BE1; text-decoration: none; } td a:hover { text-decoration: underline; }
+                    th, td { padding: 12px 15px; border: 1px solid var(--border); text-align: left; font-size: 14px; }
+                    th { background-color: var(--muted-bg); font-weight: 600; }
+                    tr { background-color: var(--card-bg); }
+                    tr:hover { background-color: var(--muted-bg); }
+                    td a { color: var(--link-color); text-decoration: none; } td a:hover { text-decoration: underline; }
                     .badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; color: white; }
                     .badge-red { background-color: #EF4444; } .badge-orange { background-color: #F97316; } .badge-yellow { background-color: #FBBF24; color: #000; } .badge-gray { background-color: #6B7280; } .badge-green { background-color: #22C55E; }
                     .grid-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-top: 20px; }
-                    .card { position: relative; padding: 20px; border: 1px solid ${theme === 'dark' ? '#27272a' : '#e4e4e7'}; border-radius: 8px; background-color: ${theme === 'dark' ? '#18181b' : '#ffffff'}; }
-                    .card-title { font-weight: 500; margin-bottom: 10px; color: ${theme === 'dark' ? '#a1a1aa' : '#71717a'}; } .card-value { font-size: 2.5em; font-weight: bold; }
-                    .chart-container { margin-top: 20px; padding: 20px; border: 1px solid ${theme === 'dark' ? '#27272a' : '#e4e4e7'}; border-radius: 8px; text-align: center; background-color: ${theme === 'dark' ? '#09090b' : '#ffffff'}; }
+                    .card { position: relative; padding: 20px; border: 1px solid var(--border); border-radius: 8px; background-color: var(--card-bg); }
+                    .card-title { font-weight: 500; margin-bottom: 10px; color: color-mix(in srgb, var(--foreground) 70%, transparent); } .card-value { font-size: 2.5em; font-weight: bold; }
+                    .chart-container { margin-top: 20px; padding: 20px; border: 1px solid var(--border); border-radius: 8px; text-align: center; background-color: var(--background); }
                     .chart-container img { max-width: 100%; height: auto; }
-                    .chart-container .unavailable { color: ${theme === 'dark' ? '#a1a1aa' : '#71717a'}; }
+                    .chart-container .unavailable { color: color-mix(in srgb, var(--foreground) 70%, transparent); }
                     .table-responsive { overflow-x: auto; }
                     .logo { display: flex; align-items: center; gap: 10px; }
                     .logo svg { width: 24px; height: 24px; }
                     .logo-text { font-size: 1.2em; font-weight: bold; }
-                    @media (max-width: 768px) { body { padding-top: 60px; } header { padding: 10px; } nav { display: none; } .container { padding: 10px; } h1 { font-size: 1.5em; } h2 { font-size: 1.2em; } }
+                    @media (max-width: 768px) { body { padding-top: 60px; } header { padding: 10px; } nav ul { display: none; } .container { padding: 10px; } h1 { font-size: 1.5em; } h2 { font-size: 1.2em; } }
                 </style>
             </head>
             <body>
@@ -284,12 +319,16 @@ export default function AppSidebar() {
                             <li><a href="#visualizations">${visualizationsTitle}</a></li>
                             <li><a href="#all-hosts">${tHostsTable('title')}</a></li>
                         </ul>
+                        <button id="theme-toggle" title="Toggle theme">
+                            <span class="moon-icon">${moonIcon}</span>
+                            <span class="sun-icon">${sunIcon}</span>
+                        </button>
                     </nav>
                 </header>
 
                 <div class="container">
                     <h1>Visual Map Report</h1>
-                    <p style="color: ${theme === 'dark' ? '#a1a1aa' : '#71717a'};"><strong>File:</strong> ${fileName} | <strong>Date:</strong> ${new Date().toLocaleString(locale)}</p>
+                    <p style="color: color-mix(in srgb, var(--foreground) 70%, transparent);"><strong>File:</strong> ${fileName} | <strong>Date:</strong> ${new Date().toLocaleString(locale)}</p>
 
                     <section id="summary">
                         <h2>${summaryTitle}</h2>
@@ -396,11 +435,18 @@ export default function AppSidebar() {
                                 </tbody>
                                 </table>
                             </div>
-                          ` : `<p style="color: ${theme === 'dark' ? '#a1a1aa' : '#71717a'};">${tDetails('openPorts')}: 0</p>`}
+                          ` : `<p style="color: color-mix(in srgb, var(--foreground) 70%, transparent);">${tDetails('openPorts')}: 0</p>`}
                         </div>
                       `).join('')}
                     </section>
                 </div>
+                <script>
+                    const themeToggle = document.getElementById('theme-toggle');
+                    const html = document.documentElement;
+                    themeToggle.addEventListener('click', () => {
+                        html.classList.toggle('dark');
+                    });
+                </script>
             </body>
             </html>
         `;
@@ -488,7 +534,7 @@ export default function AppSidebar() {
       doc.setFontSize(32);
       doc.setFont('Helvetica', 'bold');
       doc.setTextColor(headingColor);
-      doc.text("Visual Map Scan Report", pageWidth / 2, yPos, { align: 'center' });
+      doc.text("Visual Map Report", pageWidth / 2, yPos, { align: 'center' });
       yPos += 40;
       doc.setFontSize(14);
       doc.setFont('Helvetica', 'normal');
@@ -504,7 +550,7 @@ export default function AppSidebar() {
       doc.setFontSize(22);
       doc.setFont('Helvetica', 'bold');
       doc.setTextColor(headingColor);
-      doc.text('Scan Summary', margin, yPos);
+      doc.text('Summary', margin, yPos);
       yPos += 25;
       doc.autoTable({
         startY: yPos,
@@ -556,12 +602,11 @@ export default function AppSidebar() {
       }
       
       // -- Discovered CVEs --
-      const allCves = cveCache ? Array.from(cveCache.values())
-        .filter(entry => entry.status === 'loaded' && entry.data)
-        .flatMap(entry => entry.data!.map(cveData => ({
-            ...cveData,
-            hostIp: [...cveCache.entries()].find(([_, val]) => val === entry)?.[0] || 'N/A'
-        }))) : [];
+      const allCves = Array.from(cveCache.entries())
+        .filter(([, entry]) => entry.status === 'loaded' && entry.data)
+        .flatMap(([hostIp, entry]) => 
+            entry.data!.map(cveData => ({...cveData, hostIp}))
+        );
 
       if (allCves.length > 0) {
         if (yPos > pageHeight - 120) { doc.addPage(); yPos = margin; }
@@ -747,7 +792,14 @@ export default function AppSidebar() {
   
   return (
     <>
-      <SidebarContent className='pt-6'>
+      <SidebarContent className='pt-0'>
+         <SidebarGroup>
+            <Link href="/" className="flex items-center gap-2 p-2">
+                <VmLogo className="h-6 w-6" />
+                <h1 className="text-lg md:text-xl font-bold tracking-tight group-data-[collapsible=icon]:hidden">{tHeader('title')}</h1>
+            </Link>
+        </SidebarGroup>
+        <SidebarSeparator />
         <SidebarGroup>
             <SidebarMenu>
                 <SidebarMenuItem>
