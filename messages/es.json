@@ -104,7 +104,8 @@
     "mediumRisk": "Riesgo Medio",
     "highRisk": "Riesgo Alto",
     "networkGraph": "Grafo de Red",
-    "api": "API"
+    "api": "API",
+    "configureApi": "Configurar API"
   },
   "ApiPage": {
     "title": "Configuración de API",
