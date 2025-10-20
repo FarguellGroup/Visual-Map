@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -24,7 +25,7 @@ import {
   ChevronDown,
   Printer
 } from 'lucide-react';
-import CustomNode from './custom-node';
+import CustomNode from '@/components/details/custom-node';
 import { Label } from '../ui/label';
 import { Slider } from '../ui/slider';
 import { Checkbox } from '../ui/checkbox';
