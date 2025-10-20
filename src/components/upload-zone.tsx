@@ -68,11 +68,11 @@ export default function UploadZone({ getRootProps, getInputProps, isDragActive }
 
 
   return (
-    <div className="flex flex-col md:flex-row items-stretch justify-center gap-8 w-full h-full p-4 md:p-8 lg:py-12 lg:px-8">
+    <div className="grid md:grid-cols-2 gap-8 w-full max-w-6xl mx-auto h-full">
       <div
         {...getRootProps()}
         className={cn(
-          'flex flex-col items-center justify-center w-full md:w-1/2 p-12 border-2 border-dashed rounded-lg cursor-pointer transition-colors flex-grow',
+          'flex flex-col items-center justify-center w-full p-12 border-2 border-dashed rounded-lg cursor-pointer transition-colors h-full',
           isDragActive ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50 hover:bg-muted'
         )}
       >
@@ -84,8 +84,8 @@ export default function UploadZone({ getRootProps, getInputProps, isDragActive }
           <p className="text-xs text-muted-foreground">{t('caption')}</p>
         </div>
       </div>
-      <Card className="w-full md:w-1/2 flex flex-col h-full">
-          <CardContent className="p-6 space-y-4 flex flex-col justify-center flex-grow">
+      <Card className="w-full flex flex-col justify-center">
+          <CardContent className="p-6 space-y-4">
                <CardTitle className="text-lg flex items-center gap-2 mb-4">
                 <Terminal className="w-5 h-5" />
                 {t('examplesTitle')}
