@@ -122,5 +122,5 @@ Haz clic en cualquier host para acceder a su página de detalle, donde encontrar
 -   **Gestiona tu API**: Desde la sección API, verifica tu clave de Gemini, cámbiala si es necesario y selecciona el modelo de IA que prefieras usar.
 -   **Exporta los Resultados**: Genera informes profesionales en formato JSON, PDF o HTML con un solo clic.
 
-<img width="3456" height="1924" alt="visual-ponderation" src="https://github.com/user-attachments/assets/988677d1-9b75-4ae2-aeb0-60ef14966df3" />
+<img width="3456" height="1854" alt="VM - Ponderación" src="https://github.com/user-attachments/assets/4d24bbb3-70ac-4d97-86a5-1b44bd50fd88" />
 <img width="3456" height="2096" alt="visual-reports" src="https://github.com/user-attachments/assets/594fa34f-f42e-4bc0-9a92-a4dd4c0db242" />
