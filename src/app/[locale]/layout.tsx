@@ -5,8 +5,7 @@ import React, { useState, useEffect } from 'react';
 import AppFooter from '@/components/layout/footer';
 import AppHeader from '@/components/layout/header';
 import AppSidebar from '@/components/layout/sidebar';
-import { Sidebar, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import { useScanStore } from '@/store/use-scan-store';
+import { Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import { usePathname } from '@/navigation';
 import { useTheme } from 'next-themes';
 import VulnerabilitiesDetailView from '@/components/details/vulnerabilities-detail-view';
@@ -14,6 +13,8 @@ import PortsDetailView from '@/components/details/ports-detail-view';
 import ServicesDetailView from '@/components/details/services-detail-view';
 import ThreatsDetailView from '@/components/details/threats-detail-view';
 import { ClientSidebarProvider } from '@/components/layout/sidebar-provider';
+import { useScanStore } from '@/store/use-scan-store';
+import ApiErrorToast from '@/components/api-error-toast';
 
 export default function LocaleLayout({
   children,
@@ -22,18 +23,17 @@ export default function LocaleLayout({
   children: React.ReactNode;
   params: {locale: string};
 }) {
-  const { scanResult, clearScanResult } = useScanStore();
   const pathname = usePathname();
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
   
+  // We need to get the scanResult here to conditionally render the sidebar
+  // but we pass the logic that uses the store down to the header.
+  const scanResult = useScanStore((state) => state.scanResult);
+
   useEffect(() => {
     setMounted(true);
   }, []);
-  
-  const handleUploadNew = () => {
-    clearScanResult();
-  };
 
   const showSidebar = scanResult || pathname.includes('/details');
 
@@ -46,9 +46,7 @@ export default function LocaleLayout({
       )}
       <SidebarInset>
         <div className="flex flex-col min-h-screen">
-          <AppHeader onUploadNew={handleUploadNew} showUploadNew={!!scanResult}>
-              {showSidebar && <SidebarTrigger />}
-          </AppHeader>
+          <AppHeader />
           <main className="flex flex-col flex-grow w-full">
             <div className='container mx-auto flex-grow flex flex-col p-4 md:p-8'>
                 {children}
@@ -57,6 +55,7 @@ export default function LocaleLayout({
           <AppFooter />
         </div>
       </SidebarInset>
+      <ApiErrorToast />
        {/* Container for off-screen rendering for exports */}
       {mounted && scanResult && (
         <div id="export-container" className={`${theme} bg-background`} style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '800px', padding: '1rem' }}>
