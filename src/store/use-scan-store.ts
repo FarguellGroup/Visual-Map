@@ -57,6 +57,7 @@ type ScanState = {
   scanResult: ScanResult | null;
   selectedHost: Host | null;
   apiStatus: ApiStatus;
+  apiError: string | null;
   aiModel: string;
   apiKey: string | null;
   explanationCache: AiCache<ExplainVulnerabilityRiskOutput>;
@@ -66,6 +67,8 @@ type ScanState = {
   riskWeights: RiskWeights;
   cveScanProgress: CveScanProgress;
   isCveScanRunning: boolean;
+  isCveScanPaused: boolean;
+  remainingHostsToScan: Host[];
   setScanResult: (fileName: string, hosts: Host[], weights?: RiskWeights, resetCache?: boolean) => void;
   clearScanResult: () => void;
   setSelectedHost: (host: Host | null) => void;
@@ -75,6 +78,7 @@ type ScanState = {
   setRiskWeights: (weights: RiskWeights) => void;
   setAiModel: (model: string) => void;
   setApiKey: (key: string | null) => void;
+  setApiError: (error: string | null) => void;
   fetchCvesForHost: (hosts: Host | Host[], locale: string) => Promise<void>;
   fetchVulnerabilityExplanation: (host: Host, locale: string) => Promise<void>;
   fetchPentestingNextSteps: (host: Host, locale: string) => Promise<void>;
@@ -106,21 +110,42 @@ const getGenerativeModel = (genAI: GoogleGenerativeAI, modelName: string) => {
     });
 };
 
-async function callGemini<T_in, T_out>(prompt: string): Promise<T_out> {
+async function callGemini<T_in, T_out>(prompt: string): Promise<T_out | { error: string }> {
+    const { aiModel, apiKey, setApiError } = useScanStore.getState();
+    
     try {
-        const { aiModel, apiKey } = useScanStore.getState();
         const genAI = getGenAI(apiKey);
         const model = getGenerativeModel(genAI, aiModel);
+        
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
-        return JSON.parse(text);
-    } catch (error) {
-        console.error("Error fetching data from Gemini API:", error);
-        if (error instanceof Error && (error.message.includes('429') || error.message.toLowerCase().includes('rate limit'))) {
-            throw new Error('Rate limit exceeded. Please wait and try again.');
+        
+        if (text.trim().startsWith('{') && text.trim().endsWith('}')) {
+          return JSON.parse(text) as T_out;
+        } else {
+           let errorMessage = 'Invalid JSON response from API.';
+           if (text.toLowerCase().includes('rate limit') || text.toLowerCase().includes('quota')) {
+                errorMessage = 'Rate limit exceeded';
+           }
+           setApiError(errorMessage);
+           return { error: errorMessage };
         }
-        throw error;
+
+    } catch (error: any) {
+        let errorMessage = 'An unknown API error occurred';
+        if (error instanceof Error) {
+            errorMessage = error.message;
+        } else if (typeof error === 'object' && error !== null && 'message' in error) {
+            errorMessage = String(error.message);
+        }
+
+        if (errorMessage.toLowerCase().includes('429') || errorMessage.toLowerCase().includes('rate limit') || errorMessage.toLowerCase().includes('quota')) {
+            setApiError('Rate limit exceeded');
+        } else {
+            setApiError(errorMessage);
+        }
+        return { error: errorMessage };
     }
 }
 
@@ -162,7 +187,7 @@ const getScripts = (item: Port | Host): Script[] => {
     const potentialScripts = Array.isArray(scriptsSource) ? scriptsSource : [scriptsSource];
     potentialScripts.forEach(potential => {
         if (potential) {
-            if ('script'in potential) { 
+            if ('script' in potential) { 
                 const nested = (potential as any).script;
                 if (Array.isArray(nested)) {
                     scripts.push(...nested);
@@ -182,6 +207,7 @@ export const useScanStore = create<ScanState>((set, get) => ({
   scanResult: null,
   selectedHost: null,
   apiStatus: 'idle',
+  apiError: null,
   aiModel: AI_MODEL_NAME,
   apiKey: process.env.NEXT_PUBLIC_GOOGLE_GENAI_API_KEY || null,
   explanationCache: new Map(),
@@ -191,6 +217,8 @@ export const useScanStore = create<ScanState>((set, get) => ({
   riskWeights: defaultRiskWeights,
   cveScanProgress: { processed: 0, total: 0, isComplete: false },
   isCveScanRunning: false,
+  isCveScanPaused: false,
+  remainingHostsToScan: [],
 
   setScanResult: (fileName, hosts, weights, resetCache = true) => {
     const finalWeights = weights || get().riskWeights;
@@ -226,6 +254,8 @@ export const useScanStore = create<ScanState>((set, get) => ({
       newState.cveCache = new Map();
       newState.isCveScanRunning = false;
       newState.cveScanProgress = { processed: 0, total: 0, isComplete: false };
+      newState.isCveScanPaused = false;
+      newState.remainingHostsToScan = [];
     }
     set(newState);
   },
@@ -241,6 +271,9 @@ export const useScanStore = create<ScanState>((set, get) => ({
     cveScanProgress: { processed: 0, total: 0, isComplete: false },
     isCveScanRunning: false,
     apiStatus: 'idle',
+    apiError: null,
+    isCveScanPaused: false,
+    remainingHostsToScan: [],
   }),
 
   setSelectedHost: (host) => set({ selectedHost: host }),
@@ -260,20 +293,14 @@ export const useScanStore = create<ScanState>((set, get) => ({
       explanationCache: new Map(),
       pentestingStepsCache: new Map(),
       nseSummaryCache: new Map(),
-      cveCache: new Map(),
-      isCveScanRunning: false, 
-      cveScanProgress: { processed: 0, total: 0, isComplete: false },
     });
-
-    const { scanResult, riskWeights } = get();
-    if (scanResult) {
-      get().setScanResult(scanResult.fileName, scanResult.originalHosts, riskWeights, false);
-    }
   },
 
   setApiKey: (key: string | null) => {
     set({ apiKey: key });
   },
+
+  setApiError: (error: string | null) => set({ apiError: error }),
 
   setApiStatus: (status: ApiStatus) => set({ apiStatus: status }),
 
@@ -290,87 +317,96 @@ export const useScanStore = create<ScanState>((set, get) => ({
   },
 
   fetchCvesForHost: async (hosts: Host | Host[], locale: string) => {
-    const hostsArray = Array.isArray(hosts) ? hosts : [hosts];
-    const { cveCache, isCveScanRunning } = get();
-
-    if (isCveScanRunning) return;
-
-    const hostsToScan = hostsArray.filter(host => {
-        const hasScannablePorts = getOpenPortsWithServices(host).length > 0;
-        const cacheEntry = cveCache.get(host.address[0].addr);
-        return hasScannablePorts && (!cacheEntry || cacheEntry.status === 'idle' || cacheEntry.status === 'error');
-    });
-
-    if (hostsToScan.length === 0) return;
-
-    const totalServicesToScan = hostsToScan.reduce((acc, host) => acc + getOpenPortsWithServices(host).length, 0);
-    
-    if (totalServicesToScan === 0) return;
-    
-    set({ isCveScanRunning: true, cveScanProgress: { processed: 0, total: totalServicesToScan, isComplete: false } });
-
-    const BATCH_SIZE = 5;
-    const DELAY_BETWEEN_BATCHES = 4000;
-
-    for (let i = 0; i < hostsToScan.length; i += BATCH_SIZE) {
-        const batch = hostsToScan.slice(i, i + BATCH_SIZE);
-
-        const batchPromises = batch.map(async (host) => {
-            const hostIp = host.address[0].addr;
-            
-            set(state => ({ cveCache: new Map(state.cveCache).set(hostIp, { status: 'loading' }) }));
-
-            try {
-                const portsToScan = getOpenPortsWithServices(host);
-                let hostCves: CveData[] = [];
-
-                for (const port of portsToScan) {
-                    try {
-                        const portInfoForPrompt = { port: port.portid, protocol: port.protocol, service: port.service!.name, product: port.service!.product || '', version: port.service!.version || '' };
-                        const input: CveDetailsInput = { hostInfo: JSON.stringify({ os: host.os?.osmatch?.[0]?.name || 'unknown' }), portInfo: JSON.stringify(portInfoForPrompt), locale: locale as 'en' | 'es' };
-                        const outputSchema = { cves: [{ cveId: "CVE-...", description: "...", cvssScore: 0.0 }] };
-                        const prompt = `You are a cybersecurity expert. Identify potential CVEs based on the provided service info. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema, with no extra text: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\` Based on the service, list the top 3 most critical CVEs. If none are found, return an empty array. \nHost Info: \`\`\`json\n${input.hostInfo}\`\`\`\nService Info:\`\`\`json\n${input.portInfo}\`\`\``;
-                        
-                        const result = await callGemini<CveDetailsInput, CveDetailsOutput>(prompt);
-
-                        if (result.cves && result.cves.length > 0) {
-                            hostCves.push(...result.cves.map(cve => ({ service: port.service!, portId: port.portid, cve })));
-                        }
-                    } catch (error) {
-                        console.error(`[CVE Fetch] Failed for port ${port.portid} on host ${hostIp}:`, error);
-                    } finally {
-                        set(state => ({
-                            cveScanProgress: { ...state.cveScanProgress, processed: state.cveScanProgress.processed + 1 }
-                        }));
-                    }
-                }
-                
-                set(state => ({
-                    cveCache: new Map(state.cveCache).set(hostIp, { status: 'loaded', data: hostCves })
-                }));
-
-            } catch (error) {
-                 set(state => ({
-                    cveCache: new Map(state.cveCache).set(hostIp, { status: 'error', error: error instanceof Error ? error.message : "Unknown CVE scan error" })
-                }));
-            }
-        });
-
-        await Promise.all(batchPromises);
-
-        if (i + BATCH_SIZE < hostsToScan.length) {
-            await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
-        }
+    if (!get().apiKey) {
+      get().setApiError('API key not configured');
+      return;
     }
     
-    set(state => ({ 
-        cveScanProgress: { ...state.cveScanProgress, isComplete: true },
-        isCveScanRunning: false 
-    }));
+    if (get().isCveScanRunning) return;
+    if (get().apiError) setApiError(null);
+
+    const hostsToProcess = Array.isArray(hosts) ? hosts : [hosts];
+
+    let hostsForScan: Host[];
+    if (get().isCveScanPaused && get().remainingHostsToScan.length > 0) {
+        hostsForScan = get().remainingHostsToScan;
+    } else {
+        hostsForScan = hostsToProcess.filter(host => {
+            const hasScannablePorts = getOpenPortsWithServices(host).length > 0;
+            const cacheEntry = get().cveCache.get(host.address[0].addr);
+            return hasScannablePorts && (!cacheEntry || cacheEntry.status === 'idle' || cacheEntry.status === 'error');
+        });
+    }
+
+    if (hostsForScan.length === 0) return;
     
-    const { scanResult, riskWeights } = get();
-    if (scanResult) {
-      get().setScanResult(scanResult.fileName, scanResult.originalHosts, riskWeights, false);
+    if (!get().isCveScanPaused) {
+       const totalServicesToScan = hostsForScan.reduce((acc, host) => acc + getOpenPortsWithServices(host).length, 0);
+       set({ cveScanProgress: { processed: 0, total: totalServicesToScan, isComplete: false } });
+    }
+    
+    set({ 
+        isCveScanRunning: true, 
+        isCveScanPaused: false, 
+        remainingHostsToScan: [],
+    });
+    
+    const BATCH_DELAY = 1000;
+
+    for (let i = 0; i < hostsForScan.length; i++) {
+        const host = hostsForScan[i];
+        const hostIp = host.address[0].addr;
+        
+        set(state => ({ cveCache: new Map(state.cveCache).set(hostIp, { status: 'loading' }) }));
+
+        const portsToScan = getOpenPortsWithServices(host);
+        let hostCves: CveData[] = get().cveCache.get(hostIp)?.data || [];
+
+        for (const port of portsToScan) {
+            const portInfoForPrompt = { port: port.portid, protocol: port.protocol, service: port.service!.name, product: port.service!.product || '', version: port.service!.version || '' };
+            const input: CveDetailsInput = { hostInfo: JSON.stringify({ os: host.os?.osmatch?.[0]?.name || 'unknown' }), portInfo: JSON.stringify(portInfoForPrompt), locale: locale as 'en' | 'es' };
+            const outputSchema = { cves: [{ cveId: "CVE-...", description: "...", cvssScore: 0.0 }] };
+            const prompt = `You are a cybersecurity expert. Identify potential CVEs based on the provided service info. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema, with no extra text: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\` Based on the service, list the top 3 most critical CVEs. If none are found, return an empty array. \nHost Info: \`\`\`json\n${input.hostInfo}\`\`\`\nService Info:\`\`\`json\n${input.portInfo}\`\`\``;
+            
+            const result = await callGemini<CveDetailsInput, CveDetailsOutput>(prompt);
+
+            if ((result as any).error) {
+              const remainingHosts = hostsForScan.slice(i);
+              set({
+                isCveScanRunning: false,
+                isCveScanPaused: true,
+                remainingHostsToScan: remainingHosts,
+              });
+              return;
+            }
+
+            if (result.cves && result.cves.length > 0) {
+                hostCves.push(...result.cves.map(cve => ({ service: port.service!, portId: port.portid, cve })));
+            }
+
+            set(state => ({
+                cveScanProgress: { ...state.cveScanProgress, processed: state.cveScanProgress.processed + 1 }
+            }));
+            await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
+        }
+        
+        set(state => ({
+            cveCache: new Map(state.cveCache).set(hostIp, { status: 'loaded', data: hostCves })
+        }));
+    }
+    
+    set({ 
+        cveScanProgress: { ...get().cveScanProgress, isComplete: true },
+        isCveScanRunning: false,
+        isCveScanPaused: false,
+        remainingHostsToScan: [],
+    });
+    
+    if (!get().apiError) {
+        const { scanResult, riskWeights } = get();
+        if (scanResult) {
+          get().setScanResult(scanResult.fileName, scanResult.originalHosts, riskWeights, false);
+        }
     }
   },
 
@@ -389,7 +425,10 @@ export const useScanStore = create<ScanState>((set, get) => ({
         const prompt = `You are a senior security analyst. Explain concisely why the host has its risk ranking. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nHost details:\n${input.hostDetails}\nRanking factors:\n- ${input.rankingFactors.join('\n- ')}\nRisk score: ${input.riskScore}`;
 
         const result = await callGemini<ExplainVulnerabilityRiskInput, ExplainVulnerabilityRiskOutput>(prompt);
-        set(state => ({ explanationCache: new Map(state.explanationCache).set(cacheKey, { status: 'loaded', data: result }) }));
+        if ((result as any).error) {
+            throw new Error((result as any).error);
+        }
+        set(state => ({ explanationCache: new Map(state.explanationCache).set(cacheKey, { status: 'loaded', data: result as ExplainVulnerabilityRiskOutput }) }));
       } catch (err) {
         set(state => ({ explanationCache: new Map(state.explanationCache).set(cacheKey, { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' }) }));
       }
@@ -413,7 +452,10 @@ export const useScanStore = create<ScanState>((set, get) => ({
         const prompt = `You are a world-class penetration tester. Provide actionable next steps for a penetration test based on the Nmap scan results. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema. Replace any placeholders like IP addresses in commands with the actual IP: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nHost Details:\n\`\`\`json\n${input.hostDetails}\`\`\``;
 
         const result = await callGemini<PentestingNextStepsInput, PentestingNextStepsOutput>(prompt);
-        set(state => ({ pentestingStepsCache: new Map(state.pentestingStepsCache).set(cacheKey, { status: 'loaded', data: result }) }));
+        if ((result as any).error) {
+            throw new Error((result as any).error);
+        }
+        set(state => ({ pentestingStepsCache: new Map(state.pentestingStepsCache).set(cacheKey, { status: 'loaded', data: result as PentestingNextStepsOutput }) }));
       } catch (err) {
         set(state => ({ pentestingStepsCache: new Map(state.pentestingStepsCache).set(cacheKey, { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' }) }));
       }
@@ -445,10 +487,13 @@ export const useScanStore = create<ScanState>((set, get) => ({
         const input: NseScriptsSummaryInput = { rawScriptOutput, locale: locale as 'en' | 'es' };
         
         const outputSchema = { summary: "A concise, easy-to-read summary of the key findings from the NSE scripts, formatted in Markdown." };
-        const prompt = `You are a cybersecurity expert. Summarize the following NSE script outputs. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nNSE Output:\n\`\`\`\n${input.rawScriptOutput}\`\`\``;
+        const prompt = `You are a cybersecurity expert. Summarize the following NSE script outputs. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nNSE Output:\n\`\`\`\n${rawScriptOutput}\`\`\``;
 
         const result = await callGemini<NseScriptsSummaryInput, NseScriptsSummaryOutput>(prompt);
-        set(state => ({ nseSummaryCache: new Map(state.nseSummaryCache).set(cacheKey, { status: 'loaded', data: result }) }));
+        if ((result as any).error) {
+            throw new Error((result as any).error);
+        }
+        set(state => ({ nseSummaryCache: new Map(state.nseSummaryCache).set(cacheKey, { status: 'loaded', data: result as NseScriptsSummaryOutput }) }));
       } catch (err) {
         set(state => ({ nseSummaryCache: new Map(state.nseSummaryCache).set(cacheKey, { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' }) }));
       }
