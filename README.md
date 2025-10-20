@@ -103,9 +103,9 @@ Escanea todos los servicios expuestos y detecta todos los CVEs asociados, con su
 <img width="3456" height="1860" alt="VM - CVEs" src="https://github.com/user-attachments/assets/47db32ce-baae-43ce-8142-4056d63bbfd9" />
 
 #### Grafo de red
-Visualiza un esquema de la red y las relaciones entre los hosts de manera super simple.
+Visualiza un esquema de la red y las relaciones entre los hosts de manera super simple, identificando posibles rutas de pivoting.
 
-<img width="3456" height="1856" alt="VM - Grafo" src="https://github.com/user-attachments/assets/9219466d-9e09-486e-83cf-39325c4536d3" />
+<img width="3456" height="1856" alt="VM - Grafo" src="https://github.com/user-attachments/assets/ee963017-b8cd-4a9e-a08a-96f711c8db42" />
 
 ### 4. Profundiza en cada Host
 Haz clic en cualquier host para acceder a su página de detalle, donde encontrarás:
