@@ -76,7 +76,7 @@ export default function Home() {
           <p className="text-lg text-muted-foreground">{t('analyzing')}</p>
         </div>
       ) : !scanResult ? (
-        <div className="flex-grow flex items-stretch">
+        <div className="flex-grow flex flex-col items-center justify-center">
           <UploadZone
             getRootProps={getRootProps}
             getInputProps={getInputProps}
