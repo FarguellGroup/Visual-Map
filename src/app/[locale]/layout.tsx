@@ -29,7 +29,9 @@ export default function LocaleLayout({
   
   // We need to get the scanResult here to conditionally render the sidebar
   // but we pass the logic that uses the store down to the header.
-  const scanResult = useScanStore((state) => state.scanResult);
+  const { scanResult, cveCache } = useScanStore();
+  const hasCves = Array.from(cveCache.values()).some(e => e.status === 'loaded' && e.data && e.data.length > 0);
+
 
   useEffect(() => {
     setMounted(true);
@@ -63,6 +65,8 @@ export default function LocaleLayout({
             <PortsDetailView hosts={scanResult.hosts} />
             <ServicesDetailView hosts={scanResult.hosts} />
             <ThreatsDetailView hosts={scanResult.hosts} />
+            {/* Explicitly render for PDF with a specific ID */}
+            {hasCves && <ThreatsDetailView hosts={scanResult.hosts} pdfMode={true} forceId="pdf-threat-service-dist-chart" />}
         </div>
       )}
     </ClientSidebarProvider>
