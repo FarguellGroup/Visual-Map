@@ -80,7 +80,7 @@ export default function DetailsPage() {
   return (
     <>
       <div className="container mx-auto p-0">
-        <div className="flex items-center gap-4 mb-4">
+        <div className="flex items-center gap-4 mb-8">
           <h1 className="text-2xl md:text-3xl font-bold capitalize font-headline text-primary">{getPageTitle()}</h1>
         </div>
         {renderContent()}
