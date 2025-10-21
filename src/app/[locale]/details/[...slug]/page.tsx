@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useParams } from 'next/navigation';
@@ -41,7 +40,7 @@ export default function DetailsPage() {
         return locale === 'es' ? 'Hosts Vulnerables' : 'Vulnerable Hosts';
     }
     if (page === 'vulnerabilities') {
-        return locale === 'es' ? 'Vulnerabilidades' : 'Vulnerabilities';
+        return locale === 'es' ? 'CVEs y Vulnerabilidades' : 'CVEs & Vulnerabilities';
     }
 
     const pageTitles: { [key: string]: string } = {
@@ -82,7 +81,7 @@ export default function DetailsPage() {
     <>
       <div className="container mx-auto p-0">
         <div className="flex items-center gap-4 mb-4">
-          <h1 className="text-2xl md:text-3xl font-bold capitalize">{getPageTitle()}</h1>
+          <h1 className="text-2xl md:text-3xl font-bold capitalize font-headline">{getPageTitle()}</h1>
         </div>
         {renderContent()}
       </div>
