@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { DropzoneRootProps, DropzoneInputProps } from 'react-dropzone';
@@ -78,9 +77,9 @@ export default function UploadZone({ getRootProps, getInputProps, isDragActive }
       >
         <input {...getInputProps()} />
         <div className="flex flex-col items-center justify-center gap-4 text-center">
-          <UploadCloud className={cn('w-12 h-12 md:w-16 md:h-16', isDragActive ? 'text-primary' : 'text-muted-foreground')} />
-          <h3 className="text-xl md:text-2xl font-bold">{t('title')}</h3>
-          <p className="text-muted-foreground">{t('subtitle')}</p>
+          <UploadCloud className={cn('w-12 h-12 md:w-16 md:h-16 text-primary', isDragActive ? 'text-primary' : 'text-primary')} />
+          <h3 className="text-xl md:text-2xl font-bold font-headline">{t('title')}</h3>
+          <p className="text-primary">{t('subtitle')}</p>
           <p className="text-xs text-muted-foreground">{t('caption')}</p>
         </div>
       </div>
