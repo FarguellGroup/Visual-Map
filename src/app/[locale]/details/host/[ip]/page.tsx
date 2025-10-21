@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -226,12 +225,12 @@ export default function HostDetailPage() {
             <Server className="h-8 w-8" />
             <div>
                 {hasHostname ? (
-                    <h1 className="text-xl md:text-3xl font-bold flex items-baseline gap-2">
+                    <h1 className="text-xl md:text-3xl font-bold flex items-baseline gap-2 font-headline">
                         {hostname} 
                         <span className="text-lg md:text-2xl text-muted-foreground font-mono">({host.address[0].addr})</span>
                     </h1>
                 ) : (
-                    <h1 className="text-xl md:text-3xl font-bold font-mono">{host.address[0].addr}</h1>
+                    <h1 className="text-xl md:text-3xl font-bold font-mono font-headline">{host.address[0].addr}</h1>
                 )}
             </div>
         </div>
