@@ -37,7 +37,7 @@ export default function RiskRanking() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>{t('title')}</CardTitle>
+          <CardTitle className="text-primary">{t('title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">{t('noVulnerableHosts')}</p>
@@ -57,7 +57,7 @@ export default function RiskRanking() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('title')}</CardTitle>
+        <CardTitle className="text-primary">{t('title')}</CardTitle>
       </CardHeader>
       <CardContent>
         <Accordion type="single" collapsible className="w-full">
@@ -81,5 +81,3 @@ export default function RiskRanking() {
     </Card>
   );
 }
-
-    
