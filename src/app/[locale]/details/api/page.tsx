@@ -251,7 +251,7 @@ export default function ApiPage() {
   return (
     <div className="container mx-auto p-0 space-y-8">
       <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold font-headline">{t('title')}</h1>
+        <h1 className="text-2xl md:text-3xl font-bold font-headline text-primary">{t('title')}</h1>
         <p className="text-muted-foreground">{locale === 'es' ? 'Verifica tu clave API Gemini y consulta los modelos disponibles.' : 'Verify your Gemini API key and see the available models.'}</p>
       </div>
 
