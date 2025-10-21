@@ -8,7 +8,7 @@ import { Button } from '../ui/button';
 import { Download, Loader2, Home, Users, Shield, Server, DoorOpen, Network, Skull, SlidersHorizontal, ChevronDown, KeyRound } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useScanStore, type RiskWeights } from '@/store/use-scan-store';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import html2canvas from 'html2canvas';
@@ -168,7 +168,7 @@ export default function AppSidebar() {
     setScanResult(scanResult.fileName, scanResult.originalHosts, newWeights, false);
   };
 
-  const handleExportJson = () => {
+  const handleExportJson = useCallback(() => {
     if (!scanResult) return;
     const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
       JSON.stringify(scanResult, null, 2)
@@ -177,7 +177,7 @@ export default function AppSidebar() {
     link.href = jsonString;
     link.download = `visual-map-report-${getFormattedTimestamp()}.json`;
     link.click();
-  };
+  }, [scanResult]);
 
   const captureChartAsBase64 = async (elementId: string, options?: { backgroundColor?: string | null }) => {
     const element = document.getElementById(elementId) as HTMLElement;
@@ -199,7 +199,7 @@ export default function AppSidebar() {
     }
   };
 
-  const handleExportHtml = async () => {
+  const handleExportHtml = useCallback(async () => {
     if (!scanResult) return;
     setIsExportingHtml(true);
     try {
@@ -473,9 +473,9 @@ export default function AppSidebar() {
     } finally {
       setIsExportingHtml(false);
     }
-  };
+  }, [scanResult, theme, locale, tDetails, tSummary, tHostsTable, tRiskRanking, cveCache]);
 
-  const handleExportPdf = async () => {
+  const handleExportPdf = useCallback(async () => {
     if (!scanResult) return;
     setIsExportingPdf(true);
   
@@ -783,7 +783,7 @@ export default function AppSidebar() {
     } finally {
       setIsExportingPdf(false);
     }
-  };
+  }, [scanResult, cveCache, locale, tDetails, tSummary, tHostsTable, tRiskRanking]);
 
   const dashboardTitle = locale === 'es' ? 'Dashboard' : 'Dashboard';
   const hostsTitle = tDetails('hosts');
@@ -1007,5 +1007,7 @@ export default function AppSidebar() {
     </>
   );
 }
+
+    
 
     
