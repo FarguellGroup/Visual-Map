@@ -85,7 +85,7 @@ export default function Home() {
           />
         </div>
       ) : (
-        <div className="space-y-4 md:space-y-8 py-4 md:py-8">
+        <div className="space-y-4 md:space-y-8 py-4">
           <SummaryCards />
           <HostsTable />
         </div>
