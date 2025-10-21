@@ -246,7 +246,17 @@ export default function ApiPage() {
   const rateLimitHintTitleText = locale === 'es' ? 'Consejo sobre el Límite de la API' : 'API Rate Limit Tip';
   const rateLimitHintDescriptionText = locale === 'es' ? 'Si alcanzas el límite de peticiones (rate limit) de la API para un modelo, prueba a cambiar a uno diferente para seguir utilizando la plataforma.' : 'If you reach the API rate limit for a model, try switching to a different one to continue using the platform.';
 
-  const shouldShowApiKeyInput = apiStatus === 'error' || (!storedApiKey && apiStatus !== 'loading');
+  const apiKeyInputTitle = storedApiKey 
+    ? (locale === 'es' ? 'Actualizar Clave API' : 'Update API Key') 
+    : (locale === 'es' ? 'Añadir Clave API' : 'Add API Key');
+
+  const apiKeyInputPlaceholder = storedApiKey
+    ? (locale === 'es' ? 'Introduce la nueva clave API Gemini...' : 'Enter the new Gemini API key...')
+    : (locale === 'es' ? 'Introduce tu clave API Gemini...' : 'Enter your Gemini API key...');
+
+  const apiKeySaveButtonText = storedApiKey
+    ? (locale === 'es' ? 'Actualizar' : 'Update')
+    : (locale === 'es' ? 'Guardar' : 'Save');
 
   return (
     <div className="container mx-auto p-0 space-y-8">
@@ -283,36 +293,34 @@ export default function ApiPage() {
             </Button>
           </div>
           
-          {shouldShowApiKeyInput && (
-              <div className="space-y-4 pt-4 border-t">
-                  <h4 className="font-semibold">{locale === 'es' ? 'Añadir Clave API' : 'Add API Key'}</h4>
-                   <div className="flex items-center gap-2">
-                        <div className="relative w-full">
-                           <Input 
-                                type={isApiKeyVisible ? 'text' : 'password'}
-                                placeholder={locale === 'es' ? 'Introduce tu clave API Gemini...' : 'Enter your Gemini API key...'}
-                                value={apiKeyInput}
-                                onChange={(e) => setApiKeyInput(e.target.value)}
-                                className="pr-10"
-                            />
-                           <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                                onClick={() => setIsApiKeyVisible(prev => !prev)}
-                           >
-                               {isApiKeyVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                               <span className="sr-only">{isApiKeyVisible ? (locale === 'es' ? 'Ocultar clave API' : 'Hide API key') : (locale === 'es' ? 'Mostrar clave API' : 'Show API key')}</span>
-                           </Button>
-                        </div>
-                        <Button onClick={handleSaveApiKey} disabled={!apiKeyInput || isSaving}>
-                           {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                            {locale === 'es' ? 'Guardar' : 'Save'}
-                        </Button>
-                   </div>
-              </div>
-          )}
+            <div className="space-y-4 pt-4 border-t">
+                <h4 className="font-semibold">{apiKeyInputTitle}</h4>
+                 <div className="flex items-center gap-2">
+                      <div className="relative w-full">
+                         <Input 
+                              type={isApiKeyVisible ? 'text' : 'password'}
+                              placeholder={apiKeyInputPlaceholder}
+                              value={apiKeyInput}
+                              onChange={(e) => setApiKeyInput(e.target.value)}
+                              className="pr-10"
+                          />
+                         <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                              onClick={() => setIsApiKeyVisible(prev => !prev)}
+                         >
+                             {isApiKeyVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                             <span className="sr-only">{isApiKeyVisible ? (locale === 'es' ? 'Ocultar clave API' : 'Hide API key') : (locale === 'es' ? 'Mostrar clave API' : 'Show API key')}</span>
+                         </Button>
+                      </div>
+                      <Button onClick={handleSaveApiKey} disabled={!apiKeyInput || isSaving}>
+                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                          {apiKeySaveButtonText}
+                      </Button>
+                 </div>
+            </div>
 
 
           {apiStatus === 'success' && models.length > 0 && (
