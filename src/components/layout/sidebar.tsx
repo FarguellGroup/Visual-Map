@@ -1,8 +1,7 @@
 
-
 'use client';
 
-import { SidebarContent, SidebarGroup, SidebarSeparator, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
+import { SidebarHeader, SidebarContent, SidebarGroup, SidebarSeparator, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '../ui/button';
@@ -291,7 +290,7 @@ export default function AppSidebar() {
                     .sun-icon { display: none; }
                     .dark .sun-icon { display: block; }
                     .dark .moon-icon { display: none; }
-                    h1, h2, h3 { color: var(--foreground); font-weight: 600; }
+                    h1, h2, h3 { color: var(--foreground); font-weight: 600; font-family: 'Space Grotesk', sans-serif; }
                     h1 { font-size: 2em; text-align: left; } h2 { font-size: 1.5em; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-top: 40px; } h3 { font-size: 1.2em; }
                     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
                     th, td { padding: 12px 15px; border: 1px solid var(--border); text-align: left; font-size: 14px; }
@@ -313,6 +312,9 @@ export default function AppSidebar() {
                     .logo-text { font-size: 1.2em; font-weight: bold; }
                     @media (max-width: 768px) { body { padding-top: 60px; } header { padding: 10px; } nav ul { display: none; } .container { padding: 10px; } h1 { font-size: 1.5em; } h2 { font-size: 1.2em; } }
                 </style>
+                <link rel="preconnect" href="https://fonts.googleapis.com">
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+                <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&display=swap" rel="stylesheet">
             </head>
             <body>
                 <header>
@@ -801,14 +803,15 @@ export default function AppSidebar() {
   
   return (
     <>
-      <SidebarContent className='pt-0'>
-         <SidebarGroup className='pt-2'>
-            <Link href="/" className="flex items-center gap-2 p-2">
-                <VmLogo className="h-6 w-6" />
-                <h1 className="text-lg md:text-xl font-bold tracking-tight group-data-[collapsible=icon]:hidden">{tHeader('title')}</h1>
-            </Link>
-        </SidebarGroup>
-        <SidebarSeparator />
+      <SidebarHeader className="flex h-14 px-4 pt-4">
+        {scanResult && (
+          <Link href="/" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+            <VmLogo className="h-6 w-6" />
+            <h1 className="text-lg font-bold tracking-tight group-data-[collapsible=icon]:hidden font-headline">{tHeader('title')}</h1>
+          </Link>
+        )}
+      </SidebarHeader>
+      <SidebarContent>
         <SidebarGroup>
             <SidebarMenu>
                 <SidebarMenuItem>
@@ -1004,3 +1007,5 @@ export default function AppSidebar() {
     </>
   );
 }
+
+    
