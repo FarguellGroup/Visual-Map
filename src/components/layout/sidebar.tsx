@@ -802,7 +802,7 @@ export default function AppSidebar() {
   return (
     <>
       <SidebarContent className='pt-0'>
-         <SidebarGroup>
+         <SidebarGroup className='pt-2'>
             <Link href="/" className="flex items-center gap-2 p-2">
                 <VmLogo className="h-6 w-6" />
                 <h1 className="text-lg md:text-xl font-bold tracking-tight group-data-[collapsible=icon]:hidden">{tHeader('title')}</h1>
