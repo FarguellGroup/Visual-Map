@@ -4,7 +4,7 @@
 import { Separator } from "@/components/ui/separator";
 
 export default function AppFooter() {
-  const version = "2.0"; 
+  const version = "2.1"; 
 
   return (
     <footer className="w-full mt-auto">
