@@ -215,7 +215,7 @@ export default function HostsTable() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('title')} ({hosts.length})</CardTitle>
+        <CardTitle className="text-primary">{t('title')} ({hosts.length})</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">
