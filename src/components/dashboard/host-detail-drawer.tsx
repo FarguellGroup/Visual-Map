@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useScanStore } from '@/store/use-scan-store';
@@ -9,75 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Host, Port, Script } from '@/types/nmap';
 import { useTranslations } from 'next-intl';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { ArrowUpDown } from 'lucide-react';
-
-
-const getScripts = (item: Port | Host): Script[] => {
-    const scriptsSource = 'hostscript' in item ? item.hostscript : item.script;
-    if (!scriptsSource) return [];
-
-    const scripts: Script[] = [];
-    
-    const potentialScripts = Array.isArray(scriptsSource) ? scriptsSource : [scriptsSource];
-
-    potentialScripts.forEach(potential => {
-        if (potential) {
-            if ('script' in potential) { 
-                const nested = (potential as any).script;
-                if (Array.isArray(nested)) {
-                    scripts.push(...nested);
-                } else if (nested) {
-                    scripts.push(nested);
-                }
-            } else if ('id' in potential) { 
-                scripts.push(potential as Script);
-            }
-        }
-    });
-
-    return scripts;
-};
-
-const getHostname = (host: Host | null): string => {
-  if (!host) {
-    return 'N/A';
-  }
-
-  // 1. Try to get from hostnames array
-  if (host.hostnames && Array.isArray(host.hostnames)) {
-    for (const hostnamesEntry of host.hostnames) {
-      if (hostnamesEntry && hostnamesEntry.hostname) {
-        const hostnameArray = Array.isArray(hostnamesEntry.hostname) ? hostnamesEntry.hostname : [hostnamesEntry.hostname];
-        const primaryHostname = hostnameArray.find(h => h.type === 'user' || h.type === 'PTR');
-        if (primaryHostname) {
-          return primaryHostname.name;
-        }
-      }
-    }
-  } else if (host.hostnames && !Array.isArray(host.hostnames) && host.hostnames.hostname) {
-      const hostnameArray = Array.isArray(host.hostnames.hostname) ? host.hostnames.hostname : [host.hostnames.hostname];
-      const primaryHostname = hostnameArray.find(h => h.type === 'user' || h.type === 'PTR');
-      if (primaryHostname) {
-        return primaryHostname.name;
-      }
-  }
-
-
-  // 2. If not found, try to get from smb-os-discovery script
-  const hostScripts = getScripts(host);
-  const smbScript = hostScripts.find(s => s.id === 'smb-os-discovery');
-  if (smbScript) {
-    const output = smbScript.output;
-    const computerNameMatch = output.match(/Computer name: ([\w-]+)/);
-    if (computerNameMatch && computerNameMatch[1]) {
-      return computerNameMatch[1];
-    }
-  }
-
-  return 'N/A';
-};
-
+import { getHostname, getScripts } from '@/lib/nmap-parser';
 
 const getPorts = (host: Host | null): Port[] => {
     if (!host || !host.ports || !host.ports.port) return [];
@@ -92,6 +25,8 @@ export default function HostDetailDrawer() {
   const { selectedHost, setSelectedHost } = useScanStore();
   const t = useTranslations('HostDetail');
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: SortDirection } | null>(null);
+  
+  const hostname = useMemo(() => selectedHost ? getHostname(selectedHost) : 'N/A', [selectedHost]);
 
   const openPorts = useMemo(() => getPorts(selectedHost), [selectedHost]);
 
@@ -155,13 +90,13 @@ export default function HostDetailDrawer() {
           <>
             <SheetHeader>
               <SheetTitle className="font-mono">{selectedHost.address[0].addr}</SheetTitle>
-              <SheetDescription>{getHostname(selectedHost)}</SheetDescription>
+              <SheetDescription>{hostname}</SheetDescription>
             </SheetHeader>
             <div className="py-4">
               <Tabs defaultValue="ports" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="ports">{t('openPorts')} ({openPorts.length})</TabsTrigger>
-                  <TabsTrigger value="host-scripts">{t('nseScripts')} ({hostScripts.length})</TabsTrigger>
+                  <TabsTrigger value="host-scripts">{t('hostScripts')} ({hostScripts.length})</TabsTrigger>
                 </TabsList>
                 <TabsContent value="ports">
                   <ScrollArea className="h-[calc(100vh-12rem)]">
@@ -219,7 +154,3 @@ export default function HostDetailDrawer() {
     </Sheet>
   );
 }
-
-    
-
-    

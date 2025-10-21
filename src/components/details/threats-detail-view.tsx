@@ -9,12 +9,13 @@ import { Badge } from '@/components/ui/badge';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from '@/navigation';
 import { cn } from '@/lib/utils';
-import { ArrowUpDown, ShieldX, Search, RotateCw, Settings } from 'lucide-react';
+import { ArrowUpDown, ShieldX, Search, RotateCw, Settings, Pause, Play, AlertCircle } from 'lucide-react';
 import { useScanStore } from '@/store/use-scan-store';
 import { Progress } from '../ui/progress';
 import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recharts';
 import { Button } from '../ui/button';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { getHostname } from '@/lib/nmap-parser';
 
 const getCveRiskColorClass = (score: number | string | null): string => {
     const numericScore = typeof score === 'string' ? parseFloat(score) : score;
@@ -30,7 +31,7 @@ const COLORS = [
 ];
 
 type SortDirection = 'ascending' | 'descending';
-type SortableKeys = 'service' | 'cveId' | 'cvssScore' | 'hostIp';
+type SortableKeys = 'service' | 'cveId' | 'cvssScore' | 'hostIp' | 'hostname';
 
 const ipToNumber = (ip: string) => {
     return ip.split('.').reduce((acc, octet, index) => acc + parseInt(octet) * Math.pow(256, 3 - index), 0);
@@ -71,12 +72,14 @@ const ResumeScanButton = () => {
 
 export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: { hosts: Host[], pdfMode?: boolean, forceId?: string }) {
     const t = useTranslations('DetailsPage');
+    const tHostsTable = useTranslations('HostsTable');
     const router = useRouter();
     const locale = useLocale();
     
     const { 
         cveCache, 
         fetchCvesForHost, 
+        pauseCveScan,
         cveScanProgress,
         isCveScanRunning,
         isCveScanPaused,
@@ -95,6 +98,10 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     const handleConfigureApi = () => {
         router.push('/details/api');
     };
+
+    const handleResumeScan = () => {
+      fetchCvesForHost(hosts, locale);
+    }
 
     const { allFoundCves, vulnerableServices, serviceDistribution, hasUnscannedHosts } = useMemo(() => {
         if (!cveCache) {
@@ -156,7 +163,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
             setScanResult(scanResult.fileName, scanResult.originalHosts, riskWeights, false);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cveScanProgress?.isComplete, scanResult, riskWeights]);
+    }, [cveScanProgress?.isComplete]);
 
 
     const sortedCves = useMemo(() => {
@@ -180,6 +187,10 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
                         bValue = b.cve.cvssScore !== null ? parseFloat(b.cve.cvssScore) : -1;
                         if (isNaN(aValue)) aValue = -1;
                         if (isNaN(bValue)) bValue = -1;
+                        break;
+                    case 'hostname':
+                        aValue = getHostname(a.host);
+                        bValue = getHostname(b.host);
                         break;
                     case 'hostIp':
                         aValue = ipToNumber(a.host.address[0].addr);
@@ -220,7 +231,11 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
         router.push(`/details/host/${hostIp}`);
     };
 
-    const cvesTitle = locale === 'es' ? 'CVEs Descubiertos' : 'Discovered CVEs';
+    const cvesTitleText = locale === 'es' ? 'CVEs Descubiertos' : 'Discovered CVEs';
+    const cvesTitle = allFoundCves.length > 0 
+        ? `${cvesTitleText} (${allFoundCves.length})` 
+        : cvesTitleText;
+
     const cvesDescription = locale === 'es' ? 'Busca vulnerabilidades y CVEs en los hosts descubiertos mediante IA.' : 'Search for vulnerabilities and CVEs on discovered hosts using AI.';
     const vulnerableServicesTitle = locale === 'es' ? 'Principales Servicios Vulnerables' : 'Top Vulnerable Services';
     const serviceTitle = t('service');
@@ -235,9 +250,12 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     
     const isRateLimitError = apiError?.toLowerCase().includes('rate limit') || false;
     const showConfigureApiButton = apiError && !isRateLimitError;
-    const showResumeScanButton = isCveScanPaused && isRateLimitError;
+    const showResumeFromRateLimit = isCveScanPaused && isRateLimitError;
 
-    const showGlobalScanButton = hasUnscannedHosts && !isCveScanRunning && !apiError;
+    const showGlobalScanButton = hasUnscannedHosts && !isCveScanRunning && !apiError && !isCveScanPaused;
+    const showPauseButton = isCveScanRunning && !isCveScanPaused;
+    const showResumeButton = isCveScanPaused && !isRateLimitError;
+
     const chartId = forceId || (pdfMode ? 'pdf-threat-service-dist-chart' : 'threat-service-dist-chart');
     const scanStoppedError = locale === 'es' ? 'El escaneo se detuvo debido a un error de la API (rate limit). Inténtalo de nuevo más tarde.' : 'Scan stopped due to API rate limit. Please try again later.';
     const configureApiButtonText = locale === 'es' ? 'Configurar API' : 'Configure API';
@@ -246,14 +264,14 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
   return (
     <div className="space-y-8">
         <Card>
-            <CardHeader className="flex flex-row items-start justify-between">
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
                 <div>
                     <CardTitle>{cvesTitle}</CardTitle>
                     <CardDescription>{cvesDescription}</CardDescription>
                 </div>
-                <div>
+                <div className="flex items-center gap-2">
                     {showGlobalScanButton && (
-                        <Button onClick={handleFetchAllCves} size="sm" disabled={isCveScanRunning || !!apiError}>
+                        <Button onClick={handleFetchAllCves} size="sm">
                             <Search className="mr-2 h-4 w-4" />
                             {locale === 'es' ? 'Buscar CVEs' : 'Search CVEs'}
                         </Button>
@@ -262,6 +280,18 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
                         <Button onClick={handleConfigureApi} size="sm" variant="outline">
                             <Settings className="mr-2 h-4 w-4" />
                             {configureApiButtonText}
+                        </Button>
+                    )}
+                    {showPauseButton && (
+                        <Button onClick={pauseCveScan} size="sm" variant="outline">
+                            <Pause className="mr-2 h-4 w-4" />
+                            {locale === 'es' ? 'Pausar' : 'Pause'}
+                        </Button>
+                    )}
+                    {showResumeButton && (
+                         <Button onClick={handleResumeScan} size="sm" variant="outline">
+                            <Play className="mr-2 h-4 w-4" />
+                            {locale === 'es' ? 'Reanudar' : 'Resume'}
                         </Button>
                     )}
                 </div>
@@ -273,13 +303,20 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
                 </CardContent>
             )}
 
-            {showResumeScanButton && (
-                 <CardContent>
+            {showResumeFromRateLimit && (
+                <CardContent>
+                    <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>{locale === 'es' ? 'Límite de API alcanzado' : 'API Rate Limit Reached'}</AlertTitle>
+                        <AlertDescription>
+                          {locale === 'es' ? 'El escaneo se ha pausado. Puedes reanudarlo en un minuto.' : 'The scan has been paused. You can resume it in one minute.'}
+                        </AlertDescription>
+                    </Alert>
                     <ResumeScanButton />
                 </CardContent>
             )}
             
-            {!isCveScanRunning && apiError && !showConfigureApiButton && !showResumeScanButton && (
+            {!isCveScanRunning && apiError && !showConfigureApiButton && !showResumeFromRateLimit && (
                  <CardContent>
                     <Alert variant="destructive">
                         <AlertTitle>{locale === 'es' ? 'Error en el Escaneo' : 'Scan Error'}</AlertTitle>
@@ -303,6 +340,9 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
                                     <TableHead onClick={() => requestSort('cvssScore')} className="cursor-pointer">
                                         <div className="flex items-center">{cvssScoreTitle} {getSortIcon('cvssScore')}</div>
                                     </TableHead>
+                                     <TableHead onClick={() => requestSort('hostname')} className="cursor-pointer">
+                                        <div className="flex items-center">{tHostsTable('hostname')} {getSortIcon('hostname')}</div>
+                                    </TableHead>
                                     <TableHead onClick={() => requestSort('hostIp')} className="cursor-pointer">
                                         <div className="flex items-center">{t('hostIp')} {getSortIcon('hostIp')}</div>
                                     </TableHead>
@@ -312,6 +352,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
                                 {sortedCves.map((item, index) => {
                                     const score = item.cve.cvssScore !== null ? parseFloat(item.cve.cvssScore) : null;
                                     const displayScore = score !== null && !isNaN(score) ? score.toFixed(1) : 'N/A';
+                                    const hostname = getHostname(item.host);
                                     return (
                                         <TableRow key={index} onClick={() => handleRowClick(item.host.address[0].addr)} className="cursor-pointer">
                                             <TableCell className="font-medium">{item.service.product} {item.service.version}</TableCell>
@@ -325,6 +366,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
                                                     {displayScore}
                                                 </Badge>
                                             </TableCell>
+                                            <TableCell>{hostname}</TableCell>
                                             <TableCell className="font-mono">{item.host.address[0].addr}</TableCell>
                                         </TableRow>
                                     );
@@ -405,3 +447,5 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     </div>
   );
 }
+
+    

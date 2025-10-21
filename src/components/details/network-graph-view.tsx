@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -12,6 +11,9 @@ import ReactFlow, {
   Panel,
   useNodesState,
   useEdgesState,
+  useReactFlow,
+  ReactFlowProvider,
+  getConnectedEdges,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import type { Host } from '@/types/nmap';
@@ -32,7 +34,7 @@ import { Checkbox } from '../ui/checkbox';
 import { useLocale } from 'next-intl';
 import { Button } from '../ui/button';
 import { useDebounce } from 'use-debounce';
-import { Input } from '../ui/input';
+import { getOsName } from '@/lib/nmap-parser';
 
 const nodeTypes = {
   custom: CustomNode,
@@ -62,25 +64,14 @@ const getServiceIcon = (osName: string = '') => {
     }
 };
 
-const getOsName = (host: Host | null): string => {
-    if (!host || !host.os || !host.os.osmatch) {
-        return 'Unknown';
-    }
-    const osMatches = Array.isArray(host.os.osmatch) ? host.os.osmatch : [host.os.osmatch];
-    if (osMatches.length > 0) {
-        const bestMatch = osMatches.reduce((prev, current) => (parseInt(prev.accuracy) > parseInt(current.accuracy)) ? prev : current);
-        return bestMatch.name;
-    }
-    return 'Unknown';
-};
-
 const ipToNumber = (ip: string) => {
   return ip.split('.').reduce((acc, octet, index) => acc + parseInt(octet) * Math.pow(256, 3 - index), 0);
 };
 
-export default function NetworkGraphView({ hosts, pdfMode = false }: { hosts: Host[]; pdfMode?: boolean }) {
+const Graph = ({ hosts }: { hosts: Host[] }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const { fitBounds } = useReactFlow();
   
   const [riskFilter, setRiskFilter] = useState(0);
   const [debouncedRiskFilter] = useDebounce(riskFilter, 500);
@@ -91,6 +82,16 @@ export default function NetworkGraphView({ hosts, pdfMode = false }: { hosts: Ho
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
 
   const locale = useLocale();
+
+  const hostData = useMemo(() => {
+    if (!hosts) {
+      return [];
+    }
+    return hosts.map(host => ({
+      ...host,
+      osName: getOsName(host),
+    }));
+  }, [hosts]);
 
   const allDeviceTypes = useMemo(() => [
     { id: 'Server', icon: Server, label: locale === 'es' ? 'Servidor' : 'Server' },
@@ -103,37 +104,59 @@ export default function NetworkGraphView({ hosts, pdfMode = false }: { hosts: Ho
 
   const detectedDeviceTypes = useMemo(() => {
     const detected = new Set<string>();
-    hosts.forEach(host => {
-        const osName = getOsName(host);
-        detected.add(getDeviceType(osName));
+    hostData.forEach(host => {
+        detected.add(getDeviceType(host.osName));
     });
     return allDeviceTypes.filter(dt => detected.has(dt.id));
-  }, [hosts, allDeviceTypes]);
+  }, [hostData, allDeviceTypes]);
 
 
   const uniqueOsTypes = useMemo(() => {
     const osTypes = new Set<string>();
-    hosts.forEach(host => {
-        const osName = getOsName(host);
-        if (osName !== 'Unknown') {
-            osTypes.add(osName);
+    hostData.forEach(host => {
+        if (host.osName !== 'Unknown' && host.osName !== 'N/A') {
+            osTypes.add(host.osName);
         }
     });
     return Array.from(osTypes);
-  }, [hosts]);
+  }, [hostData]);
 
   const onConnect = useCallback((params: any) => setEdges(eds => addEdge(params, eds)), [setEdges]);
 
   const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    setSelectedNodeId(prevId => prevId === node.id ? null : node.id);
-  }, []);
+    const newSelectedNodeId = selectedNodeId === node.id ? null : node.id;
+    setSelectedNodeId(newSelectedNodeId);
+
+    if (newSelectedNodeId) {
+        const connectedEdges = getConnectedEdges([node], edges);
+        const connectedNodeIds = new Set([node.id, ...connectedEdges.flatMap(edge => [edge.source, edge.target])]);
+
+        const includedNodes = nodes.filter(n => connectedNodeIds.has(n.id));
+
+        if (includedNodes.length > 0) {
+            const minX = Math.min(...includedNodes.map(n => n.position.x));
+            const minY = Math.min(...includedNodes.map(n => n.position.y));
+            const maxX = Math.max(...includedNodes.map(n => n.position.x + (n.width || 150)));
+            const maxY = Math.max(...includedNodes.map(n => n.position.y + (n.height || 50)));
+
+            const boundingBox = {
+                x: minX,
+                y: minY,
+                width: maxX - minX,
+                height: maxY - minY,
+            };
+            
+            fitBounds(boundingBox, { padding: 0.3, duration: 800 });
+        }
+    }
+}, [selectedNodeId, nodes, edges, fitBounds]);
   
   const { filteredNodes, filteredEdges } = useMemo(() => {
-    const filteredHosts = hosts.filter(host => {
+    const filteredHosts = hostData.filter(host => {
         const riskScore = host.riskScore ?? 0;
         if (riskScore < debouncedRiskFilter) return false;
 
-        const osName = getOsName(host);
+        const osName = host.osName;
         if (osFilters.length > 0 && !osFilters.includes(osName)) return false;
         
         const deviceType = getDeviceType(osName);
@@ -148,7 +171,7 @@ export default function NetworkGraphView({ hosts, pdfMode = false }: { hosts: Ho
       const ip = host.address[0].addr;
       const subnetId = `subnet-${ip.substring(0, ip.lastIndexOf('.'))}`;
       const openPorts = (host.ports?.port && (Array.isArray(host.ports.port) ? host.ports.port : [host.ports.port]).filter(p => p?.state.state === 'open')) || [];
-      const osName = getOsName(host);
+      const osName = host.osName;
 
       if (!subnets[subnetId]) {
           subnets[subnetId] = { nodes: [], count: 0 };
@@ -222,28 +245,27 @@ export default function NetworkGraphView({ hosts, pdfMode = false }: { hosts: Ho
         filteredEdges: initialEdges,
     }
 
-  }, [hosts, debouncedRiskFilter, osFilters, deviceTypeFilters]);
+  }, [hostData, debouncedRiskFilter, osFilters, deviceTypeFilters]);
 
   React.useEffect(() => {
-    const finalNodes = filteredNodes.map(node => ({
-      ...node,
-      data: {
-        ...node.data,
-        dimmed: selectedNodeId ? !filteredEdges.some(e => e.source === selectedNodeId && e.target === node.id) && !filteredEdges.some(e => e.target === selectedNodeId && e.source === node.id) && node.id !== selectedNodeId : false
-      }
-    }));
+    const connectedEdges = selectedNodeId ? getConnectedEdges(filteredNodes.filter(n => n.id === selectedNodeId), filteredEdges) : [];
+    
+    const finalNodes = filteredNodes.map(node => {
+      const isDimmed = selectedNodeId
+        ? node.id !== selectedNodeId && !connectedEdges.some(e => e.source === node.id || e.target === node.id)
+        : false;
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          dimmed: isDimmed
+        }
+      };
+    });
     setNodes(finalNodes);
     setEdges(filteredEdges);
   }, [filteredNodes, filteredEdges, selectedNodeId, setNodes, setEdges]);
   
-  if (pdfMode) {
-    return (
-      <div id="pdf-network-graph" className="w-[800px] h-[600px] bg-background">
-        <p>Network Graph visualization is not available in PDF export.</p>
-      </div>
-    );
-  }
-
   const handleOsFilterChange = (os: string, checked: boolean) => {
     setOsFilters(prev => checked ? [...prev, os] : prev.filter(o => o !== os));
   };
@@ -271,8 +293,7 @@ export default function NetworkGraphView({ hosts, pdfMode = false }: { hosts: Ho
   `;
 
   return (
-    <Card>
-      <CardContent className="p-0 relative" style={{ height: 'calc(100vh - 12rem)' }}>
+    <>
         <style>{reactFlowStyles}</style>
         <ReactFlow
           nodes={nodes}
@@ -347,6 +368,25 @@ export default function NetworkGraphView({ hosts, pdfMode = false }: { hosts: Ho
                 )}
             </Panel>
         </ReactFlow>
+    </>
+  );
+}
+
+export default function NetworkGraphView({ hosts, pdfMode = false }: { hosts: Host[]; pdfMode?: boolean }) {
+  if (pdfMode) {
+    return (
+      <div id="pdf-network-graph" className="w-[800px] h-[600px] bg-background">
+        <p>Network Graph visualization is not available in PDF export.</p>
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-0 relative" style={{ height: 'calc(100vh - 12rem)' }}>
+        <ReactFlowProvider>
+          <Graph hosts={hosts} />
+        </ReactFlowProvider>
       </CardContent>
     </Card>
   );

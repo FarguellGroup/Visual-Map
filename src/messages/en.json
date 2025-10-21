@@ -82,7 +82,7 @@
     "hosts": "Hosts",
     "openPorts": "Open Ports",
     "services": "Services",
-    "vulnerabilities": "Vulnerabilities",
+    "vulnerabilities": "CVEs & Vulnerabilities",
     "pageNotFound": "Page not found",
     "hostsDetected": "{count, plural, =0 {No hosts detected} =1 {# host detected} other {# hosts detected}}",
     "os": "OS",
@@ -103,9 +103,9 @@
     "lowRisk": "Low Risk",
     "mediumRisk": "Medium Risk",
     "highRisk": "High Risk",
-    "threats": "Threats",
     "networkGraph": "Network Graph",
-    "api": "API"
+    "api": "API",
+    "configureApi": "Configure API"
   },
   "ApiPage": {
     "title": "API Configuration",
@@ -117,16 +117,25 @@
     "invalidKey": "API Key is invalid or has an issue.",
     "invalidKeyDescription": "The API key is not valid. Please enter a valid API key.",
     "noKey": "API Key not configured.",
-    "noKeyDescription": "Please add your NEXT_PUBLIC_GOOGLE_GENAI_API_KEY to the .env file.",
+    "noKeyDescription": "No valid API key is linked. Please enter it to use the AI features.",
     "errorPrefix": "Error",
     "availableModels": "Available Models",
     "modelName": "Model Name",
     "modelDisplayName": "Display Name",
     "currentModel": "In Use",
-    "howToChangeModelTitle": "How to Change the AI Model",
-    "howToChangeModelDescription": "<p>To change the AI model for the entire application, follow these steps:</p><ol><li>Open the file <code>src/ai/config.ts</code> in your code editor.</li><li>Locate the line: <code>export const AI_MODEL_NAME = ...</code></li><li>Replace the current model name with one from the list above. Keep the single quotes.</li><li>Save the file. The change will be applied automatically.</li></ol>",
     "getApiKeyTitle": "Get your API Key",
     "getApiKeyDescription": "You need a valid Gemini API key to use the AI features.",
     "getApiKeyButton": "Get API Key"
+  },
+  "NetworkGraph": {
+    "filters": "Filters",
+    "riskScore": "Risk Score",
+    "deviceType": "Device Type",
+    "server": "Server",
+    "desktop": "Desktop",
+    "router": "Router",
+    "mobile": "Mobile",
+    "printer": "Printer",
+    "other": "Other"
   }
 }

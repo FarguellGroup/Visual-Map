@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useScanStore } from '@/store/use-scan-store';
@@ -6,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import React from 'react';
-import type { Host, Script } from '@/types/nmap';
+import type { Host } from '@/types/nmap';
 import { VulnerabilityExplanation } from './vulnerability-explanation';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';

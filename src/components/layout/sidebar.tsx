@@ -8,11 +8,11 @@ import { Button } from '../ui/button';
 import { Download, Loader2, Home, Users, Shield, Server, DoorOpen, Network, Skull, SlidersHorizontal, ChevronDown, KeyRound } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useScanStore, type RiskWeights } from '@/store/use-scan-store';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import html2canvas from 'html2canvas';
-import type { Host, Script, CveData } from '@/types/nmap';
+import type { Host } from '@/types/nmap';
 import { Slider } from '../ui/slider';
 import { Link, usePathname } from '@/navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
@@ -20,6 +20,7 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/
 import { useSidebar } from '@/components/ui/sidebar';
 import { useTheme } from 'next-themes';
 import { VmLogo } from '../icons';
+import { getHostname, getOsName } from '@/lib/nmap-parser';
 
 
 // Extend jsPDF with autoTable
@@ -27,84 +28,6 @@ interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
   lastAutoTable: { finalY: number };
 }
-
-const getScripts = (item: Host): Script[] => {
-    const scriptsSource = item.hostscript;
-    if (!scriptsSource) return [];
-
-    const scripts: Script[] = [];
-    
-    const potentialScripts = Array.isArray(scriptsSource) ? scriptsSource : [scriptsSource];
-
-    potentialScripts.forEach(potential => {
-        if (potential) {
-            if ('script' in potential) { 
-                const nested = (potential as any).script;
-                if (Array.isArray(nested)) {
-                    scripts.push(...nested);
-                } else if (nested) {
-                    scripts.push(nested);
-                }
-            } else if ('id' in potential) { 
-                scripts.push(potential as Script);
-            }
-        }
-    });
-
-    return scripts;
-};
-
-const getHostname = (host: Host | null): string => {
-  if (!host) {
-    return 'N/A';
-  }
-
-  // 1. Try to get from hostnames array
-  if (host.hostnames && Array.isArray(host.hostnames)) {
-    for (const hostnamesEntry of host.hostnames) {
-      if (hostnamesEntry && hostnamesEntry.hostname) {
-        const hostnameArray = Array.isArray(hostnamesEntry.hostname) ? hostnamesEntry.hostname : [hostnamesEntry.hostname];
-        const primaryHostname = hostnameArray.find(h => h.type === 'user' || h.type === 'PTR');
-        if (primaryHostname) {
-          return primaryHostname.name;
-        }
-      }
-    }
-  } else if (host.hostnames && !Array.isArray(host.hostnames) && host.hostnames.hostname) {
-      const hostnameArray = Array.isArray(host.hostnames.hostname) ? host.hostnames.hostname : [host.hostnames.hostname];
-      const primaryHostname = hostnameArray.find(h => h.type === 'user' || h.type === 'PTR');
-      if (primaryHostname) {
-        return primaryHostname.name;
-      }
-  }
-
-
-  // 2. If not found, try to get from smb-os-discovery script
-  const hostScripts = getScripts(host);
-  const smbScript = hostScripts.find(s => s.id === 'smb-os-discovery');
-  if (smbScript) {
-    const output = smbScript.output;
-    const computerNameMatch = output.match(/Computer name: ([\w-]+)/);
-    if (computerNameMatch && computerNameMatch[1]) {
-      return computerNameMatch[1];
-    }
-  }
-
-  return 'N/A';
-};
-
-const getOsName = (host: Host | null): string => {
-    if (!host || !host.os || !host.os.osmatch) {
-        return 'N/A';
-    }
-    const osMatches = Array.isArray(host.os.osmatch) ? host.os.osmatch : [host.os.osmatch];
-    if (osMatches.length > 0) {
-        const bestMatch = osMatches.reduce((prev, current) => (parseInt(prev.accuracy) > parseInt(current.accuracy)) ? prev : current);
-        return bestMatch.name;
-    }
-    return 'N/A';
-};
-
 
 const getOpenPortsCount = (host: Host) => {
   if (!host.ports || !host.ports.port) return 0;
@@ -139,9 +62,8 @@ export default function AppSidebar() {
   const { scanResult, riskWeights, setRiskWeights, setScanResult, cveCache } = useScanStore();
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingHtml, setIsExportingHtml] = useState(false);
-  const [accordionValue, setAccordionValue] = useState<string>('');
   const [localWeights, setLocalWeights] = useState<RiskWeights>(riskWeights);
-  const { state, setOpen } = useSidebar();
+  const { state } = useSidebar();
   const locale = useLocale();
   const pathname = usePathname();
   const { theme } = useTheme();
@@ -149,35 +71,31 @@ export default function AppSidebar() {
   useEffect(() => {
     setLocalWeights(riskWeights);
   }, [riskWeights]);
-
-  useEffect(() => {
-    if (state === 'collapsed' && accordionValue) {
-      setAccordionValue('');
-    }
-  }, [state, accordionValue, setAccordionValue]);
-
+  
   const handleWeightChange = (factor: keyof typeof riskWeights, value: number[]) => {
     setLocalWeights(prev => ({ ...prev, [factor]: value[0] }));
   };
 
   const commitWeightChange = (factor: keyof typeof riskWeights, value: number[]) => {
-    if (!scanResult) return;
+    const currentScanResult = useScanStore.getState().scanResult;
+    if (!currentScanResult) return;
     const newWeights = { ...riskWeights, [factor]: value[0] };
     setRiskWeights(newWeights);
     // Trigger recalculation
-    setScanResult(scanResult.fileName, scanResult.originalHosts, newWeights, false);
+    setScanResult(currentScanResult.fileName, currentScanResult.originalHosts, newWeights, false);
   };
 
   const handleExportJson = useCallback(() => {
-    if (!scanResult) return;
+    const currentScanResult = useScanStore.getState().scanResult;
+    if (!currentScanResult) return;
     const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
-      JSON.stringify(scanResult, null, 2)
+      JSON.stringify(currentScanResult, null, 2)
     )}`;
     const link = document.createElement("a");
     link.href = jsonString;
     link.download = `visual-map-report-${getFormattedTimestamp()}.json`;
     link.click();
-  }, [scanResult]);
+  }, []);
 
   const captureChartAsBase64 = async (elementId: string, options?: { backgroundColor?: string | null }) => {
     const element = document.getElementById(elementId) as HTMLElement;
@@ -200,17 +118,18 @@ export default function AppSidebar() {
   };
 
   const handleExportHtml = useCallback(async () => {
-    if (!scanResult) return;
+    const { scanResult: currentScanResult, cveCache: currentCveCache } = useScanStore.getState();
+    if (!currentScanResult) return;
     setIsExportingHtml(true);
     try {
-        const { fileName, hosts, summary } = scanResult;
+        const { fileName, hosts, summary } = currentScanResult;
         
         const currentThemeBg = theme === 'dark' ? '#09090b' : '#ffffff';
         const riskChart = await captureChartAsBase64('risk-distribution-chart', { backgroundColor: currentThemeBg });
         const portsChart = await captureChartAsBase64('top-ports-chart', { backgroundColor: currentThemeBg });
         const servicesChart = await captureChartAsBase64('service-distribution-chart', { backgroundColor: currentThemeBg });
         
-        const allCves = Array.from(cveCache.entries())
+        const allCves = Array.from(currentCveCache.entries())
             .filter(([, entry]) => entry.status === 'loaded' && entry.data)
             .flatMap(([hostIp, entry]) => 
                 entry.data!.map(cveData => ({...cveData, hostIp}))
@@ -225,6 +144,8 @@ export default function AppSidebar() {
             .sort((a, b) => (b.riskScore ?? 0) - (a.riskScore ?? 0));
         
         const allHostsSorted = [...hosts].sort((a,b) => ipToNumber(a.address[0].addr) - ipToNumber(b.address[0].addr));
+        const allHostsData = allHostsSorted.map(h => ({...h, hostname: getHostname(h), osName: getOsName(h)}));
+        const topVulnerableHostsData = topVulnerableHosts.map(h => ({...h, hostname: getHostname(h), osName: getOsName(h)}));
 
         const getRiskClass = (score: number) => {
             if (score >= 75) return 'badge-red';
@@ -351,18 +272,18 @@ export default function AppSidebar() {
                         </div>
                     </section>
 
-                    ${topVulnerableHosts.length > 0 ? `
+                    ${topVulnerableHostsData.length > 0 ? `
                     <section id="vulnerable-hosts">
                         <h2>${tRiskRanking('title')}</h2>
                         <div class="table-responsive">
                             <table>
                                 <thead><tr><th>${tHostsTable('ipAddress')}</th><th>${tHostsTable('hostname')}</th><th>${osTitle}</th><th>${tHostsTable('riskScore')}</th></tr></thead>
                                 <tbody>
-                                    ${topVulnerableHosts.map(h => `
+                                    ${topVulnerableHostsData.map(h => `
                                         <tr>
                                             <td><a href="#host-${h.address[0].addr.replace(/\./g, '-')}">${h.address[0].addr}</a></td>
-                                            <td>${getHostname(h)}</td>
-                                            <td>${getOsName(h)}</td>
+                                            <td>${h.hostname}</td>
+                                            <td>${h.osName}</td>
                                             <td><span class="badge ${getRiskClass(h.riskScore ?? 0)}">${h.riskScore?.toFixed(0) ?? '0'}</span></td>
                                         </tr>
                                     `).join('')}
@@ -407,11 +328,11 @@ export default function AppSidebar() {
                             <table>
                             <thead><tr><th>${tHostsTable('ipAddress')}</th><th>${tHostsTable('hostname')}</th><th>${osTitle}</th><th>${tHostsTable('openPorts')}</th><th>${tHostsTable('riskScore')}</th></tr></thead>
                             <tbody>
-                                ${allHostsSorted.map(h => `
+                                ${allHostsData.map(h => `
                                     <tr>
                                         <td><a href="#host-${h.address[0].addr.replace(/\./g, '-')}">${h.address[0].addr}</a></td>
-                                        <td>${getHostname(h)}</td>
-                                        <td>${getOsName(h)}</td>
+                                        <td>${h.hostname}</td>
+                                        <td>${h.osName}</td>
                                         <td>${getOpenPortsCount(h)}</td>
                                         <td><span class="badge ${getRiskClass(h.riskScore ?? 0)}">${h.riskScore?.toFixed(0) ?? '0'}</span></td>
                                     </tr>
@@ -423,12 +344,12 @@ export default function AppSidebar() {
 
                     <section id="host-details">
                       <h2>${tDetails('hosts')}</h2>
-                      ${allHostsSorted.map(host => `
+                      ${allHostsData.map(host => `
                         <div id="host-${host.address[0].addr.replace(/\./g, '-')}" class="card" style="margin-top: 30px;">
                           <div style="position: absolute; top: 20px; right: 20px;">
                               <span class="badge ${getRiskClass(host.riskScore ?? 0)}">${tHostsTable('riskScore')}: ${host.riskScore?.toFixed(0) ?? '0'}</span>
                           </div>
-                          <h3>Host: ${host.address[0].addr} (${getHostname(host)})</h3>
+                          <h3>Host: ${host.address[0].addr} (${host.hostname})</h3>
                           ${(Array.isArray(host.ports.port) ? host.ports.port : (host.ports.port ? [host.ports.port] : [])).filter(p => p?.state.state === 'open').length > 0 ? `
                             <div class="table-responsive">
                                 <table>
@@ -473,10 +394,12 @@ export default function AppSidebar() {
     } finally {
       setIsExportingHtml(false);
     }
-  }, [scanResult, theme, locale, tDetails, tSummary, tHostsTable, tRiskRanking, cveCache]);
+  }, [locale, tDetails, tSummary, tHostsTable, tRiskRanking, theme]);
 
   const handleExportPdf = useCallback(async () => {
-    if (!scanResult) return;
+    const { scanResult: currentScanResult, cveCache: currentCveCache } = useScanStore.getState();
+
+    if (!currentScanResult) return;
     setIsExportingPdf(true);
   
     try {
@@ -550,7 +473,7 @@ export default function AppSidebar() {
       doc.setFontSize(14);
       doc.setFont('Helvetica', 'normal');
       doc.setTextColor(mutedTextColor);
-      doc.text(`File: ${scanResult.fileName}`, pageWidth / 2, yPos, { align: 'center' });
+      doc.text(`File: ${currentScanResult.fileName}`, pageWidth / 2, yPos, { align: 'center' });
       yPos += 20;
       doc.text(`Date: ${new Date().toLocaleString(locale)}`, pageWidth / 2, yPos, { align: 'center' });
       
@@ -567,10 +490,10 @@ export default function AppSidebar() {
         startY: yPos,
         head: [['Metric', 'Value']],
         body: [
-          [tSummary('totalHosts'), scanResult.summary.hostCount],
-          [tSummary('openPorts'), scanResult.summary.openPorts],
-          [tSummary('uniqueServices'), scanResult.summary.uniqueServices],
-          [tSummary('highRiskHosts'), scanResult.hosts.filter(h => (h.riskScore ?? 0) >= 75).length],
+          [tSummary('totalHosts'), currentScanResult.summary.hostCount],
+          [tSummary('openPorts'), currentScanResult.summary.openPorts],
+          [tSummary('uniqueServices'), currentScanResult.summary.uniqueServices],
+          [tSummary('highRiskHosts'), currentScanResult.hosts.filter(h => (h.riskScore ?? 0) >= 75).length],
         ],
         theme: 'striped',
         headStyles: { fillColor: primaryColor, textColor: '#ffffff' },
@@ -579,12 +502,13 @@ export default function AppSidebar() {
       yPos = doc.lastAutoTable.finalY + 30;
   
       // -- Top Vulnerable Hosts --
-      const topVulnerableHosts = [...scanResult.hosts]
+      const topVulnerableHosts = [...currentScanResult.hosts]
         .filter(h => (h.riskScore ?? 0) > 0)
         .sort((a, b) => (b.riskScore ?? 0) - (a.riskScore ?? 0))
         .slice(0, 10);
       
       if (topVulnerableHosts.length > 0) {
+        const topVulnerableHostsData = topVulnerableHosts.map(h => ({...h, hostname: getHostname(h), osName: getOsName(h)}));
         if (yPos > pageHeight - 120) { doc.addPage(); yPos = margin; }
         doc.setFontSize(22);
         doc.setFont('Helvetica', 'bold');
@@ -593,10 +517,10 @@ export default function AppSidebar() {
         doc.autoTable({
             startY: yPos,
             head: [[tHostsTable('ipAddress'), tHostsTable('hostname'), tDetails('os'), tHostsTable('riskScore')]],
-            body: topVulnerableHosts.map(h => [
+            body: topVulnerableHostsData.map(h => [
                 h.address[0].addr,
-                getHostname(h),
-                getOsName(h),
+                h.hostname,
+                h.osName,
                 h.riskScore?.toFixed(0) ?? '0'
             ]),
             theme: 'striped',
@@ -613,7 +537,7 @@ export default function AppSidebar() {
       }
       
       // -- Discovered CVEs --
-      const allCves = Array.from(cveCache.entries())
+      const allCves = Array.from(currentCveCache.entries())
         .filter(([, entry]) => entry.status === 'loaded' && entry.data)
         .flatMap(([hostIp, entry]) => 
             entry.data!.map(cveData => ({...cveData, hostIp}))
@@ -696,7 +620,9 @@ export default function AppSidebar() {
 
 
       // -- All Hosts Table --
-      const allHostsSortedByIp = [...scanResult.hosts].sort((a, b) => ipToNumber(a.address[0].addr) - ipToNumber(b.address[0].addr));
+      const allHostsSortedByIp = [...currentScanResult.hosts].sort((a, b) => ipToNumber(a.address[0].addr) - ipToNumber(b.address[0].addr));
+      const allHostsData = allHostsSortedByIp.map(h => ({...h, hostname: getHostname(h), osName: getOsName(h)}));
+
       doc.addPage();
       yPos = margin;
       doc.setFontSize(22);
@@ -706,10 +632,10 @@ export default function AppSidebar() {
       doc.autoTable({
         startY: yPos,
         head: [[tHostsTable('ipAddress'), tHostsTable('hostname'), tDetails('os'), tHostsTable('openPorts'), tHostsTable('riskScore')]],
-        body: allHostsSortedByIp.map(h => [
+        body: allHostsData.map(h => [
           h.address[0].addr,
-          getHostname(h),
-          getOsName(h),
+          h.hostname,
+          h.osName,
           getOpenPortsCount(h),
           h.riskScore?.toFixed(0) ?? '0'
         ]),
@@ -733,12 +659,12 @@ export default function AppSidebar() {
       doc.text('Detailed Host Information', margin, yPos);
       yPos += 15;
 
-      for (const host of allHostsSortedByIp) {
+      for (const host of allHostsData) {
         if (yPos > pageHeight - 100) { doc.addPage(); yPos = margin; }
         yPos += 20;
         doc.setFontSize(16);
         doc.setFont('Helvetica', 'bold');
-        doc.text(`Host: ${host.address[0].addr} (${getHostname(host)})`, margin, yPos);
+        doc.text(`Host: ${host.address[0].addr} (${host.hostname})`, margin, yPos);
         yPos += 15;
   
         const openPorts = (Array.isArray(host.ports.port) ? host.ports.port : (host.ports.port ? [host.ports.port] : []))
@@ -783,231 +709,225 @@ export default function AppSidebar() {
     } finally {
       setIsExportingPdf(false);
     }
-  }, [scanResult, cveCache, locale, tDetails, tSummary, tHostsTable, tRiskRanking]);
+  }, [locale, tDetails, tSummary, tHostsTable, tRiskRanking, theme]);
 
-  const dashboardTitle = locale === 'es' ? 'Dashboard' : 'Dashboard';
-  const hostsTitle = tDetails('hosts');
-  const openPortsTitle = tDetails('openPorts');
-  const servicesTitle = tDetails('services');
-  const vulnerableHostsTitle = locale === 'es' ? 'Hosts Vulnerables' : 'Vulnerable Hosts';
-  const threatsTitle = locale === 'es' ? 'CVEs y Vulnerabilidades' : 'CVEs & Vulnerabilities';
-  const networkTitle = tDetails('networkGraph');
-  const apiTitle = tApi('title');
-
-  const handleAccordionTriggerClick = (value: string) => {
-    if (state === 'collapsed') {
-      setOpen(true);
-    }
-    setAccordionValue(value === accordionValue ? '' : value);
-  }
+  const sidebarTooltip = (text: string) => {
+    return state === 'collapsed' ? text : undefined;
+  };
   
   return (
-    <>
-      <SidebarHeader className="flex h-14 px-4 pt-4">
+    <TooltipProvider>
+      <SidebarHeader className="flex h-14 pt-4 px-4">
         {scanResult && (
-          <Link href="/" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+          <Link href="/" className="flex gap-2 group-data-[collapsible=icon]:justify-start items-center">
             <VmLogo className="h-6 w-6" />
             <h1 className="text-lg font-bold tracking-tight group-data-[collapsible=icon]:hidden font-headline">{tHeader('title')}</h1>
           </Link>
         )}
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-            <SidebarMenu>
-                <SidebarMenuItem>
-                     <Link href="/" className='w-full'>
-                        <SidebarMenuButton isActive={pathname === '/'} tooltip={dashboardTitle}>
-                            <Home />
-                            <span className="group-data-[collapsible=icon]:hidden">{dashboardTitle}</span>
-                        </SidebarMenuButton>
-                    </Link>
-                </SidebarMenuItem>
-                 <SidebarMenuItem>
-                <Link href="/details/hosts" className='w-full'>
-                    <SidebarMenuButton isActive={pathname.startsWith('/details/hosts')} tooltip={hostsTitle}>
-                        <Server />
-                        <span className="group-data-[collapsible=icon]:hidden">{hostsTitle}</span>
-                    </SidebarMenuButton>
-                </Link>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-                 <Link href="/details/ports" className='w-full'>
-                    <SidebarMenuButton isActive={pathname.startsWith('/details/ports')} tooltip={openPortsTitle}>
-                        <DoorOpen />
-                        <span className="group-data-[collapsible=icon]:hidden">{openPortsTitle}</span>
-                    </SidebarMenuButton>
-                </Link>
-            </SidebarMenuItem>
-             <SidebarMenuItem>
-                 <Link href="/details/services" className='w-full'>
-                    <SidebarMenuButton isActive={pathname.startsWith('/details/services')} tooltip={servicesTitle}>
-                        <Shield />
-                        <span className="group-data-[collapsible=icon]:hidden">{servicesTitle}</span>
-                    </SidebarMenuButton>
-                </Link>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-                 <Link href="/details/vulnerable-hosts" className='w-full'>
-                    <SidebarMenuButton isActive={pathname.startsWith('/details/vulnerable-hosts')} tooltip={vulnerableHostsTitle}>
-                        <Users />
-                        <span className="group-data-[collapsible=icon]:hidden">{vulnerableHostsTitle}</span>
-                    </SidebarMenuButton>
-                </Link>
-            </SidebarMenuItem>
-             <SidebarMenuItem>
-                 <Link href="/details/vulnerabilities" className='w-full'>
-                    <SidebarMenuButton isActive={pathname.startsWith('/details/vulnerabilities')} tooltip={threatsTitle}>
-                        <Skull />
-                         <span className="group-data-[collapsible=icon]:hidden flex-1 flex items-center justify-between">
-                            {threatsTitle}
-                        </span>
-                    </SidebarMenuButton>
-                </Link>
-            </SidebarMenuItem>
-             <SidebarMenuItem>
-                 <Link href="/details/network" className='w-full'>
-                    <SidebarMenuButton isActive={pathname.startsWith('/details/network')} tooltip={networkTitle}>
-                        <Network />
-                        <span className="group-data-[collapsible=icon]:hidden">{networkTitle}</span>
-                    </SidebarMenuButton>
-                </Link>
-            </SidebarMenuItem>
-            </SidebarMenu>
-        </SidebarGroup>
-        <SidebarSeparator className="my-4" />
-        <SidebarGroup>
-            <SidebarMenu>
-                <SidebarMenuItem>
-                    <Link href="/details/api" className='w-full'>
-                        <SidebarMenuButton isActive={pathname.startsWith('/details/api')} tooltip={apiTitle}>
-                            <KeyRound />
-                            <span className="group-data-[collapsible=icon]:hidden flex-1 flex items-center justify-between">
-                                {apiTitle}
-                            </span>
-                        </SidebarMenuButton>
-                    </Link>
-                </SidebarMenuItem>
-            </SidebarMenu>
-        </SidebarGroup>
-        <SidebarSeparator className="my-4" />
-        <SidebarGroup>
-            <Accordion type="single" collapsible value={accordionValue} onValueChange={setAccordionValue}>
-                <AccordionItem value="risk-weighting" className="border-none">
-                     <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <AccordionTrigger 
-                                    className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180"
-                                    onClick={() => handleAccordionTriggerClick('risk-weighting')}
-                                >
-                                     <div className='flex items-center justify-between w-full'>
-                                        <div className='flex items-center gap-2'>
-                                            <SlidersHorizontal className="h-4 w-4" />
-                                            <span className="group-data-[collapsible=icon]:hidden">{tSidebar('riskWeighting')}</span>
+        
+            <SidebarGroup>
+                <SidebarMenu>
+                    <SidebarMenuItem>
+                        <Link href="/" className='w-full'>
+                            <SidebarMenuButton isActive={pathname === '/'} tooltip={sidebarTooltip(locale === 'es' ? 'Dashboard' : 'Dashboard')}>
+                                <Home />
+                                <span className="group-data-[collapsible=icon]:hidden">{locale === 'es' ? 'Dashboard' : 'Dashboard'}</span>
+                            </SidebarMenuButton>
+                        </Link>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <Link href="/details/hosts" className='w-full'>
+                            <SidebarMenuButton isActive={pathname.startsWith('/details/hosts')} tooltip={sidebarTooltip(tDetails('hosts'))}>
+                                <Server />
+                                <span className="group-data-[collapsible=icon]:hidden">{tDetails('hosts')}</span>
+                            </SidebarMenuButton>
+                        </Link>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <Link href="/details/ports" className='w-full'>
+                            <SidebarMenuButton isActive={pathname.startsWith('/details/ports')} tooltip={sidebarTooltip(tDetails('openPorts'))}>
+                                <DoorOpen />
+                                <span className="group-data-[collapsible=icon]:hidden">{tDetails('openPorts')}</span>
+                            </SidebarMenuButton>
+                        </Link>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <Link href="/details/services" className='w-full'>
+                            <SidebarMenuButton isActive={pathname.startsWith('/details/services')} tooltip={sidebarTooltip(tDetails('services'))}>
+                                <Shield />
+                                <span className="group-data-[collapsible=icon]:hidden">{tDetails('services')}</span>
+                            </SidebarMenuButton>
+                        </Link>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <Link href="/details/vulnerable-hosts" className='w-full'>
+                            <SidebarMenuButton isActive={pathname.startsWith('/details/vulnerable-hosts')} tooltip={sidebarTooltip(locale === 'es' ? 'Hosts Vulnerables' : 'Vulnerable Hosts')}>
+                                <Users />
+                                <span className="group-data-[collapsible=icon]:hidden">{locale === 'es' ? 'Hosts Vulnerables' : 'Vulnerable Hosts'}</span>
+                            </SidebarMenuButton>
+                        </Link>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <Link href="/details/vulnerabilities" className='w-full'>
+                            <SidebarMenuButton isActive={pathname.startsWith('/details/vulnerabilities')} tooltip={sidebarTooltip(tDetails('vulnerabilities'))}>
+                                <Skull />
+                                <span className="group-data-[collapsible=icon]:hidden flex-1 flex items-center justify-between">
+                                    {tDetails('vulnerabilities')}
+                                </span>
+                            </SidebarMenuButton>
+                        </Link>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <Link href="/details/network" className='w-full'>
+                            <SidebarMenuButton isActive={pathname.startsWith('/details/network')} tooltip={sidebarTooltip(tDetails('networkGraph'))}>
+                                <Network />
+                                <span className="group-data-[collapsible=icon]:hidden">{tDetails('networkGraph')}</span>
+                            </SidebarMenuButton>
+                        </Link>
+                    </SidebarMenuItem>
+                </SidebarMenu>
+            </SidebarGroup>
+            <SidebarSeparator className="my-4" />
+            <SidebarGroup>
+                <SidebarMenu>
+                    <SidebarMenuItem>
+                        <Link href="/details/api" className='w-full'>
+                            <SidebarMenuButton isActive={pathname.startsWith('/details/api')} tooltip={sidebarTooltip(tApi('title'))}>
+                                <KeyRound />
+                                <span className="group-data-[collapsible=icon]:hidden flex-1 flex items-center justify-between">
+                                    {tApi('title')}
+                                </span>
+                            </SidebarMenuButton>
+                        </Link>
+                    </SidebarMenuItem>
+                </SidebarMenu>
+            </SidebarGroup>
+            <SidebarSeparator className="my-4" />
+            <SidebarGroup>
+                <Accordion type="single" collapsible>
+                    <AccordionItem value="risk-weighting" className="border-none">
+                       {state === 'collapsed' ? (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <AccordionTrigger className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180">
+                                        <SlidersHorizontal className="h-4 w-4" />
+                                    </AccordionTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" align="center">
+                                    <p>{tSidebar('riskWeighting')}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                       ) : (
+                          <AccordionTrigger 
+                              className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180"
+                          >
+                            <div className='flex items-center justify-between w-full'>
+                                <div className='flex items-center gap-2'>
+                                    <SlidersHorizontal className="h-4 w-4" />
+                                    <span className="group-data-[collapsible=icon]:hidden">{tSidebar('riskWeighting')}</span>
+                                </div>
+                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden" />
+                            </div>
+                          </AccordionTrigger>
+                       )}
+
+                        <AccordionContent>
+                            <Card className="bg-background/50">
+                                <CardContent className="p-4 space-y-4">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <Label htmlFor="critical-ports-weight" className='text-xs'>
+                                                {locale === 'es' ? 'Puertos Críticos' : 'Critical Ports'}
+                                            </Label>
+                                            <span className="text-xs text-muted-foreground">{localWeights.criticalPorts}/100</span>
                                         </div>
-                                        <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden" />
+                                        <Slider value={[localWeights.criticalPorts]} max={100} step={1} onValueChange={(v) => handleWeightChange('criticalPorts', v)} onValueCommit={(v) => commitWeightChange('criticalPorts', v)} id="critical-ports-weight"/>
                                     </div>
-                                </AccordionTrigger>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" align="center" className="group-data-[collapsible=icon]:block hidden">
-                                <p>{tSidebar('riskWeighting')}</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                    <AccordionContent>
-                        <Card className="bg-background/50">
-                            <CardContent className="p-4 space-y-4">
-                            <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                <Label htmlFor="critical-ports-weight" className='text-xs'>
-                                    {locale === 'es' ? 'Puertos Críticos' : 'Critical Ports'}
-                                </Label>
-                                <span className="text-xs text-muted-foreground">{localWeights.criticalPorts}/100</span>
-                                </div>
-                                <Slider value={[localWeights.criticalPorts]} max={100} step={1} onValueChange={(v) => handleWeightChange('criticalPorts', v)} onValueCommit={(v) => commitWeightChange('criticalPorts', v)} id="critical-ports-weight"/>
-                            </div>
-                            <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                <Label htmlFor="cve-weight" className='text-xs'>{locale === 'es' ? 'CVEs y Vulnerabilidades' : 'CVEs & Vulnerabilities'}</Label>
-                                <span className="text-xs text-muted-foreground">{localWeights.cveScore}/100</span>
-                                </div>
-                                <Slider value={[localWeights.cveScore]} max={100} step={1} onValueChange={(v) => handleWeightChange('cveScore', v)} onValueCommit={(v) => commitWeightChange('cveScore', v)} id="cve-weight"/>
-                            </div>
-                            <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                <Label htmlFor="vuln-scripts-weight" className='text-xs'>{tSidebar('nseScripts')}</Label>
-                                <span className="text-xs text-muted-foreground">{localWeights.vulnScripts}/100</span>
-                                </div>
-                                <Slider value={[localWeights.vulnScripts]} max={100} step={1} onValueChange={(v) => handleWeightChange('vulnScripts', v)} onValueCommit={(v) => commitWeightChange('vulnScripts', v)} id="vuln-scripts-weight"/>
-                            </div>
-                            <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                <Label htmlFor="service-version-weight" className='text-xs'>{tSidebar('serviceVersions')}</Label>
-                                <span className="text-xs text-muted-foreground">{localWeights.serviceVersions}/100</span>
-                                </div>
-                                <Slider value={[localWeights.serviceVersions]} max={100} step={1} onValueChange={(v) => handleWeightChange('serviceVersions', v)} onValueCommit={(v) => commitWeightChange('serviceVersions', v)} id="service-version-weight" />
-                            </div>
-                            <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                <Label htmlFor="open-ports-weight" className='text-xs'>{tSidebar('openPorts')}</Label>
-                                <span className="text-xs text-muted-foreground">{localWeights.openPortsCount}/100</span>
-                                </div>
-                                <Slider value={[localWeights.openPortsCount]} max={100} step={1} onValueChange={(v) => handleWeightChange('openPortsCount', v)} onValueCommit={(v) => commitWeightChange('openPortsCount', v)} id="open-ports-weight"/>
-                            </div>
-                            </CardContent>
-                        </Card>
-                    </AccordionContent>
-                </AccordionItem>
-            </Accordion>
-        </SidebarGroup>
-         <SidebarGroup>
-            <Accordion type="single" collapsible value={accordionValue} onValueChange={setAccordionValue}>
-                <AccordionItem value="export" className="border-none">
-                     <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                 <AccordionTrigger 
-                                    className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180"
-                                    onClick={() => handleAccordionTriggerClick('export')}
-                                >
-                                     <div className='flex items-center justify-between w-full'>
-                                        <div className='flex items-center gap-2'>
-                                            <Download className="h-4 w-4" />
-                                            <span className="group-data-[collapsible=icon]:hidden">{tSidebar('export')}</span>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <Label htmlFor="cve-weight" className='text-xs'>{tDetails('vulnerabilities')}</Label>
+                                            <span className="text-xs text-muted-foreground">{localWeights.cveScore}/100</span>
                                         </div>
-                                        <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden" />
+                                        <Slider value={[localWeights.cveScore]} max={100} step={1} onValueChange={(v) => handleWeightChange('cveScore', v)} onValueCommit={(v) => commitWeightChange('cveScore', v)} id="cve-weight"/>
                                     </div>
-                                </AccordionTrigger>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" align="center" className="group-data-[collapsible=icon]:block hidden">
-                                <p>{tSidebar('export')}</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                    <AccordionContent>
-                        <div className="mt-4 flex flex-col items-center justify-center gap-2">
-                           <Button variant="outline" size="sm" onClick={handleExportJson} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs" disabled={isExportingPdf || isExportingHtml}>
-                                <Download />
-                                {tSidebar('exportJson')}
-                            </Button>
-                             <Button variant="outline" size="sm" onClick={handleExportHtml} disabled={isExportingPdf || isExportingHtml} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
-                                {isExportingHtml ? <Loader2 className="animate-spin" /> : <Download />}
-                                {tSidebar('exportHtml')}
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={isExportingPdf || isExportingHtml} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
-                                {isExportingPdf ? <Loader2 className="animate-spin" /> : <Download />}
-                                {tSidebar('exportPdf')}
-                            </Button>
-                        </div>
-                    </AccordionContent>
-                </AccordionItem>
-            </Accordion>
-        </SidebarGroup>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <Label htmlFor="vuln-scripts-weight" className='text-xs'>{tSidebar('nseScripts')}</Label>
+                                            <span className="text-xs text-muted-foreground">{localWeights.vulnScripts}/100</span>
+                                        </div>
+                                        <Slider value={[localWeights.vulnScripts]} max={100} step={1} onValueChange={(v) => handleWeightChange('vulnScripts', v)} onValueCommit={(v) => commitWeightChange('vulnScripts', v)} id="vuln-scripts-weight"/>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <Label htmlFor="service-version-weight" className='text-xs'>{tSidebar('serviceVersions')}</Label>
+                                            <span className="text-xs text-muted-foreground">{localWeights.serviceVersions}/100</span>
+                                        </div>
+                                        <Slider value={[localWeights.serviceVersions]} max={100} step={1} onValueChange={(v) => handleWeightChange('serviceVersions', v)} onValueCommit={(v) => commitWeightChange('serviceVersions', v)} id="service-version-weight" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <Label htmlFor="open-ports-weight" className='text-xs'>{tSidebar('openPorts')}</Label>
+                                            <span className="text-xs text-muted-foreground">{localWeights.openPortsCount}/100</span>
+                                        </div>
+                                        <Slider value={[localWeights.openPortsCount]} max={100} step={1} onValueChange={(v) => handleWeightChange('openPortsCount', v)} onValueCommit={(v) => commitWeightChange('openPortsCount', v)} id="open-ports-weight"/>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
+            </SidebarGroup>
+            <SidebarGroup>
+                <Accordion type="single" collapsible>
+                    <AccordionItem value="export" className="border-none">
+                         {state === 'collapsed' ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                  <AccordionTrigger 
+                                      className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180"
+                                  >
+                                    <Download className="h-4 w-4" />
+                                  </AccordionTrigger>
+                              </TooltipTrigger>
+                              <TooltipContent side="right" align="center"><p>{tSidebar('export')}</p></TooltipContent>
+                            </Tooltip>
+                         ) : (
+                            <AccordionTrigger 
+                                className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180"
+                            >
+                                <div className='flex items-center justify-between w-full'>
+                                    <div className='flex items-center gap-2'>
+                                        <Download className="h-4 w-4" />
+                                        <span className="group-data-[collapsible=icon]:hidden">{tSidebar('export')}</span>
+                                    </div>
+                                    <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden" />
+                                </div>
+                            </AccordionTrigger>
+                         )}
+                        <AccordionContent>
+                            <div className="mt-4 flex flex-col items-center justify-center gap-2">
+                                <Button variant="outline" size="sm" onClick={handleExportJson} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs" disabled={isExportingPdf || isExportingHtml}>
+                                    <Download />
+                                    {tSidebar('exportJson')}
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={handleExportHtml} disabled={isExportingPdf || isExportingHtml} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
+                                    {isExportingHtml ? <Loader2 className="animate-spin" /> : <Download />}
+                                    {tSidebar('exportHtml')}
+                                </Button>
+
+                                <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={isExportingPdf || isExportingHtml} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
+                                    {isExportingPdf ? <Loader2 className="animate-spin" /> : <Download />}
+                                    {tSidebar('exportPdf')}
+                                </Button>
+                            </div>
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
+            </SidebarGroup>
+        
       </SidebarContent>
-    </>
+    </TooltipProvider>
   );
 }
-
-    
-
-    

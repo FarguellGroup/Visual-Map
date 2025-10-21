@@ -1,97 +1,17 @@
-
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useScanStore } from '@/store/use-scan-store';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { Host, OsMatch, Script } from '@/types/nmap';
+import type { Host } from '@/types/nmap';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/navigation';
 import { cn } from '@/lib/utils';
-
-const getScripts = (item: Host): Script[] => {
-    const scriptsSource = item.hostscript;
-    if (!scriptsSource) return [];
-
-    const scripts: Script[] = [];
-    
-    const potentialScripts = Array.isArray(scriptsSource) ? scriptsSource : [scriptsSource];
-
-    potentialScripts.forEach(potential => {
-        if (potential) {
-            if ('script' in potential) { 
-                const nested = (potential as any).script;
-                if (Array.isArray(nested)) {
-                    scripts.push(...nested);
-                } else if (nested) {
-                    scripts.push(nested);
-                }
-            } else if ('id' in potential) { 
-                scripts.push(potential as Script);
-            }
-        }
-    });
-
-    return scripts;
-};
-
-
-const getHostname = (host: Host | null): string => {
-  if (!host) {
-    return 'N/A';
-  }
-
-  // 1. Try to get from hostnames array
-  if (host.hostnames && Array.isArray(host.hostnames)) {
-    for (const hostnamesEntry of host.hostnames) {
-      if (hostnamesEntry && hostnamesEntry.hostname) {
-        const hostnameArray = Array.isArray(hostnamesEntry.hostname) ? hostnamesEntry.hostname : [hostnamesEntry.hostname];
-        const primaryHostname = hostnameArray.find(h => h.type === 'user' || h.type === 'PTR');
-        if (primaryHostname) {
-          return primaryHostname.name;
-        }
-      }
-    }
-  } else if (host.hostnames && !Array.isArray(host.hostnames) && host.hostnames.hostname) {
-      const hostnameArray = Array.isArray(host.hostnames.hostname) ? host.hostnames.hostname : [host.hostnames.hostname];
-      const primaryHostname = hostnameArray.find(h => h.type === 'user' || h.type === 'PTR');
-      if (primaryHostname) {
-        return primaryHostname.name;
-      }
-  }
-
-
-  // 2. If not found, try to get from smb-os-discovery script
-  const hostScripts = getScripts(host);
-  const smbScript = hostScripts.find(s => s.id === 'smb-os-discovery');
-  if (smbScript) {
-    const output = smbScript.output;
-    const computerNameMatch = output.match(/Computer name: ([\w-]+)/);
-    if (computerNameMatch && computerNameMatch[1]) {
-      return computerNameMatch[1];
-    }
-  }
-
-  return 'N/A';
-};
-
-const getOsName = (host: Host | null): string => {
-    if (!host || !host.os || !host.os.osmatch) {
-        return 'N/A';
-    }
-    const osMatches = Array.isArray(host.os.osmatch) ? host.os.osmatch : [host.os.osmatch];
-    if (osMatches.length > 0) {
-        // Find the one with the highest accuracy
-        const bestMatch = osMatches.reduce((prev, current) => (parseInt(prev.accuracy) > parseInt(current.accuracy)) ? prev : current);
-        return bestMatch.name;
-    }
-    return 'N/A';
-};
-
+import { getHostname, getOsName } from '@/lib/nmap-parser';
 
 const getOpenPortsCount = (host: Host) => {
   if (!host.ports || !host.ports.port) return 0;
@@ -125,9 +45,20 @@ export default function HostsTable() {
   const tDetails = useTranslations('DetailsPage');
   const router = useRouter();
 
+  const hostData = useMemo(() => {
+    if (!scanResult?.hosts) {
+      return [];
+    }
+    return scanResult.hosts.map(host => ({
+      ...host,
+      hostname: getHostname(host),
+      osName: getOsName(host),
+    }));
+  }, [scanResult?.hosts]);
+
   const sortedHosts = useMemo(() => {
-    if (!scanResult?.hosts) return [];
-    let sortableItems = [...scanResult.hosts];
+    if (!hostData) return [];
+    let sortableItems = [...hostData];
     if (sortConfig !== null) {
       sortableItems.sort((a, b) => {
         let aValue: string | number;
@@ -139,12 +70,12 @@ export default function HostsTable() {
             bValue = ipToNumber(b.address[0].addr);
             break;
           case 'hostname':
-            aValue = getHostname(a);
-            bValue = getHostname(b);
+            aValue = a.hostname;
+            bValue = b.hostname;
             break;
           case 'os':
-            aValue = getOsName(a);
-            bValue = getOsName(b);
+            aValue = a.osName;
+            bValue = b.osName;
             break;
           case 'openPorts':
             aValue = getOpenPortsCount(a);
@@ -168,7 +99,7 @@ export default function HostsTable() {
       });
     }
     return sortableItems;
-  }, [scanResult?.hosts, sortConfig]);
+  }, [hostData, sortConfig]);
 
   if (!scanResult) return null;
 
@@ -240,15 +171,15 @@ export default function HostsTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {currentHosts.map((host: Host, index: number) => (
+              {currentHosts.map((host: any, index: number) => (
                 <TableRow
                   key={`${host.address[0].addr}-${index}`}
                   onClick={() => handleRowClick(host)}
                   className="cursor-pointer"
                 >
                   <TableCell className="font-mono font-medium">{host.address[0].addr}</TableCell>
-                  <TableCell className="truncate max-w-[200px] hidden md:table-cell">{getHostname(host)}</TableCell>
-                  <TableCell className="truncate max-w-[200px] hidden lg:table-cell">{getOsName(host)}</TableCell>
+                  <TableCell className="truncate max-w-[200px] hidden md:table-cell">{host.hostname}</TableCell>
+                  <TableCell className="truncate max-w-[200px] hidden lg:table-cell">{host.osName}</TableCell>
                   <TableCell className="text-center">{getOpenPortsCount(host)}</TableCell>
                   <TableCell className="text-right">
                     <Badge variant="default" className={cn('border-transparent', getRiskColorClass(host.riskScore ?? 0))}>
