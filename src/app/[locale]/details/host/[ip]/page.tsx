@@ -16,85 +16,7 @@ import { PentestingNextSteps } from '@/components/details/pentesting-next-steps'
 import { NseSummary } from '@/components/details/nse-summary';
 import { cn } from '@/lib/utils';
 import { CveDetails } from '@/components/details/cve-details';
-
-const getScripts = (item: Port | Host): Script[] => {
-    const scriptsSource = 'hostscript' in item ? item.hostscript : item.script;
-    if (!scriptsSource) return [];
-
-    const scripts: Script[] = [];
-    
-    const potentialScripts = Array.isArray(scriptsSource) ? scriptsSource : [scriptsSource];
-
-    potentialScripts.forEach(potential => {
-        if (potential) {
-            if ('script' in potential) { 
-                const nested = (potential as any).script;
-                if (Array.isArray(nested)) {
-                    scripts.push(...nested);
-                } else if (nested) {
-                    scripts.push(nested);
-                }
-            } else if ('id' in potential) { 
-                scripts.push(potential as Script);
-            }
-        }
-    });
-
-    return scripts;
-};
-
-
-const getHostname = (host: Host | null): string => {
-  if (!host) {
-    return 'N/A';
-  }
-
-  // 1. Try to get from hostnames array
-  if (host.hostnames && Array.isArray(host.hostnames)) {
-    for (const hostnamesEntry of host.hostnames) {
-      if (hostnamesEntry && hostnamesEntry.hostname) {
-        const hostnameArray = Array.isArray(hostnamesEntry.hostname) ? hostnamesEntry.hostname : [hostnamesEntry.hostname];
-        const primaryHostname = hostnameArray.find(h => h.type === 'user' || h.type === 'PTR');
-        if (primaryHostname) {
-          return primaryHostname.name;
-        }
-      }
-    }
-  } else if (host.hostnames && !Array.isArray(host.hostnames) && host.hostnames.hostname) {
-      const hostnameArray = Array.isArray(host.hostnames.hostname) ? host.hostnames.hostname : [host.hostnames.hostname];
-      const primaryHostname = hostnameArray.find(h => h.type === 'user' || h.type === 'PTR');
-      if (primaryHostname) {
-        return primaryHostname.name;
-      }
-  }
-
-
-  // 2. If not found, try to get from smb-os-discovery script
-  const hostScripts = getScripts(host);
-  const smbScript = hostScripts.find(s => s.id === 'smb-os-discovery');
-  if (smbScript) {
-    const output = smbScript.output;
-    const computerNameMatch = output.match(/Computer name: ([\w-]+)/);
-    if (computerNameMatch && computerNameMatch[1]) {
-      return computerNameMatch[1];
-    }
-  }
-
-  return 'N/A';
-};
-
-
-const getOsName = (host: Host | null): string => {
-    if (!host || !host.os || !host.os.osmatch) {
-        return 'N/A';
-    }
-    const osMatches = Array.isArray(host.os.osmatch) ? host.os.osmatch : [host.os.osmatch];
-    if (osMatches.length > 0) {
-        const bestMatch = osMatches.reduce((prev, current) => (parseInt(prev.accuracy) > parseInt(current.accuracy)) ? prev : current);
-        return bestMatch.name;
-    }
-    return 'N/A';
-};
+import { getHostname, getOsName, getScripts } from '@/lib/nmap-parser';
 
 const getPorts = (host: Host | null): Port[] => {
     if (!host || !host.ports || !host.ports.port) return [];
@@ -120,9 +42,6 @@ export default function HostDetailPage() {
   const { 
     scanResult, 
     setSelectedHost,
-    fetchVulnerabilityExplanation,
-    fetchPentestingNextSteps,
-    fetchNseSummary,
   } = useScanStore();
   const t = useTranslations('HostDetail');
   const tDetails = useTranslations('DetailsPage');
@@ -131,14 +50,25 @@ export default function HostDetailPage() {
 
   const host = useMemo(() => scanResult?.hosts.find(h => h.address[0].addr === ip), [scanResult, ip]);
 
+  const hostData = useMemo(() => {
+    if (!host) return null;
+    return {
+      ...host,
+      hostname: getHostname(host),
+      osName: getOsName(host),
+      hostScripts: getScripts(host)
+    };
+  }, [host]);
+
   useEffect(() => {
-    if (!scanResult) {
-      router.push('/');
-      return;
+    if (scanResult && !host) {
+        // if scan is loaded but host not found
+        // This can happen if the host list changes after a rescore
+        // We don't push to `/` to avoid losing the scan context
+    } else if (!scanResult) {
+        router.push('/');
     }
-    
-    setSelectedHost(null);
-    
+
     if (host) {
       // Trigger all AI generations for this host (except CVEs)
       const store = useScanStore.getState();
@@ -146,11 +76,14 @@ export default function HostDetailPage() {
       store.fetchPentestingNextSteps(host, locale);
       store.fetchNseSummary(host, locale);
     }
+    
+    setSelectedHost(null);
+    
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [host, locale]);
+  }, [ip, scanResult, host, locale, router]);
   
 
-  const openPorts = useMemo(() => getPorts(host), [host]);
+  const openPorts = useMemo(() => getPorts(hostData), [hostData]);
 
   const sortedPorts = useMemo(() => {
     let sortableItems = [...openPorts];
@@ -202,21 +135,20 @@ export default function HostDetailPage() {
     return <ArrowUpDown className="ml-2 h-4 w-4" />;
   };
 
-  if (!host) {
+  if (!hostData) {
     return (
-        <p className="text-center">{tDetails('pageNotFound')}</p>
+        <div className="flex-grow flex items-center justify-center">
+            <p className="text-center text-muted-foreground">{tDetails('pageNotFound')}</p>
+        </div>
     );
   }
 
-  const hostScripts = getScripts(host);
-  const riskScore = host.riskScore ?? 0;
-  const hostname = getHostname(host);
+  const { riskScore, hostname, osName, hostScripts } = hostData;
   const hasHostname = hostname !== 'N/A';
-  const osName = getOsName(host);
-
+  
   return (
     <>
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center gap-4 mb-8">
         <Button variant="outline" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4" />
           <span className="sr-only">Go back</span>
@@ -227,10 +159,10 @@ export default function HostDetailPage() {
                 {hasHostname ? (
                     <h1 className="text-xl md:text-3xl font-bold flex items-baseline gap-2 font-headline">
                         {hostname} 
-                        <span className="text-lg md:text-2xl text-muted-foreground font-mono">({host.address[0].addr})</span>
+                        <span className="text-lg md:text-2xl text-muted-foreground font-mono">({hostData.address[0].addr})</span>
                     </h1>
                 ) : (
-                    <h1 className="text-xl md:text-3xl font-bold font-mono font-headline">{host.address[0].addr}</h1>
+                    <h1 className="text-xl md:text-3xl font-bold font-mono font-headline">{hostData.address[0].addr}</h1>
                 )}
             </div>
         </div>
@@ -282,7 +214,7 @@ export default function HostDetailPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <CveDetails host={host} />
+                    <CveDetails host={hostData} />
                 </CardContent>
             </Card>
 
@@ -293,7 +225,7 @@ export default function HostDetailPage() {
                 <CardContent>
                 {hostScripts.length > 0 ? (
                     <div className="space-y-4">
-                        {hostScripts.map((script, index) => (
+                        {hostScripts.map((script: Script, index: number) => (
                             <div key={`${script.id}-${index}`}>
                                 <h4 className="font-semibold">{script.id}</h4>
                                 <pre className="mt-2 rounded-md bg-muted p-4 text-xs font-code overflow-x-auto">
@@ -324,7 +256,7 @@ export default function HostDetailPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <NseSummary host={host} />
+                    <NseSummary host={hostData} />
                 </CardContent>
             </Card>
 
@@ -339,7 +271,7 @@ export default function HostDetailPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <PentestingNextSteps host={host} />
+                    <PentestingNextSteps host={hostData} />
                 </CardContent>
             </Card>
         </div>
@@ -352,10 +284,10 @@ export default function HostDetailPage() {
                     <div className="flex justify-between items-baseline">
                         <span className="text-sm text-muted-foreground">{t('riskScore')}</span>
                          <Badge variant="default" className={cn('border-transparent text-lg', getRiskColorClass(riskScore))}>
-                            {riskScore.toFixed(0)} / 100
+                            {(riskScore ?? 0).toFixed(0)} / 100
                         </Badge>
                     </div>
-                    <VulnerabilityExplanation host={host} />
+                    <VulnerabilityExplanation host={hostData} />
                 </CardContent>
             </Card>
             <Card>
