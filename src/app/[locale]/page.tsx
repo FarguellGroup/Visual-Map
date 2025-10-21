@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import HostDetailDrawer from '@/components/dashboard/host-detail-drawer';
+import { cn } from '@/lib/utils';
 
 export default function Home() {
   const { scanResult, setScanResult, clearScanResult, riskWeights } = useScanStore();
@@ -72,11 +73,11 @@ export default function Home() {
     <div className='flex-grow flex flex-col'>
       {isLoading ? (
         <div className="flex-grow flex flex-col items-center justify-center gap-4">
-          <Loader2 className="w-16 h-16 animate-spin text-primary" />
+          <Loader2 className={cn('w-16 h-16 animate-spin text-primary')} />
           <p className="text-lg text-muted-foreground">{t('analyzing')}</p>
         </div>
       ) : !scanResult ? (
-        <div className="flex-grow flex flex-col items-center justify-center">
+        <div className="flex-grow flex flex-col items-center justify-center py-8 md:py-20">
           <UploadZone
             getRootProps={getRootProps}
             getInputProps={getInputProps}
