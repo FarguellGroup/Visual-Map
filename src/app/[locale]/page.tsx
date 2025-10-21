@@ -12,6 +12,7 @@ import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import HostDetailDrawer from '@/components/dashboard/host-detail-drawer';
 import { cn } from '@/lib/utils';
+import RiskRanking from '@/components/dashboard/risk-ranking';
 
 export default function Home() {
   const { scanResult, setScanResult, clearScanResult, riskWeights } = useScanStore();
@@ -77,7 +78,7 @@ export default function Home() {
           <p className="text-lg text-muted-foreground">{t('analyzing')}</p>
         </div>
       ) : !scanResult ? (
-        <div className="flex-grow flex flex-col items-center justify-center py-8 md:py-20">
+        <div className="flex-grow flex flex-col items-center justify-center">
           <UploadZone
             getRootProps={getRootProps}
             getInputProps={getInputProps}
@@ -85,9 +86,13 @@ export default function Home() {
           />
         </div>
       ) : (
-        <div className="space-y-4 md:space-y-8 py-4">
+        <div className="space-y-8">
           <SummaryCards />
-          <HostsTable />
+          <div className="grid gap-8 lg:grid-cols-1">
+              <div className="lg:col-span-1 space-y-4">
+                  <HostsTable />
+              </div>
+          </div>
         </div>
       )}
       <HostDetailDrawer />

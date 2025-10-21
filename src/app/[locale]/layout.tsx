@@ -37,6 +37,22 @@ export default function LocaleLayout({
     setMounted(true);
   }, []);
 
+  if (!mounted) {
+    // Render a placeholder or simplified layout on the server and during initial client render
+    // to prevent hydration mismatch.
+    return (
+       <div className="flex flex-col min-h-screen">
+          <AppHeader />
+          <main className="flex flex-col flex-grow w-full">
+            <div className='container mx-auto flex-grow flex flex-col px-6 py-8'>
+                {children}
+            </div>
+          </main>
+          <AppFooter />
+        </div>
+    );
+  }
+
   const showSidebar = scanResult || pathname.includes('/details');
 
   return (
@@ -50,7 +66,7 @@ export default function LocaleLayout({
         <div className="flex flex-col min-h-screen">
           <AppHeader />
           <main className="flex flex-col flex-grow w-full">
-            <div className='container mx-auto flex-grow flex flex-col p-4 md:p-8'>
+            <div className='container mx-auto flex-grow flex flex-col px-6 py-8'>
                 {children}
             </div>
           </main>
@@ -59,16 +75,18 @@ export default function LocaleLayout({
       </SidebarInset>
       <ApiErrorToast />
        {/* Container for off-screen rendering for exports */}
-      {mounted && scanResult && (
-        <div id="export-container" className={`${theme} bg-background`} style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '800px', padding: '1rem' }}>
+      <div id="export-container" className={`${theme} bg-background`} style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '800px', padding: '1rem' }}>
+        {scanResult && (
+          <>
             <VulnerabilitiesDetailView hosts={scanResult.hosts} />
             <PortsDetailView hosts={scanResult.hosts} />
             <ServicesDetailView hosts={scanResult.hosts} />
             <ThreatsDetailView hosts={scanResult.hosts} />
             {/* Explicitly render for PDF with a specific ID */}
             {hasCves && <ThreatsDetailView hosts={scanResult.hosts} pdfMode={true} forceId="pdf-threat-service-dist-chart" />}
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </ClientSidebarProvider>
   );
 }
