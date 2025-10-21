@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '../ui/button';
 import { Download, Loader2, Home, Users, Shield, Server, DoorOpen, Network, Skull, SlidersHorizontal, ChevronDown, KeyRound } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useScanStore } from '@/store/use-scan-store';
+import { useScanStore, type RiskWeights } from '@/store/use-scan-store';
 import { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -141,10 +141,15 @@ export default function AppSidebar() {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingHtml, setIsExportingHtml] = useState(false);
   const [accordionValue, setAccordionValue] = useState<string>('');
+  const [localWeights, setLocalWeights] = useState<RiskWeights>(riskWeights);
   const { state, setOpen } = useSidebar();
   const locale = useLocale();
   const pathname = usePathname();
   const { theme } = useTheme();
+
+  useEffect(() => {
+    setLocalWeights(riskWeights);
+  }, [riskWeights]);
 
   useEffect(() => {
     if (state === 'collapsed' && accordionValue) {
@@ -153,6 +158,10 @@ export default function AppSidebar() {
   }, [state, accordionValue, setAccordionValue]);
 
   const handleWeightChange = (factor: keyof typeof riskWeights, value: number[]) => {
+    setLocalWeights(prev => ({ ...prev, [factor]: value[0] }));
+  };
+
+  const commitWeightChange = (factor: keyof typeof riskWeights, value: number[]) => {
     if (!scanResult) return;
     const newWeights = { ...riskWeights, [factor]: value[0] };
     setRiskWeights(newWeights);
@@ -910,37 +919,37 @@ export default function AppSidebar() {
                                 <Label htmlFor="critical-ports-weight" className='text-xs'>
                                     {locale === 'es' ? 'Puertos Críticos' : 'Critical Ports'}
                                 </Label>
-                                <span className="text-xs text-muted-foreground">{riskWeights.criticalPorts}/100</span>
+                                <span className="text-xs text-muted-foreground">{localWeights.criticalPorts}/100</span>
                                 </div>
-                                <Slider defaultValue={[riskWeights.criticalPorts]} max={100} step={1} onValueCommit={(v) => handleWeightChange('criticalPorts', v)} id="critical-ports-weight"/>
+                                <Slider value={[localWeights.criticalPorts]} max={100} step={1} onValueChange={(v) => handleWeightChange('criticalPorts', v)} onValueCommit={(v) => commitWeightChange('criticalPorts', v)} id="critical-ports-weight"/>
                             </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
                                 <Label htmlFor="cve-weight" className='text-xs'>{locale === 'es' ? 'CVEs y Vulnerabilidades' : 'CVEs & Vulnerabilities'}</Label>
-                                <span className="text-xs text-muted-foreground">{riskWeights.cveScore}/100</span>
+                                <span className="text-xs text-muted-foreground">{localWeights.cveScore}/100</span>
                                 </div>
-                                <Slider defaultValue={[riskWeights.cveScore]} max={100} step={1} onValueCommit={(v) => handleWeightChange('cveScore', v)} id="cve-weight"/>
+                                <Slider value={[localWeights.cveScore]} max={100} step={1} onValueChange={(v) => handleWeightChange('cveScore', v)} onValueCommit={(v) => commitWeightChange('cveScore', v)} id="cve-weight"/>
                             </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
                                 <Label htmlFor="vuln-scripts-weight" className='text-xs'>{tSidebar('nseScripts')}</Label>
-                                <span className="text-xs text-muted-foreground">{riskWeights.vulnScripts}/100</span>
+                                <span className="text-xs text-muted-foreground">{localWeights.vulnScripts}/100</span>
                                 </div>
-                                <Slider defaultValue={[riskWeights.vulnScripts]} max={100} step={1} onValueCommit={(v) => handleWeightChange('vulnScripts', v)} id="vuln-scripts-weight"/>
+                                <Slider value={[localWeights.vulnScripts]} max={100} step={1} onValueChange={(v) => handleWeightChange('vulnScripts', v)} onValueCommit={(v) => commitWeightChange('vulnScripts', v)} id="vuln-scripts-weight"/>
                             </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
                                 <Label htmlFor="service-version-weight" className='text-xs'>{tSidebar('serviceVersions')}</Label>
-                                <span className="text-xs text-muted-foreground">{riskWeights.serviceVersions}/100</span>
+                                <span className="text-xs text-muted-foreground">{localWeights.serviceVersions}/100</span>
                                 </div>
-                                <Slider defaultValue={[riskWeights.serviceVersions]} max={100} step={1} onValueCommit={(v) => handleWeightChange('serviceVersions', v)} id="service-version-weight" />
+                                <Slider value={[localWeights.serviceVersions]} max={100} step={1} onValueChange={(v) => handleWeightChange('serviceVersions', v)} onValueCommit={(v) => commitWeightChange('serviceVersions', v)} id="service-version-weight" />
                             </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
                                 <Label htmlFor="open-ports-weight" className='text-xs'>{tSidebar('openPorts')}</Label>
-                                <span className="text-xs text-muted-foreground">{riskWeights.openPortsCount}/100</span>
+                                <span className="text-xs text-muted-foreground">{localWeights.openPortsCount}/100</span>
                                 </div>
-                                <Slider defaultValue={[riskWeights.openPortsCount]} max={100} step={1} onValueCommit={(v) => handleWeightChange('openPortsCount', v)} id="open-ports-weight"/>
+                                <Slider value={[localWeights.openPortsCount]} max={100} step={1} onValueChange={(v) => handleWeightChange('openPortsCount', v)} onValueCommit={(v) => commitWeightChange('openPortsCount', v)} id="open-ports-weight"/>
                             </div>
                             </CardContent>
                         </Card>
