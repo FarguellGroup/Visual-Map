@@ -3,7 +3,7 @@
 import React from 'react';
 import { usePathname } from '@/navigation';
 import { useScanStore } from '@/store/use-scan-store';
-import { Sidebar } from '@/components/ui/sidebar';
+import { Sidebar, SidebarProvider } from '@/components/ui/sidebar';
 import AppHeader from '@/components/layout/header';
 import AppSidebar from '@/components/layout/sidebar';
 import AppFooter from '@/components/layout/footer';
@@ -24,6 +24,7 @@ export default function MainLayout({
   const hasCves = Array.from(cveCache.values()).some(e => e.status === 'loaded' && e.data && e.data.length > 0);
 
   return (
+    <SidebarProvider defaultOpen={true}>
       <div className="relative flex min-h-screen w-full">
         {showSidebar && (
           <Sidebar side="left" collapsible="icon">
@@ -54,5 +55,6 @@ export default function MainLayout({
           )}
         </div>
       </div>
+    </SidebarProvider>
   );
 }
