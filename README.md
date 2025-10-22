@@ -52,7 +52,7 @@ docker build -t visual-map .
 
 # 2. Ejecuta el contenedor
 # El -d lo ejecuta en segundo plano (detached)
-docker run -p 9002:9002 -d visual-map
+docker run -p 9002:3000 -d visual-map
 ```
 Una vez ejecutado, la aplicación estará disponible en [http://localhost:9002](http://localhost:9002).
 
