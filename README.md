@@ -50,11 +50,10 @@ También puedes desplegar la aplicación utilizando Docker para un entorno estan
 # 1. Construye la imagen de Docker
 docker build -t visual-map .
 
-# 2. Ejecuta el contenedor
-# El -d lo ejecuta en segundo plano (detached)
-docker run -p 9002:9002 -d visual-map
+# 2. Ejecuta el contenedor (-d lo ejecuta en segundo plano)
+docker run -p 9002:3000 -d visual-map
 ```
-Una vez ejecutado, la aplicación estará disponible en [http://localhost:9002](http://localhost:9002).
+Una vez ejecutado, la aplicación estará disponible en [http://localhost:9002](http://localhost:3000).
 
 ## Generación del XML con Nmap
 
