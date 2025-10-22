@@ -44,16 +44,17 @@ Una vez ejecutado, la aplicación estará disponible en [http://localhost:9002](
 
 ## Despliegue con Docker
 
-También puedes desplegar la aplicación utilizando Docker para un entorno estandarizado.
+Puedes desplegar la aplicación utilizando Docker. Primero, necesitas tu clave de API de Gemini, que puedes obtener gratis en [Google AI Studio](https://aistudio.google.com/).
 
 ```bash
 # 1. Construye la imagen de Docker
 docker build -t visual-map .
 
-# 2. Ejecuta el contenedor (-d lo ejecuta en segundo plano)
-docker run -p 9002:3000 -d visual-map
+# 2. Ejecuta el contenedor con tu clave de API
+# Reemplaza TU_API_KEY_AQUI con tu clave de API de Gemini
+docker run -p 3000:3000 -e NEXT_PUBLIC_GOOGLE_GENAI_API_KEY="TU_API_KEY_AQUI" -d visual-map
 ```
-Una vez ejecutado, la aplicación estará disponible en [http://localhost:9002](http://localhost:9002).
+Una vez ejecutado, la aplicación estará disponible en [http://localhost:3000](http://localhost:3000).
 
 ## Generación del XML con Nmap
 
@@ -71,7 +72,7 @@ sudo nmap -v -A -iL subdomains.txt -oX scan.xml
 ## Configuración de la API de Gemini
 Esta herramienta utiliza un módulo de inteligencia artificial a través de la API de Gemini que permite hacer una descripción avanzada de cada host encontrado, buscando vulnerabilidades y dándonos los pasos de explotación de la máquina. Puedes conseguir tu API de Gemini gratis aqui: https://aistudio.google.com/
 
-Para importar la API solamente debemos dirigirnos al apartado "Configuración de la API" en el menú lateral e introducir la clave API generada. Automáticamente se verificará la autenticidad de la API y podrás elegir entre distintos modelos de Gemini:
+Para usar la IA, debes proporcionar tu clave API al ejecutar el contenedor de Docker como se muestra en la sección de despliegue. En el apartado "Configuración de la API" podrás verificar el estado de tu clave y seleccionar el modelo de Gemini que prefieras. Si ejecutas la aplicación en modo desarrollo (`npm run dev`), podrás introducir la clave directamente en la interfaz.
 
 <img width="3456" height="1860" alt="VM - API" src="https://github.com/user-attachments/assets/d9031c0a-41c4-4730-8b6e-c562a47706b1" />
 
