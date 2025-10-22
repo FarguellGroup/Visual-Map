@@ -74,7 +74,7 @@ Esta herramienta utiliza un módulo de inteligencia artificial a través de la A
 
 Para usar la IA, debes proporcionar tu clave API al ejecutar el contenedor de Docker como se muestra en la sección de despliegue. En el apartado "Configuración de la API" podrás verificar el estado de tu clave y seleccionar el modelo de Gemini que prefieras. Si ejecutas la aplicación en modo desarrollo (`npm run dev`), podrás introducir la clave directamente en la interfaz.
 
-<img width="3456" height="1860" alt="VM - API" src="https://github.com/user-attachments/assets/d9031c0a-41c4-4730-8b6e-c562a47706b1" />
+<img width="3456" height="1858" alt="VM - API" src="https://github.com/user-attachments/assets/479c2814-f2b5-4560-b84a-c8105b646241" />
 
 ## Cómo Usar
 
