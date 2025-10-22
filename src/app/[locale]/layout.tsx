@@ -44,7 +44,7 @@ export default function LocaleLayout({
        <div className="flex flex-col min-h-screen">
           <AppHeader />
           <main className="flex flex-col flex-grow w-full">
-            <div className='container mx-auto flex-grow flex flex-col px-6 py-8'>
+            <div className='container mx-auto flex-grow flex flex-col px-6 py-16'>
                 {children}
             </div>
           </main>
@@ -66,7 +66,7 @@ export default function LocaleLayout({
         <div className="flex flex-col min-h-screen">
           <AppHeader />
           <main className="flex flex-col flex-grow w-full">
-            <div className='container mx-auto flex-grow flex flex-col px-6 py-8'>
+            <div className='container mx-auto flex-grow flex flex-col px-6 py-16'>
                 {children}
             </div>
           </main>
