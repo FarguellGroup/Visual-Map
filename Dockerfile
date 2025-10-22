@@ -1,27 +1,25 @@
-# 1. Base Image for dependencies
-FROM node:20-alpine AS deps
+# 1. Install dependencies
+FROM node:20-alpine AS installer
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm install --omit=dev
+COPY package*.json ./
+RUN npm install
 
-# 2. Base Image for building the application
+# 2. Build the app
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=installer /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-# 3. Final Image for production
+# 3. Final image for production
 FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Copy built assets
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder /app/messages ./messages
 
 EXPOSE 9002
 
