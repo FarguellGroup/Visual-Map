@@ -1,7 +1,7 @@
 import React from 'react';
 import { unstable_setRequestLocale } from 'next-intl/server';
-import { ClientSidebarProvider } from '@/components/layout/sidebar-provider';
 import MainLayout from '@/components/layout/main-layout';
+import { NextIntlClientProvider, useMessages } from 'next-intl';
 
 export default function LocaleLayout({
   children,
@@ -12,10 +12,11 @@ export default function LocaleLayout({
 }) {
   // Enable static rendering
   unstable_setRequestLocale(locale);
+  const messages = useMessages();
 
   return (
-    <ClientSidebarProvider>
+    <NextIntlClientProvider locale={locale} messages={messages}>
       <MainLayout>{children}</MainLayout>
-    </ClientSidebarProvider>
+    </NextIntlClientProvider>
   );
 }
