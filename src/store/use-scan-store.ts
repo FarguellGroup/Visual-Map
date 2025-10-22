@@ -1,11 +1,12 @@
 
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Host, Port, Script, Service, CveData, CveInfo } from '@/types/nmap';
 import type { ExplainVulnerabilityRiskOutput, PentestingNextStepsOutput, NseScriptsSummaryOutput, CveDetailsOutput, CveDetailsInput, ExplainVulnerabilityRiskInput, PentestingNextStepsInput, NseScriptsSummaryInput } from '@/ai/types';
 import { calculateRiskScores } from '@/lib/risk-scorer';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export const AI_MODEL_NAME = 'gemini-2.5-flash-lite';
+export const AI_MODEL_NAME = 'gemini-1.5-flash-latest';
 
 export type RiskWeights = {
   criticalPorts: number;
@@ -73,6 +74,7 @@ type ScanState = {
   cveScanProgress: CveScanProgress;
   isCveScanRunning: boolean;
   isCveScanPaused: boolean;
+  isUsingEnvVar: boolean;
   remainingHostsToScan: Host[];
   abortableCveScan: AbortableScan | null;
   setScanResult: (fileName: string, hosts: Host[], weights?: RiskWeights, resetCache?: boolean) => void;
@@ -92,6 +94,8 @@ type ScanState = {
   fetchNseSummary: (host: Host, locale: string) => Promise<void>;
   hostHasNseScripts: (hostIp: string) => boolean;
   setApiStatus: (status: ApiStatus) => void;
+  _hydrated: boolean;
+  setHydrated: (hydrated: boolean) => void;
 };
 
 // --- API Call Functions ---
@@ -124,9 +128,6 @@ async function callGemini<T_in, T_out>(prompt: string, signal: AbortSignal): Pro
         const genAI = getGenAI(apiKey);
         const model = getGenerativeModel(genAI, aiModel);
         
-        // The `generateContent` call needs to be adapted to be abortable if the SDK supports it.
-        // As of now, the SDK doesn't directly support AbortSignal in generateContent.
-        // We'll check the signal before the call and rely on the loop structure to stop execution.
         if (signal.aborted) {
             return { aborted: true };
         }
@@ -160,6 +161,8 @@ async function callGemini<T_in, T_out>(prompt: string, signal: AbortSignal): Pro
 
         if (errorMessage.toLowerCase().includes('429') || errorMessage.toLowerCase().includes('rate limit') || errorMessage.toLowerCase().includes('quota')) {
             setApiError('Rate limit exceeded');
+        } else if (errorMessage.toLowerCase().includes('api key not valid')) {
+            setApiError('API Key not valid. Please check the key.');
         } else {
             setApiError(errorMessage);
         }
@@ -220,353 +223,359 @@ const getScripts = (item: Port | Host): Script[] => {
     return scripts;
 };
 
-
-export const useScanStore = create<ScanState>((set, get) => ({
-  scanResult: null,
-  selectedHost: null,
-  apiStatus: 'idle',
-  apiError: null,
-  aiModel: AI_MODEL_NAME,
-  apiKey: process.env.NEXT_PUBLIC_GOOGLE_GENAI_API_KEY || null,
-  explanationCache: new Map(),
-  pentestingStepsCache: new Map(),
-  nseSummaryCache: new Map(),
-  cveCache: new Map(),
-  riskWeights: defaultRiskWeights,
-  cveScanProgress: { processed: 0, total: 0, isComplete: false },
-  isCveScanRunning: false,
-  isCveScanPaused: false,
-  remainingHostsToScan: [],
-  abortableCveScan: null,
-
-  setScanResult: (fileName, hosts, weights, resetCache = true) => {
-    const finalWeights = weights || get().riskWeights;
-    
-    // Always use the original hosts for recalculation to avoid compounding modifications.
-    const hostsToProcess = get().scanResult?.originalHosts || hosts;
-
-    const cveCache = get().cveCache;
-    const hostsWithCves = (resetCache ? hosts : hostsToProcess).map(host => {
-        const cachedCves = cveCache.get(host.address[0].addr);
-        const cachedData = cachedCves?.status === 'loaded' ? cachedCves.data : [];
-        return { ...host, cves: cachedData };
-    });
-
-    const scoredHosts = calculateRiskScores(hostsWithCves, finalWeights);
-    scoredHosts.sort((a, b) => (b.riskScore ?? 0) - (a.riskScore ?? 0));
-    const summary = calculateSummary(scoredHosts);
-    
-    const newState: Partial<ScanState> = {
-      scanResult: {
-        fileName: get().scanResult?.fileName || fileName,
-        hosts: scoredHosts,
-        originalHosts: hosts, // Store the new clean, original hosts
-        summary
-      },
-      riskWeights: finalWeights,
-    };
-
-    if (resetCache) {
-      newState.explanationCache = new Map();
-      newState.pentestingStepsCache = new Map();
-      newState.nseSummaryCache = new Map();
-      newState.cveCache = new Map();
-      newState.isCveScanRunning = false;
-      newState.cveScanProgress = { processed: 0, total: 0, isComplete: false };
-      newState.isCveScanPaused = false;
-      newState.remainingHostsToScan = [];
-    }
-    set(newState);
-  },
-  
-  clearScanResult: () => {
-    get().pauseCveScan(); // Abort any running scan
-    set({ 
-      scanResult: null, 
-      selectedHost: null, 
-      explanationCache: new Map(), 
-      pentestingStepsCache: new Map(), 
-      nseSummaryCache: new Map(), 
+export const useScanStore = create<ScanState>()(
+  persist(
+    (set, get) => ({
+      scanResult: null,
+      selectedHost: null,
+      apiStatus: 'idle',
+      apiError: null,
+      aiModel: AI_MODEL_NAME,
+      apiKey: process.env.NEXT_PUBLIC_GOOGLE_GENAI_API_KEY || null,
+      isUsingEnvVar: !!process.env.NEXT_PUBLIC_GOOGLE_GENAI_API_KEY,
+      explanationCache: new Map(),
+      pentestingStepsCache: new Map(),
+      nseSummaryCache: new Map(),
       cveCache: new Map(),
       riskWeights: defaultRiskWeights,
       cveScanProgress: { processed: 0, total: 0, isComplete: false },
       isCveScanRunning: false,
-      apiStatus: 'idle',
-      apiError: null,
       isCveScanPaused: false,
       remainingHostsToScan: [],
-    });
-  },
+      abortableCveScan: null,
+      _hydrated: false,
+      setHydrated: (hydrated) => set({ _hydrated: hydrated }),
 
-  setSelectedHost: (host) => set({ selectedHost: host }),
-  clearExplanationCache: () => set({ explanationCache: new Map() }),
-  clearPentestingStepsCache: () => set({ pentestingStepsCache: new Map() }),
-  clearNseSummaryCache: () => set({ nseSummaryCache: new Map() }),
-  setRiskWeights: (weights: RiskWeights) => {
-      const { scanResult } = get();
-      if(scanResult) {
-          get().setScanResult(scanResult.fileName, scanResult.originalHosts, weights, false);
-      }
-  },
-  
-  setAiModel: (model: string) => {
-    set({ 
-      aiModel: model,
-      explanationCache: new Map(),
-      pentestingStepsCache: new Map(),
-      nseSummaryCache: new Map(),
-    });
-  },
+      setScanResult: (fileName, hosts, weights, resetCache = true) => {
+        const finalWeights = weights || get().riskWeights;
+        const hostsToProcess = get().scanResult?.originalHosts || hosts;
 
-  setApiKey: (key: string | null) => {
-    set({ apiKey: key });
-  },
-
-  setApiError: (error: string | null) => set({ apiError: error }),
-
-  setApiStatus: (status: ApiStatus) => set({ apiStatus: status }),
-
-  hostHasNseScripts: (hostIp: string) => {
-    const host = get().scanResult?.hosts.find(h => h.address[0].addr === hostIp);
-    if (!host) return false;
-    const hostScripts = getScripts(host);
-    const portScripts: Script[] = [];
-    if (host.ports && host.ports.port) {
-        const ports = Array.isArray(host.ports.port) ? host.ports.port : [host.ports.port];
-        ports.forEach(port => portScripts.push(...getScripts(port)));
-    }
-    return (hostScripts.length + portScripts.length) > 0;
-  },
-
-  pauseCveScan: () => {
-    const { abortableCveScan } = get();
-    if (abortableCveScan) {
-      abortableCveScan.controller.abort();
-      set({ 
-        isCveScanRunning: false, 
-        isCveScanPaused: true, 
-        abortableCveScan: null 
-      });
-    }
-  },
-
-  fetchCvesForHost: async (hosts: Host | Host[], locale: string) => {
-    if (!get().apiKey) {
-      get().setApiError('API key not configured');
-      return;
-    }
-    
-    if (get().isCveScanRunning && !get().isCveScanPaused) return; // Don't start a new scan if one is already running
-    if (get().apiError) set({ apiError: null });
-
-    const hostsToProcess = Array.isArray(hosts) ? hosts : [hosts];
-    
-    let hostsForScan: Host[];
-    // If resuming a paused scan, use the remaining hosts
-    if (get().isCveScanPaused && get().remainingHostsToScan.length > 0) {
-        hostsForScan = get().remainingHostsToScan;
-    } else {
-        // Otherwise, filter for new hosts to scan
-        hostsForScan = hostsToProcess.filter(host => {
-            const hasScannablePorts = getOpenPortsWithServices(host).length > 0;
-            const cacheEntry = get().cveCache.get(host.address[0].addr);
-            return hasScannablePorts && (!cacheEntry || cacheEntry.status === 'idle' || cacheEntry.status === 'error');
+        const cveCache = get().cveCache;
+        const hostsWithCves = (resetCache ? hosts : hostsToProcess).map(host => {
+            const cachedCves = cveCache.get(host.address[0].addr);
+            const cachedData = cachedCves?.status === 'loaded' ? cachedCves.data : [];
+            return { ...host, cves: cachedData };
         });
-        // If it's a fresh scan, reset the progress
-        const totalServicesToScan = hostsForScan.reduce((acc, host) => acc + getOpenPortsWithServices(host).length, 0);
-        set({ cveScanProgress: { processed: 0, total: totalServicesToScan, isComplete: false } });
-    }
 
-    if (hostsForScan.length === 0) {
-        // If there's nothing to scan, ensure the state is clean.
-        set({ isCveScanRunning: false, isCveScanPaused: false, cveScanProgress: { ...get().cveScanProgress, isComplete: true } });
-        return;
-    }
-    
-    const controller = new AbortController();
-    const signal = controller.signal;
-    
-    set({ 
-        isCveScanRunning: true, 
-        isCveScanPaused: false, 
-        remainingHostsToScan: hostsForScan,
-        abortableCveScan: { controller },
-    });
-    
-    const BATCH_DELAY = 1000;
+        const scoredHosts = calculateRiskScores(hostsWithCves, finalWeights);
+        scoredHosts.sort((a, b) => (b.riskScore ?? 0) - (a.riskScore ?? 0));
+        const summary = calculateSummary(scoredHosts);
+        
+        const newState: Partial<ScanState> = {
+          scanResult: {
+            fileName: get().scanResult?.fileName || fileName,
+            hosts: scoredHosts,
+            originalHosts: hosts,
+            summary
+          },
+          riskWeights: finalWeights,
+        };
 
-    for (let i = 0; i < hostsForScan.length; i++) {
-        const host = hostsForScan[i];
-        const hostIp = host.address[0].addr;
+        if (resetCache) {
+          newState.explanationCache = new Map();
+          newState.pentestingStepsCache = new Map();
+          newState.nseSummaryCache = new Map();
+          newState.cveCache = new Map();
+          newState.isCveScanRunning = false;
+          newState.cveScanProgress = { processed: 0, total: 0, isComplete: false };
+          newState.isCveScanPaused = false;
+          newState.remainingHostsToScan = [];
+        }
+        set(newState);
+      },
+      
+      clearScanResult: () => {
+        get().pauseCveScan();
+        set({ 
+          scanResult: null, 
+          selectedHost: null, 
+          explanationCache: new Map(), 
+          pentestingStepsCache: new Map(), 
+          nseSummaryCache: new Map(), 
+          cveCache: new Map(),
+          riskWeights: defaultRiskWeights,
+          cveScanProgress: { processed: 0, total: 0, isComplete: false },
+          isCveScanRunning: false,
+          apiStatus: 'idle',
+          apiError: null,
+          isCveScanPaused: false,
+          remainingHostsToScan: [],
+        });
+      },
 
-        // If the scan was paused and is now being resumed, skip marking as loading if already loaded.
-        const currentCacheEntry = get().cveCache.get(hostIp);
-        if (!currentCacheEntry || currentCacheEntry.status !== 'loaded') {
-          set(state => ({ cveCache: new Map(state.cveCache).set(hostIp, { status: 'loading' }) }));
+      setSelectedHost: (host) => set({ selectedHost: host }),
+      clearExplanationCache: () => set({ explanationCache: new Map() }),
+      clearPentestingStepsCache: () => set({ pentestingStepsCache: new Map() }),
+      clearNseSummaryCache: () => set({ nseSummaryCache: new Map() }),
+      
+      setRiskWeights: (weights: RiskWeights) => {
+          const { scanResult } = get();
+          if(scanResult) {
+              get().setScanResult(scanResult.fileName, scanResult.originalHosts, weights, false);
+          }
+      },
+      
+      setAiModel: (model: string) => {
+        set({ 
+          aiModel: model,
+          explanationCache: new Map(),
+          pentestingStepsCache: new Map(),
+          nseSummaryCache: new Map(),
+        });
+      },
+
+      setApiKey: (key: string | null) => {
+        // Don't allow overwriting the env var key
+        if(get().isUsingEnvVar) return;
+        set({ apiKey: key });
+      },
+
+      setApiError: (error: string | null) => set({ apiError: error }),
+      setApiStatus: (status: ApiStatus) => set({ apiStatus: status }),
+
+      hostHasNseScripts: (hostIp: string) => {
+        const host = get().scanResult?.hosts.find(h => h.address[0].addr === hostIp);
+        if (!host) return false;
+        const hostScripts = getScripts(host);
+        const portScripts: Script[] = [];
+        if (host.ports && host.ports.port) {
+            const ports = Array.isArray(host.ports.port) ? host.ports.port : [host.ports.port];
+            ports.forEach(port => portScripts.push(...getScripts(port)));
+        }
+        return (hostScripts.length + portScripts.length) > 0;
+      },
+
+      pauseCveScan: () => {
+        const { abortableCveScan } = get();
+        if (abortableCveScan) {
+          abortableCveScan.controller.abort();
+          set({ 
+            isCveScanRunning: false, 
+            isCveScanPaused: true, 
+            abortableCveScan: null 
+          });
+        }
+      },
+
+      fetchCvesForHost: async (hosts: Host | Host[], locale: string) => {
+        if (!get().apiKey) {
+          set({ apiError: 'API key not configured' });
+          return;
+        }
+        
+        if (get().isCveScanRunning && !get().isCveScanPaused) return;
+        if (get().apiError) set({ apiError: null });
+
+        const hostsToProcess = Array.isArray(hosts) ? hosts : [hosts];
+        
+        let hostsForScan: Host[];
+        if (get().isCveScanPaused && get().remainingHostsToScan.length > 0) {
+            hostsForScan = get().remainingHostsToScan;
+        } else {
+            hostsForScan = hostsToProcess.filter(host => {
+                const hasScannablePorts = getOpenPortsWithServices(host).length > 0;
+                const cacheEntry = get().cveCache.get(host.address[0].addr);
+                return hasScannablePorts && (!cacheEntry || cacheEntry.status === 'idle' || cacheEntry.status === 'error');
+            });
+            const totalServicesToScan = hostsForScan.reduce((acc, host) => acc + getOpenPortsWithServices(host).length, 0);
+            set({ cveScanProgress: { processed: 0, total: totalServicesToScan, isComplete: false } });
         }
 
-        const portsToScan = getOpenPortsWithServices(host);
-        let hostCves: CveData[] = get().cveCache.get(hostIp)?.data || [];
+        if (hostsForScan.length === 0) {
+            set({ isCveScanRunning: false, isCveScanPaused: false, cveScanProgress: { ...get().cveScanProgress, isComplete: true } });
+            return;
+        }
+        
+        const controller = new AbortController();
+        const signal = controller.signal;
+        
+        set({ 
+            isCveScanRunning: true, 
+            isCveScanPaused: false, 
+            remainingHostsToScan: hostsForScan,
+            abortableCveScan: { controller },
+        });
+        
+        const BATCH_DELAY = 1000;
 
-        for (const port of portsToScan) {
-            // Check for abort signal before each API call
-            if (signal.aborted) {
-              console.log("CVE scan aborted by user.");
-              return;
+        for (let i = 0; i < hostsForScan.length; i++) {
+            const host = hostsForScan[i];
+            const hostIp = host.address[0].addr;
+
+            const currentCacheEntry = get().cveCache.get(hostIp);
+            if (!currentCacheEntry || currentCacheEntry.status !== 'loaded') {
+              set(state => ({ cveCache: new Map(state.cveCache).set(hostIp, { status: 'loading' }) }));
             }
 
-            const portInfoForPrompt = { port: port.portid, protocol: port.protocol, service: port.service!.name, product: port.service!.product || '', version: port.service!.version || '' };
-            const input: CveDetailsInput = { hostInfo: JSON.stringify({ os: host.os?.osmatch?.[0]?.name || 'unknown' }), portInfo: JSON.stringify(portInfoForPrompt), locale: locale as 'en' | 'es' };
-            const outputSchema = { cves: [{ cveId: "CVE-...", description: "...", cvssScore: 0.0 }] };
-            const prompt = `You are a cybersecurity expert. Identify potential CVEs based on the provided service info. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema, with no extra text: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\` Based on the service, list the top 3 most critical CVEs. If none are found, return an empty array. \nHost Info: \`\`\`json\n${input.hostInfo}\`\`\`\nService Info:\`\`\`json\n${input.portInfo}\`\`\``;
+            const portsToScan = getOpenPortsWithServices(host);
+            let hostCves: CveData[] = get().cveCache.get(hostIp)?.data || [];
+
+            for (const port of portsToScan) {
+                if (signal.aborted) {
+                  console.log("CVE scan aborted by user.");
+                  return;
+                }
+
+                const portInfoForPrompt = { port: port.portid, protocol: port.protocol, service: port.service!.name, product: port.service!.product || '', version: port.service!.version || '' };
+                const input: CveDetailsInput = { hostInfo: JSON.stringify({ os: host.os?.osmatch?.[0]?.name || 'unknown' }), portInfo: JSON.stringify(portInfoForPrompt), locale: locale as 'en' | 'es' };
+                const outputSchema = { cves: [{ cveId: "CVE-...", description: "...", cvssScore: 0.0 }] };
+                const prompt = `You are a cybersecurity expert. Identify potential CVEs based on the provided service info. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema, with no extra text: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\` Based on the service, list the top 3 most critical CVEs. If none are found, return an empty array. \nHost Info: \`\`\`json\n${input.hostInfo}\`\`\`\nService Info:\`\`\`json\n${input.portInfo}\`\`\``;
+                
+                const result = await callGemini<CveDetailsInput, CveDetailsOutput>(prompt, signal);
+
+                 if ('aborted' in result && result.aborted) {
+                  return;
+                }
+
+                if ('error' in result && result.error) {
+                  const remainingHosts = hostsForScan.slice(i);
+                  set({
+                    isCveScanRunning: false,
+                    isCveScanPaused: true,
+                    remainingHostsToScan: remainingHosts,
+                    abortableCveScan: null,
+                  });
+                  return;
+                }
+
+                if (result.cves && result.cves.length > 0) {
+                    hostCves.push(...result.cves.map(cve => ({ service: port.service!, portId: port.portid, cve })));
+                }
+
+                set(state => ({
+                    cveScanProgress: { ...state.cveScanProgress, processed: state.cveScanProgress.processed + 1 }
+                }));
+                await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
+            }
             
-            const result = await callGemini<CveDetailsInput, CveDetailsOutput>(prompt, signal);
-
-             if ('aborted' in result && result.aborted) {
-              return; // Exit the loop if aborted
-            }
-
-            if ('error' in result && result.error) {
-              const remainingHosts = hostsForScan.slice(i);
-              set({
-                isCveScanRunning: false,
-                isCveScanPaused: true,
-                remainingHostsToScan: remainingHosts,
-                abortableCveScan: null,
-              });
-              return;
-            }
-
-            if (result.cves && result.cves.length > 0) {
-                hostCves.push(...result.cves.map(cve => ({ service: port.service!, portId: port.portid, cve })));
-            }
-
             set(state => ({
-                cveScanProgress: { ...state.cveScanProgress, processed: state.cveScanProgress.processed + 1 }
+                cveCache: new Map(state.cveCache).set(hostIp, { status: 'loaded', data: hostCves }),
+                remainingHostsToScan: state.remainingHostsToScan.slice(1),
             }));
-            await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
         }
         
-        set(state => ({
-            cveCache: new Map(state.cveCache).set(hostIp, { status: 'loaded', data: hostCves }),
-            // Update remaining hosts after one is fully processed
-            remainingHostsToScan: state.remainingHostsToScan.slice(1),
-        }));
-    }
-    
-    set({ 
-        cveScanProgress: { ...get().cveScanProgress, isComplete: true },
-        isCveScanRunning: false,
-        isCveScanPaused: false,
-        remainingHostsToScan: [],
-        abortableCveScan: null,
-    });
-    
-    // Final score recalculation after the full scan completes
-    if (!get().apiError) {
-        const { scanResult, riskWeights } = get();
-        if (scanResult) {
-          get().setScanResult(scanResult.fileName, scanResult.originalHosts, riskWeights, false);
-        }
-    }
-  },
-
-
-  fetchVulnerabilityExplanation: async (host, locale) => {
-    const cacheKey = `${host.address[0].addr}-${locale}`;
-    const cache = get().explanationCache;
-    if (cache.get(cacheKey)?.promise) return cache.get(cacheKey)!.promise;
-    const controller = new AbortController();
-
-    const promise = (async () => {
-      try {
-        const hostDetails = JSON.stringify({ ip: host.address[0].addr, status: host.status.state, ports: host.ports, hostscript: host.hostscript }, null, 2);
-        const input: ExplainVulnerabilityRiskInput = { hostDetails, rankingFactors: host.riskFactors || [], riskScore: host.riskScore || 0, locale: locale as 'en' | 'es' };
+        set({ 
+            cveScanProgress: { ...get().cveScanProgress, isComplete: true },
+            isCveScanRunning: false,
+            isCveScanPaused: false,
+            remainingHostsToScan: [],
+            abortableCveScan: null,
+        });
         
-        const outputSchema = { explanation: "...", translatedRiskFactors: ["..."] };
-        const prompt = `You are a senior security analyst. Explain concisely why the host has its risk ranking. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nHost details:\n${input.hostDetails}\nRanking factors:\n- ${input.rankingFactors.join('\n- ')}\nRisk score: ${input.riskScore}`;
-
-        const result = await callGemini<ExplainVulnerabilityRiskInput, ExplainVulnerabilityRiskOutput>(prompt, controller.signal);
-        if ('error' in result) {
-            throw new Error(result.error);
+        if (!get().apiError) {
+            const { scanResult, riskWeights } = get();
+            if (scanResult) {
+              get().setScanResult(scanResult.fileName, scanResult.originalHosts, riskWeights, false);
+            }
         }
-         if ('aborted' in result) { return; }
-        set(state => ({ explanationCache: new Map(state.explanationCache).set(cacheKey, { status: 'loaded', data: result as ExplainVulnerabilityRiskOutput }) }));
-      } catch (err) {
-        set(state => ({ explanationCache: new Map(state.explanationCache).set(cacheKey, { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' }) }));
-      }
-    })();
-    
-    set(state => ({ explanationCache: new Map(state.explanationCache).set(cacheKey, { status: 'loading', promise }) }));
-    await promise;
-  },
+      },
 
-  fetchPentestingNextSteps: async (host, locale) => {
-    const cacheKey = `${host.address[0].addr}-${locale}`;
-    const cache = get().pentestingStepsCache;
-    if (cache.get(cacheKey)?.promise) return cache.get(cacheKey)!.promise;
-    const controller = new AbortController();
+      fetchVulnerabilityExplanation: async (host, locale) => {
+        const cacheKey = `${host.address[0].addr}-${locale}`;
+        const cache = get().explanationCache;
+        if (cache.get(cacheKey)?.promise) return cache.get(cacheKey)!.promise;
+        const controller = new AbortController();
 
-    const promise = (async () => {
-      try {
-        const hostDetails = JSON.stringify({ ip: host.address[0].addr, status: host.status.state, ports: host.ports, hostscript: host.hostscript }, null, 2);
-        const input: PentestingNextStepsInput = { hostDetails, locale: locale as 'en' | 'es' };
+        const promise = (async () => {
+          try {
+            const hostDetails = JSON.stringify({ ip: host.address[0].addr, status: host.status.state, ports: host.ports, hostscript: host.hostscript }, null, 2);
+            const input: ExplainVulnerabilityRiskInput = { hostDetails, rankingFactors: host.riskFactors || [], riskScore: host.riskScore || 0, locale: locale as 'en' | 'es' };
+            
+            const outputSchema = { explanation: "...", translatedRiskFactors: ["..."] };
+            const prompt = `You are a senior security analyst. Explain concisely why the host has its risk ranking. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nHost details:\n${input.hostDetails}\nRanking factors:\n- ${input.rankingFactors.join('\n- ')}\nRisk score: ${input.riskScore}`;
 
-        const outputSchema = { steps: [{ title: "...", description: "...", command: "..." }] };
-        const prompt = `You are a world-class penetration tester. Provide actionable next steps for a penetration test based on the Nmap scan results. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema. Replace any placeholders like IP addresses in commands with the actual IP: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nHost Details:\n\`\`\`json\n${input.hostDetails}\`\`\``;
-
-        const result = await callGemini<PentestingNextStepsInput, PentestingNextStepsOutput>(prompt, controller.signal);
-        if ('error' in result) {
-            throw new Error(result.error);
-        }
-        if ('aborted' in result) { return; }
-        set(state => ({ pentestingStepsCache: new Map(state.pentestingStepsCache).set(cacheKey, { status: 'loaded', data: result as PentestingNextStepsOutput }) }));
-      } catch (err) {
-        set(state => ({ pentestingStepsCache: new Map(state.pentestingStepsCache).set(cacheKey, { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' }) }));
-      }
-    })();
-    set(state => ({ pentestingStepsCache: new Map(state.pentestingStepsCache).set(cacheKey, { status: 'loading', promise }) }));
-    await promise;
-  },
-
-  fetchNseSummary: async (host, locale) => {
-    const cacheKey = `${host.address[0].addr}-${locale}`;
-    const cache = get().nseSummaryCache;
-    if (cache.get(cacheKey)?.promise) return cache.get(cacheKey)!.promise;
-    const controller = new AbortController();
-
-    const hostScripts = getScripts(host);
-    const portScripts: Script[] = [];
-    if (host.ports && host.ports.port) {
-        const ports = Array.isArray(host.ports.port) ? host.ports.port : [host.ports.port];
-        ports.forEach(port => portScripts.push(...getScripts(port)));
-    }
-    const rawScriptOutput = [...hostScripts, ...portScripts].map(s => `Script: ${s.id}\nOutput:\n${s.output}`).join('\n\n---\n\n');
-
-    if (!rawScriptOutput.trim()) {
-        set(state => ({ nseSummaryCache: new Map(state.nseSummaryCache).set(cacheKey, { status: 'loaded', data: { summary: '' } }) }));
-        return;
-    }
-
-    const promise = (async () => {
-      try {
-        const input: NseScriptsSummaryInput = { rawScriptOutput, locale: locale as 'en' | 'es' };
+            const result = await callGemini<ExplainVulnerabilityRiskInput, ExplainVulnerabilityRiskOutput>(prompt, controller.signal);
+            if ('error' in result) { throw new Error(result.error); }
+            if ('aborted' in result) { return; }
+            set(state => ({ explanationCache: new Map(state.explanationCache).set(cacheKey, { status: 'loaded', data: result as ExplainVulnerabilityRiskOutput }) }));
+          } catch (err) {
+            set(state => ({ explanationCache: new Map(state.explanationCache).set(cacheKey, { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' }) }));
+          }
+        })();
         
-        const outputSchema = { summary: "A concise, easy-to-read summary of the key findings from the NSE scripts, formatted in Markdown." };
-        const prompt = `You are a cybersecurity expert. Summarize the following NSE script outputs. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nNSE Output:\n\`\`\`\n${rawScriptOutput}\`\`\``;
+        set(state => ({ explanationCache: new Map(state.explanationCache).set(cacheKey, { status: 'loading', promise }) }));
+        await promise;
+      },
 
-        const result = await callGemini<NseScriptsSummaryInput, NseScriptsSummaryOutput>(prompt, controller.signal);
-        if ('error' in result) {
-            throw new Error(result.error);
+      fetchPentestingNextSteps: async (host, locale) => {
+        const cacheKey = `${host.address[0].addr}-${locale}`;
+        const cache = get().pentestingStepsCache;
+        if (cache.get(cacheKey)?.promise) return cache.get(cacheKey)!.promise;
+        const controller = new AbortController();
+
+        const promise = (async () => {
+          try {
+            const hostDetails = JSON.stringify({ ip: host.address[0].addr, status: host.status.state, ports: host.ports, hostscript: host.hostscript }, null, 2);
+            const input: PentestingNextStepsInput = { hostDetails, locale: locale as 'en' | 'es' };
+
+            const outputSchema = { steps: [{ title: "...", description: "...", command: "..." }] };
+            const prompt = `You are a world-class penetration tester. Provide actionable next steps for a penetration test based on the Nmap scan results. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema. Replace any placeholders like IP addresses in commands with the actual IP: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nHost Details:\n\`\`\`json\n${input.hostDetails}\`\`\``;
+
+            const result = await callGemini<PentestingNextStepsInput, PentestingNextStepsOutput>(prompt, controller.signal);
+            if ('error' in result) { throw new Error(result.error); }
+            if ('aborted' in result) { return; }
+            set(state => ({ pentestingStepsCache: new Map(state.pentestingStepsCache).set(cacheKey, { status: 'loaded', data: result as PentestingNextStepsOutput }) }));
+          } catch (err) {
+            set(state => ({ pentestingStepsCache: new Map(state.pentestingStepsCache).set(cacheKey, { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' }) }));
+          }
+        })();
+        set(state => ({ pentestingStepsCache: new Map(state.pentestingStepsCache).set(cacheKey, { status: 'loading', promise }) }));
+        await promise;
+      },
+
+      fetchNseSummary: async (host, locale) => {
+        const cacheKey = `${host.address[0].addr}-${locale}`;
+        const cache = get().nseSummaryCache;
+        if (cache.get(cacheKey)?.promise) return cache.get(cacheKey)!.promise;
+        const controller = new AbortController();
+
+        const hostScripts = getScripts(host);
+        const portScripts: Script[] = [];
+        if (host.ports && host.ports.port) {
+            const ports = Array.isArray(host.ports.port) ? host.ports.port : [host.ports.port];
+            ports.forEach(port => portScripts.push(...getScripts(port)));
         }
-        if ('aborted' in result) { return; }
-        set(state => ({ nseSummaryCache: new Map(state.nseSummaryCache).set(cacheKey, { status: 'loaded', data: result as NseScriptsSummaryOutput }) }));
-      } catch (err) {
-        set(state => ({ nseSummaryCache: new Map(state.nseSummaryCache).set(cacheKey, { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' }) }));
-      }
-    })();
-    set(state => ({ nseSummaryCache: new Map(state.nseSummaryCache).set(cacheKey, { status: 'loading', promise }) }));
-    await promise;
-  },
+        const rawScriptOutput = [...hostScripts, ...portScripts].map(s => `Script: ${s.id}\nOutput:\n${s.output}`).join('\n\n---\n\n');
 
-}));
+        if (!rawScriptOutput.trim()) {
+            set(state => ({ nseSummaryCache: new Map(state.nseSummaryCache).set(cacheKey, { status: 'loaded', data: { summary: '' } }) }));
+            return;
+        }
+
+        const promise = (async () => {
+          try {
+            const input: NseScriptsSummaryInput = { rawScriptOutput, locale: locale as 'en' | 'es' };
+            
+            const outputSchema = { summary: "A concise, easy-to-read summary of the key findings from the NSE scripts, formatted in Markdown." };
+            const prompt = `You are a cybersecurity expert. Summarize the following NSE script outputs. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nNSE Output:\n\`\`\`\n${rawScriptOutput}\`\`\``;
+
+            const result = await callGemini<NseScriptsSummaryInput, NseScriptsSummaryOutput>(prompt, controller.signal);
+            if ('error' in result) { throw new Error(result.error); }
+            if ('aborted' in result) { return; }
+            set(state => ({ nseSummaryCache: new Map(state.nseSummaryCache).set(cacheKey, { status: 'loaded', data: result as NseScriptsSummaryOutput }) }));
+          } catch (err) {
+            set(state => ({ nseSummaryCache: new Map(state.nseSummaryCache).set(cacheKey, { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' }) }));
+          }
+        })();
+        set(state => ({ nseSummaryCache: new Map(state.nseSummaryCache).set(cacheKey, { status: 'loading', promise }) }));
+        await promise;
+      },
+    }),
+    {
+      name: 'visual-map-storage', // name of the item in the storage (must be unique)
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        apiKey: state.isUsingEnvVar ? null : state.apiKey, // Don't persist API key if it's from env var
+        aiModel: state.aiModel,
+        riskWeights: state.riskWeights
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.setHydrated(true);
+        }
+      }
+    }
+  )
+);
+
+    
