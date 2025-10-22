@@ -1,26 +1,29 @@
-# 1. Official Node.js runtime as a parent image
-FROM node:20-alpine AS deps
+# 1. Base Image
+FROM node:20-alpine AS base
 WORKDIR /app
+
+# 2. Install Dependencies
+FROM base AS deps
 COPY package.json package-lock.json ./
 RUN npm install --omit=dev
 
-# 2. Build the Next.js app
-FROM node:20-alpine AS builder
+# 3. Build the Application
+FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-# 3. Final image for production
-FROM node:20-alpine AS runner
+# 4. Production Image
+FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 
 COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
-# Run the app
 EXPOSE 9002
+
 CMD ["node", "server.js"]
