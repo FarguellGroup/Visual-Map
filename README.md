@@ -52,9 +52,9 @@ docker build -t visual-map .
 
 # 2. Ejecuta el contenedor con tu clave de API
 # Reemplaza TU_API_KEY_AQUI con tu clave de API de Gemini
-docker run -p 3000:3000 -e NEXT_PUBLIC_GOOGLE_GENAI_API_KEY="TU_API_KEY_AQUI" -d visual-map
+docker run -p 9002:3000 -e NEXT_PUBLIC_GOOGLE_GENAI_API_KEY="TU_API_KEY_AQUI" -d visual-map
 ```
-Una vez ejecutado, la aplicación estará disponible en [http://localhost:3000](http://localhost:3000).
+Una vez ejecutado, la aplicación estará disponible en [http://localhost:9002](http://localhost:9002).
 
 ## Generación del XML con Nmap
 
