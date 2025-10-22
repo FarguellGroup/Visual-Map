@@ -4,7 +4,6 @@ import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
-import {NextIntlClientProvider, useMessages} from 'next-intl';
 
 const fontBody = Inter({
   subsets: ['latin'],
@@ -36,7 +35,6 @@ export default function RootLayout({
   children: React.ReactNode;
   params: {locale: string};
 }>) {
-  const messages = useMessages();
 
   return (
     <html lang={locale} suppressHydrationWarning>
@@ -46,7 +44,6 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Code+Pro&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
       </head>
       <body className={cn('font-body antialiased', fontBody.variable, fontHeadline.variable, fontCode.variable)}>
-        <NextIntlClientProvider locale={locale} messages={messages}>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
@@ -56,7 +53,6 @@ export default function RootLayout({
             {children}
             <Toaster />
           </ThemeProvider>
-        </NextIntlClientProvider>
       </body>
     </html>
   );
