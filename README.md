@@ -86,7 +86,7 @@ Arrastra y suelta tu archivo XML de Nmap en la zona de carga, o haz clic para se
 ## 2. Dashboard Principal
 Una vez procesado, obtendrás una vista general con tarjetas resumen, la lista de los hosts más vulnerables y una tabla con todos los dispositivos.
 
-<img width="3456" height="1858" alt="VM - Dashboard" src="https://github.com/user-attachments/assets/32a1d4ff-68e2-4a21-be26-3364d1c254ae" />
+<img width="3456" height="1860" alt="VM - Dashboard" src="https://github.com/user-attachments/assets/5ef1a7e3-cbeb-45fa-a4f0-7433b44d87fa" />
 
 ## 3. Vistas Detalladas
 Usa el menú lateral para navegar por las distintas secciones y profundizar en la información de tu escaneo.
