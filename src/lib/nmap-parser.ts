@@ -71,37 +71,51 @@ export function getScripts(item: Host | Port): Script[] {
 
 
 export function getHostname(host: Host | null): string {
-  if (!host) {
-    return 'N/A';
-  }
+    if (!host) {
+      return 'N/A';
+    }
+  
+    const hostScripts = getScripts(host);
+  
+    // 1. Try smb-os-discovery (highest priority)
+    const smbScript = hostScripts.find(s => s.id === 'smb-os-discovery');
+    if (smbScript) {
+      const output = smbScript.output;
+      const computerNameMatch = output.match(/Computer name: ([\w-]+)/);
+      if (computerNameMatch?.[1]) return computerNameMatch[1];
+      const netbiosNameMatch = output.match(/NetBIOS computer name: ([\w-]+)/);
+      if (netbiosNameMatch?.[1]) return netbiosNameMatch[1];
+    }
+  
+    // 2. Try nbstat script
+    const nbstatScript = hostScripts.find(s => s.id === 'nbstat');
+    if (nbstatScript) {
+        const nbstatMatch = nbstatScript.output.match(/NetBIOS name: (\w+),/);
+        if (nbstatMatch?.[1]) return nbstatMatch[1];
+    }
 
-  // 1. Try to get from hostnames array
-  if (host.hostnames) {
-      const hostnamesArray = Array.isArray(host.hostnames) ? host.hostnames : [host.hostnames];
-      for (const hostnamesEntry of hostnamesArray) {
-        if (hostnamesEntry && hostnamesEntry.hostname) {
-          const hostnameArray = Array.isArray(hostnamesEntry.hostname) ? hostnamesEntry.hostname : [hostnamesEntry.hostname];
-          const primaryHostname = hostnameArray.find(h => h.type === 'user' || h.type === 'PTR');
-          if (primaryHostname && primaryHostname.name) {
-            return primaryHostname.name;
+    // 3. Try rdp-ntlm-info script
+    const rdpScript = hostScripts.find(s => s.id === 'rdp-ntlm-info');
+    if (rdpScript) {
+        const targetNameMatch = rdpScript.output.match(/Target Name: (\w+)/);
+        if (targetNameMatch?.[1]) return targetNameMatch[1];
+    }
+  
+    // 4. Try to get from <hostname> tag as a fallback
+    if (host.hostnames) {
+        const hostnamesArray = Array.isArray(host.hostnames) ? host.hostnames : [host.hostnames];
+        for (const hostnamesEntry of hostnamesArray) {
+          if (hostnamesEntry && hostnamesEntry.hostname) {
+            const hostnameArray = Array.isArray(hostnamesEntry.hostname) ? hostnamesEntry.hostname : [hostnamesEntry.hostname];
+            const primaryHostname = hostnameArray.find(h => h.type === 'user' || h.type === 'PTR');
+            if (primaryHostname?.name) {
+              return primaryHostname.name;
+            }
           }
         }
-      }
-  }
-
-
-  // 2. If not found, try to get from smb-os-discovery script
-  const hostScripts = getScripts(host);
-  const smbScript = hostScripts.find(s => s.id === 'smb-os-discovery');
-  if (smbScript) {
-    const output = smbScript.output;
-    const computerNameMatch = output.match(/Computer name: ([\w-]+)/);
-    if (computerNameMatch && computerNameMatch[1]) {
-      return computerNameMatch[1];
     }
-  }
-
-  return 'N/A';
+  
+    return 'N/A';
 };
 
 export function getOsName(host: Host | null): string {
