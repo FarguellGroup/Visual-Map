@@ -24,7 +24,7 @@ Visual Map es una plataforma web Next.js que te permite subir escaneos XML de Nm
 
 **🔒 Procesamiento Local** - Tus datos nunca salen de tu máquina, solo se envía a la IA lo estrictamente necesario.
 
-## Instalación y despliegue
+# Instalación y despliegue
 
 ```bash
 # 1. Clona el repositorio
@@ -76,52 +76,52 @@ Para usar la IA, debes proporcionar tu clave API al ejecutar el contenedor de Do
 
 <img width="3456" height="1858" alt="VM - API" src="https://github.com/user-attachments/assets/479c2814-f2b5-4560-b84a-c8105b646241" />
 
-## Cómo Usar
+# Cómo Usar
 
-### 1. Sube tu Escaneo
+## 1. Sube tu Escaneo
 Arrastra y suelta tu archivo XML de Nmap en la zona de carga, o haz clic para seleccionarlo. La plataforma lo procesará al instante.
 
 <img width="3456" height="1816" alt="VM - Upload" src="https://github.com/user-attachments/assets/5782f17c-9136-43f4-8fbc-79fd2ae9a433" />
 
-### 2. Dashboard Principal
+## 2. Dashboard Principal
 Una vez procesado, obtendrás una vista general con tarjetas resumen, la lista de los hosts más vulnerables y una tabla con todos los dispositivos.
 
-<img width="3456" height="1858" alt="VM - Dashboard" src="https://github.com/user-attachments/assets/db92e253-aa28-4766-97ab-91be37ed5e9d" />
+<img width="3456" height="1858" alt="VM - Dashboard" src="https://github.com/user-attachments/assets/32a1d4ff-68e2-4a21-be26-3364d1c254ae" />
 
-### 3. Vistas Detalladas
+## 3. Vistas Detalladas
 Usa el menú lateral para navegar por las distintas secciones y profundizar en la información de tu escaneo.
 
-#### Hosts descubiertos
+### Hosts descubiertos
 Un listado de todos los hosts descubiertos en el escaneo de Nmap, incluyendo la IP, nombre del host, sistema operativo, puertos abiertos y puntaje de crédito.
 
 <img width="3454" height="1856" alt="VM - Hosts" src="https://github.com/user-attachments/assets/089b925d-42c1-432b-bf1e-98d3458be133" />
 
-#### Puertos abiertos
+### Puertos abiertos
 Consulta todos los puertos abiertos en el objetivo, con una gráfica de los 15 puertos abiertos más comunes.
 
 <img width="3456" height="1858" alt="VM - Puertos" src="https://github.com/user-attachments/assets/946e22f6-856b-41e4-b8b2-0c4b54a0c6c2" />
 
-#### Servicios expuestos
+### Servicios expuestos
 Consulta todos los servicios expuestos en la infraestructura, con una gráfica de distribución de servicios.
 
 <img width="3456" height="1856" alt="VM - Services" src="https://github.com/user-attachments/assets/37bbd2da-5e07-4e6c-9e37-5c73aab7f44e" />
 
-#### Hosts más vulnerables
+### Hosts más vulnerables
 Visualiza de manera rápida los hosts más vulnerables de una infraestructura, con un gráfico de distribución de riesgo.
 
 <img width="3456" height="1858" alt="VM - Vulns" src="https://github.com/user-attachments/assets/260f6517-03b3-4a27-9c72-b3676ec64fc0" />
 
-#### CVEs y Vulnerabilidades
+### CVEs y Vulnerabilidades
 Escanea todos los servicios expuestos y detecta todos los CVEs asociados, con su puntuación CVSS. Puedes iniciar la búsqueda de CVEs para todos los hosts desde esta vista.
 
 <img width="3456" height="1856" alt="VM - CVEs" src="https://github.com/user-attachments/assets/fd8510cb-57fb-4ae6-b0b7-f19accab2c22" />
 
-#### Grafo de red
+### Grafo de red
 Visualiza un esquema de la red y las relaciones entre los hosts de manera super simple, identificando posibles rutas de pivoting.
 
 <img width="3456" height="1858" alt="VM - Grafo" src="https://github.com/user-attachments/assets/d88b69a3-871e-426d-9bf0-e140f54de3aa" />
 
-### 4. Profundiza en cada Host
+## 4. Profundiza en cada Host
 Haz clic en cualquier host para acceder a su página de detalle, donde encontrarás:
 -   Un análisis de riesgo con IA.
 -   Una sección dedicada a CVEs para buscar vulnerabilidades específicas de ese host.
@@ -131,7 +131,7 @@ Haz clic en cualquier host para acceder a su página de detalle, donde encontrar
 <img width="3456" height="1858" alt="VM - Host 1" src="https://github.com/user-attachments/assets/c5c5097f-41dc-4bc5-9bf4-7c92d38ac861" />
 <img width="3456" height="1858" alt="VM - Host 2" src="https://github.com/user-attachments/assets/cb8ffb13-6748-4130-8784-8fe809504516" />
 
-### 5. Configura y Personaliza
+## 5. Configura y Personaliza
 -   **Ajusta los Pesos de Riesgo**: Modifica la importancia que se le da a cada factor (CVEs, puertos críticos, etc.) en el cálculo del riesgo.
 -   **Gestiona tu API**: Desde la sección API, verifica tu clave de Gemini, cámbiala si es necesario y selecciona el modelo de IA que prefieras usar.
 -   **Exporta los Resultados**: Genera informes profesionales en formato JSON, PDF o HTML con un solo clic.
