@@ -18,6 +18,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+ENV PORT=9002
 EXPOSE 9002
 
 CMD ["node", "server.js"]
