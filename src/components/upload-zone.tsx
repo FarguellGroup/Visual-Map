@@ -71,8 +71,8 @@ export default function UploadZone({ getRootProps, getInputProps, isDragActive }
       <div
         {...getRootProps()}
         className={cn(
-          'flex flex-col items-center justify-center w-full p-12 border-2 border-dashed rounded-lg cursor-pointer transition-colors h-full',
-          isDragActive ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50 hover:bg-muted'
+          'flex flex-col items-center justify-center w-full p-12 border-2 border-dashed rounded-lg cursor-pointer transition-colors h-full bg-card',
+          isDragActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-primary/5'
         )}
       >
         <input {...getInputProps()} />
@@ -83,7 +83,7 @@ export default function UploadZone({ getRootProps, getInputProps, isDragActive }
           <p className="text-xs text-muted-foreground">{t('caption')}</p>
         </div>
       </div>
-      <Card className="w-full flex flex-col justify-center">
+      <Card className="w-full flex flex-col justify-center bg-card">
           <CardContent className="p-6 space-y-4">
                <CardTitle className="text-lg flex items-center gap-2 mb-4">
                 <Terminal className="w-5 h-5" />
