@@ -110,7 +110,7 @@
   "ApiPage": {
     "title": "API Configuration",
     "description": "Verify your Gemini API key and see the available models.",
-    "checkButton": "Check API Connection",
+    "checkButton": "Check & Save Connection",
     "status": "Status",
     "checking": "Checking...",
     "validKey": "API Key is valid and connected.",
@@ -126,16 +126,7 @@
     "getApiKeyTitle": "Get your API Key",
     "getApiKeyDescription": "You need a valid Gemini API key to use the AI features.",
     "getApiKeyButton": "Get API Key"
-  },
-  "NetworkGraph": {
-    "filters": "Filters",
-    "riskScore": "Risk Score",
-    "deviceType": "Device Type",
-    "server": "Server",
-    "desktop": "Desktop",
-    "router": "Router",
-    "mobile": "Mobile",
-    "printer": "Printer",
-    "other": "Other"
   }
 }
+
+    
