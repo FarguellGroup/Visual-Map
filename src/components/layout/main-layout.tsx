@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { usePathname } from '@/navigation';
-import { useTheme } from 'next-themes';
 import { useScanStore } from '@/store/use-scan-store';
-import { Sidebar, SidebarInset } from '@/components/ui/sidebar';
+import { Sidebar } from '@/components/ui/sidebar';
 import AppHeader from '@/components/layout/header';
 import AppSidebar from '@/components/layout/sidebar';
 import AppFooter from '@/components/layout/footer';
