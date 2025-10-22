@@ -24,6 +24,7 @@ export default function DetailsPage() {
   const locale = useLocale();
 
   useEffect(() => {
+    // Do not redirect if we are on the API page.
     if (!scanResult && page !== 'api') {
       router.push('/');
     }
