@@ -1,4 +1,3 @@
-
 import { getRequestConfig } from 'next-intl/server';
 import { locales } from './src/navigation';
 import { notFound } from 'next/navigation';
@@ -20,6 +19,7 @@ export default getRequestConfig(async ({ locale }) => {
   }
 
   return {
+    locale,
     messages: messages[locale as keyof typeof messages]
   };
 });
