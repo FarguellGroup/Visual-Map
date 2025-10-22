@@ -6,6 +6,7 @@ const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
   /* config options here */
+  output: 'standalone',
   devIndicators: {
     buildActivity: false,
   },
