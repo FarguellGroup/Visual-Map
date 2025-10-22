@@ -110,7 +110,7 @@
   "ApiPage": {
     "title": "Configuración de API",
     "description": "Verifica tu clave API de Gemini y consulta los modelos disponibles.",
-    "checkButton": "Verificar Conexión de API",
+    "checkButton": "Verificar y Guardar Conexión",
     "status": "Estado",
     "checking": "Verificando...",
     "validKey": "La clave API es válida y está conectada.",
@@ -126,16 +126,7 @@
     "getApiKeyTitle": "Obtén tu clave API",
     "getApiKeyDescription": "Necesitas una clave API de Gemini válida para usar las funciones de IA.",
     "getApiKeyButton": "Obtener Clave API"
-  },
-  "NetworkGraph": {
-    "filters": "Filtros",
-    "riskScore": "Puntuación de Riesgo",
-    "deviceType": "Tipo de Dispositivo",
-    "server": "Servidor",
-    "desktop": "Equipo",
-    "router": "Router",
-    "mobile": "Móvil",
-    "printer": "Impresora",
-    "other": "Otro"
   }
 }
+
+    
