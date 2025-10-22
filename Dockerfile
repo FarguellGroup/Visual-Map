@@ -1,41 +1,28 @@
-# === STAGE 1: Build ===
-FROM node:20-alpine AS builder
-
+# 1. Base Image for dependencies
+FROM node:20-alpine AS deps
 WORKDIR /app
-
-# Copiar archivos de dependencias
-COPY package.json ./
-COPY package-lock.json ./
-
-# Instalar dependencias
-# Usamos --omit=dev para no instalar las dependencias de desarrollo
+COPY package.json package-lock.json ./
 RUN npm install --omit=dev
 
-# Copiar el resto de los archivos de la aplicación
+# 2. Base Image for building the application
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# Construir la aplicación para producción
 RUN npm run build
 
-# === STAGE 2: Production ===
-FROM node:20-alpine AS production
-
+# 3. Final Image for production
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Copiar archivos construidos desde el 'builder'
-COPY --from=builder /app/.next ./.next
+ENV NODE_ENV=production
+
+# Copy built assets
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/next.config.ts ./
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/messages ./messages
-COPY --from=builder /app/i18n.ts ./i18n.ts
-COPY --from=builder /app/middleware.ts ./middleware.ts
-COPY --from=builder /app/navigation.ts ./navigation.ts
 
-
-# Exponer el puerto en el que corre la aplicación
 EXPOSE 9002
 
-# Comando para iniciar la aplicación en modo producción
-CMD ["npm", "start", "--", "-p", "9002"]
+CMD ["node", "server.js"]
