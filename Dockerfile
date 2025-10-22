@@ -1,28 +1,22 @@
-# 1. Base Image
-FROM node:20-alpine AS base
+# Dockerfile
+
+# 1. Build stage
+FROM node:20-alpine AS builder
 WORKDIR /app
 
-# 2. Install Dependencies
-FROM base AS deps
-COPY package.json package-lock.json ./
-RUN npm install --omit=dev
+COPY package*.json ./
+RUN npm install
 
-# 3. Build the Application
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-# 4. Production Image
-FROM base AS runner
+# 2. Production stage
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-ENV NODE_ENV=production
-
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 EXPOSE 9002
 
