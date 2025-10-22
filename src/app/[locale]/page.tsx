@@ -12,7 +12,6 @@ import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import HostDetailDrawer from '@/components/dashboard/host-detail-drawer';
 import { cn } from '@/lib/utils';
-import RiskRanking from '@/components/dashboard/risk-ranking';
 
 export default function Home() {
   const { scanResult, setScanResult, clearScanResult, riskWeights } = useScanStore();
@@ -88,14 +87,7 @@ export default function Home() {
       ) : (
         <div className="space-y-8">
           <SummaryCards />
-          <div className="grid gap-8 lg:grid-cols-3">
-              <div className="lg:col-span-2 space-y-4">
-                  <HostsTable />
-              </div>
-              <div className="lg:col-span-1 space-y-4">
-                  <RiskRanking />
-              </div>
-          </div>
+          <HostsTable />
         </div>
       )}
       <HostDetailDrawer />
