@@ -80,17 +80,20 @@ export default function Home() {
       ) : !scanResult ? (
         <div className="flex-grow flex flex-col items-center justify-center">
           <UploadZone
-            getRootProps={getRootProps}
-            getInputProps={getInputProps}
+            getRootProps={() => getRootProps()}
+            getInputProps={() => getInputProps()}
             isDragActive={isDragActive}
           />
         </div>
       ) : (
         <div className="space-y-8">
           <SummaryCards />
-          <div className="grid gap-8 lg:grid-cols-1">
-              <div className="lg:col-span-1 space-y-4">
+          <div className="grid gap-8 lg:grid-cols-3">
+              <div className="lg:col-span-2 space-y-4">
                   <HostsTable />
+              </div>
+              <div className="lg:col-span-1 space-y-4">
+                  <RiskRanking />
               </div>
           </div>
         </div>
