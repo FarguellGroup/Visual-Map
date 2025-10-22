@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useScanStore } from '@/store/use-scan-store';
-import { Link, usePathname } from '@/navigation';
+import { Link, usePathname, useRouter } from '@/navigation';
 import { PlusCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import LanguageSwitcher from './language-switcher';
@@ -16,9 +16,11 @@ export default function AppHeader() {
   const t = useTranslations('Header');
   const { scanResult, clearScanResult } = useScanStore();
   const pathname = usePathname();
+  const router = useRouter();
 
   const handleUploadNew = () => {
     clearScanResult();
+    router.push('/');
   };
 
   const showUploadNew = !!scanResult;
