@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -196,7 +195,7 @@ export default function ApiPage() {
         );
       case 'success':
         return (
-          <div className="flex items-center text-green-600">
+          <div className="flex items-center text-green-700 dark:text-green-400">
             <CheckCircle2 className="mr-2 h-4 w-4" />
             <span>{t('validKey')}</span>
           </div>
@@ -293,7 +292,11 @@ export default function ApiPage() {
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 border rounded-lg">
+          <div className={cn(
+                "flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 border rounded-lg",
+                apiStatus === 'success' && 'bg-green-500/10 border-green-500/20',
+                apiStatus === 'error' && 'bg-destructive/10 border-destructive/20'
+            )}>
             <div className="text-sm font-medium">{getStatusContent()}</div>
             {isUsingEnvVar && (
                  <Button onClick={() => checkApiConnection()} disabled={isChecking}>
@@ -426,5 +429,3 @@ export default function ApiPage() {
     </div>
   );
 }
-
-    
