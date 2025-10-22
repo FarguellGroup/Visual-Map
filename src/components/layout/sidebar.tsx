@@ -5,7 +5,7 @@ import { SidebarHeader, SidebarContent, SidebarGroup, SidebarSeparator, SidebarM
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '../ui/button';
-import { Download, Loader2, Home, Users, Shield, Server, DoorOpen, Network, Skull, SlidersHorizontal, ChevronDown, KeyRound } from 'lucide-react';
+import { Download, Loader2, Home, AlertTriangle, Shield, Server, DoorOpen, Network, Skull, SlidersHorizontal, ChevronDown, KeyRound } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useScanStore, type RiskWeights } from '@/store/use-scan-store';
 import { useState, useCallback, useEffect } from 'react';
@@ -764,7 +764,7 @@ export default function AppSidebar() {
                     <SidebarMenuItem>
                         <Link href="/details/vulnerable-hosts" className='w-full'>
                             <SidebarMenuButton isActive={pathname.startsWith('/details/vulnerable-hosts')} tooltip={sidebarTooltip(locale === 'es' ? 'Hosts Vulnerables' : 'Vulnerable Hosts')}>
-                                <Users />
+                                <AlertTriangle />
                                 <span className="group-data-[collapsible=icon]:hidden">{locale === 'es' ? 'Hosts Vulnerables' : 'Vulnerable Hosts'}</span>
                             </SidebarMenuButton>
                         </Link>
