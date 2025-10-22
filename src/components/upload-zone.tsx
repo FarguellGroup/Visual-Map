@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { DropzoneRootProps, DropzoneInputProps } from 'react-dropzone';
@@ -8,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { useToast } from '@/hooks/use-toast';
 
 type UploadZoneProps = {
   getRootProps: <T extends DropzoneRootProps>(props?: T) => T;
@@ -17,11 +19,22 @@ type UploadZoneProps = {
 
 const NmapCommand = ({ title, command }: { title: string, command: string }) => {
     const [isCopied, setIsCopied] = useState(false);
+    const { toast } = useToast();
+    const locale = useLocale();
     
-    const handleCopy = () => {
-        navigator.clipboard.writeText(command);
-        setIsCopied(true);
-        setTimeout(() => setIsCopied(false), 2000);
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(command);
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 2000);
+        } catch (err) {
+            console.error("Copy failed: ", err);
+            toast({
+                variant: 'destructive',
+                title: locale === 'es' ? 'Error al copiar' : 'Copy Failed',
+                description: locale === 'es' ? 'No se pudo copiar el comando al portapapeles.' : 'Could not copy command to clipboard.',
+            });
+        }
     };
 
     return (
