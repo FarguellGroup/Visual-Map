@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev -p 9002",
     "build": "NODE_ENV=production next build",
-    "start": "node ./.next/standalone/server.js",
+    "start": "node ./.next/standalone/server.js -p 3000",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "postinstall": "patch-package"
