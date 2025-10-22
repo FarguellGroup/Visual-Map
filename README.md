@@ -22,7 +22,7 @@ Visual Map es una plataforma web Next.js que te permite subir escaneos XML de Nm
 
 **🌗 Modo Claro / Oscuro** - Selecciona tu tema favorito con persistencia automática.
 
-**🔒 Procesamiento Local** - Tus datos nunca salen de tu máquina (solo se envía a la IA lo estrictamente necesario.
+**🔒 Procesamiento Local** - Tus datos nunca salen de tu máquina, solo se envía a la IA lo estrictamente necesario.
 
 ## Instalación y despliegue
 
@@ -40,7 +40,7 @@ npm install
 # 4. Ejecuta el servidor de desarrollo
 npm run dev
 ```
-Abre [http://localhost:9002](http://localhost:9002) en tu navegador para acceder a la interfaz de carga del XML.
+Una vez ejecutado, la aplicación estará disponible en [http://localhost:9002](http://localhost:9002).
 
 ## Despliegue con Docker
 
