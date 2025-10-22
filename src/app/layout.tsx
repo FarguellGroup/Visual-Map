@@ -4,8 +4,7 @@ import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
-import {NextIntlClientProvider} from 'next-intl';
-import {getMessages} from 'next-intl/server';
+import {NextIntlClientProvider, useMessages} from 'next-intl';
 
 const fontBody = Inter({
   subsets: ['latin'],
@@ -30,14 +29,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
   params: {locale}
 }: Readonly<{
   children: React.ReactNode;
   params: {locale: string};
 }>) {
-  const messages = await getMessages();
+  const messages = useMessages();
 
   return (
     <html lang={locale} suppressHydrationWarning>
