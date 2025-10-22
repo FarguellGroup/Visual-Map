@@ -1,7 +1,5 @@
 import createMiddleware from 'next-intl/middleware';
- 
-export const locales = ['en', 'es'] as const;
-export const localePrefix = 'always';
+import { locales, localePrefix } from './navigation';
  
 export default createMiddleware({
   defaultLocale: 'es',
@@ -12,11 +10,11 @@ export default createMiddleware({
 export const config = {
   // Match only internationalized pathnames
   matcher: [
-    '/',
-    '/(en|es)/:path*',
     // Match all pathnames except for
     // - … if they start with `/api`, `/_next` or `/_vercel`
     // - … the ones containing a dot (e.g. `favicon.ico`)
-    '/((?!api|_next|_vercel|.*\\..*).*)'
+    '/((?!api|_next|_vercel|.*\\..*).*)',
+    // Match all pathnames within `/` folder
+    '/(es|en)/:path*'
   ]
 };
