@@ -24,23 +24,37 @@ Visual Map es una plataforma web Next.js que te permite subir escaneos XML de Nm
 
 **🔒 Procesamiento Local** - Tus datos nunca salen de tu máquina (solo se envía a la IA lo estrictamente necesario.
 
-## Instalación
+## Instalación y despliegue
 
 ```bash
-# Clona el repositorio
+# 1. Clona el repositorio
 git clone https://github.com/afsh4ck/Visual-Map.git
 cd Visual-Map
 
-# Instalar nodejs y npm (ejemplo en Kali Linux)
+# 2. Instalar nodejs y npm (ejemplo en Kali Linux)
 sudo apt install -y nodejs npm
 
-# Instalar dependencias
+# 3. Instalar dependencias
 npm install
 
-# Ejecuta el servidor de desarrollo
+# 4. Ejecuta el servidor de desarrollo
 npm run dev
 ```
 Abre [http://localhost:9002](http://localhost:9002) en tu navegador para acceder a la interfaz de carga del XML.
+
+## Despliegue con Docker
+
+También puedes desplegar la aplicación utilizando Docker para un entorno estandarizado.
+
+```bash
+# 1. Construye la imagen de Docker
+docker build -t visual-map .
+
+# 2. Ejecuta el contenedor
+# El -d lo ejecuta en segundo plano (detached)
+docker run -p 9002:9002 -d visual-map
+```
+Una vez ejecutado, la aplicación estará disponible en [http://localhost:9002](http://localhost:9002).
 
 ## Generación del XML con Nmap
 
