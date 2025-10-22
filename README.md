@@ -84,7 +84,7 @@ Arrastra y suelta tu archivo XML de Nmap en la zona de carga, o haz clic para se
 <img width="3456" height="1816" alt="VM - Upload" src="https://github.com/user-attachments/assets/5782f17c-9136-43f4-8fbc-79fd2ae9a433" />
 
 ## 2. Dashboard Principal
-Una vez procesado, obtendrás una vista general con tarjetas resumen, la lista de los hosts más vulnerables y una tabla con todos los dispositivos.
+Una vez procesado, obtendrás una vista general con tarjetas resumen y una tabla con todos los dispositivos ordenados por criticidad.
 
 <img width="3456" height="1860" alt="VM - Dashboard" src="https://github.com/user-attachments/assets/5ef1a7e3-cbeb-45fa-a4f0-7433b44d87fa" />
 
