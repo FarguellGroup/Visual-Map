@@ -1,11 +1,12 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, CheckCircle2, XCircle, AlertTriangle, ExternalLink, ChevronLeft, ChevronRight, Replace, ChevronDown, Info, Save, Eye, EyeOff } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, ExternalLink, ChevronLeft, ChevronRight, Replace, ChevronDown, Info, ShieldAlert, KeyRound } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
@@ -13,7 +14,6 @@ import { useScanStore } from '@/store/use-scan-store';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
 
 type Model = {
   name: string;
@@ -24,13 +24,13 @@ const RateLimitsDescription = ({ locale }: { locale: string }) => {
     if (locale === 'es') {
        return (
             <div className="prose prose-sm dark:prose-invert max-w-full space-y-4">
-               <p>En la documentación oficial de límites de tasa (rate limits) de la API Gemini, para el nivel gratis (Free Tier / Tier 1) se indican los siguientes límites para diferentes modelos:</p>
+               <p>La documentación oficial de límites de tasa (rate limits) de la API Gemini para el nivel gratuito (Free Tier) indica varios límites para diferentes modelos:</p>
                <ul className='text-xs list-disc list-inside'>
                    <li><b>RPM:</b> Peticiones por minuto</li>
                    <li><b>TPM:</b> Tokens por minuto</li>
                    <li><b>RPD:</b> Peticiones por día</li>
                </ul>
-                <a href="https://ai.google.dev/gemini-api/docs/rate-limits?authuser=2&utm_source=chatgpt.com&hl=es-419" target="_blank" rel="noopener noreferrer" className="block pt-4">
+                <a href="https://ai.google.dev/gemini-api/docs/rate-limits?hl=es-419" target="_blank" rel="noopener noreferrer" className="block pt-4">
                    <Button variant="link" className="p-0 h-auto">Saber Más <ExternalLink className="ml-2 h-3 w-3" /></Button>
                </a>
            </div>
@@ -38,13 +38,13 @@ const RateLimitsDescription = ({ locale }: { locale: string }) => {
    }
    return (
        <div className="prose prose-sm dark:prose-invert max-w-full space-y-4">
-           <p>The official Gemini API rate limits documentation (Free Tier / Tier 1) indicates the following limits for different models:</p>
+           <p>The official Gemini API rate limits documentation for the Free Tier indicates various limits for different models:</p>
             <ul className='text-xs list-disc list-inside'>
                <li><b>RPM:</b> Requests Per Minute</li>
                <li><b>TPM:</b> Tokens Per Minute</li>
                <li><b>RPD:</b> Requests Per Day</li>
            </ul>
-            <a href="https://ai.google.dev/gemini-api/docs/rate-limits?authuser=2&utm_source=chatgpt.com&hl=en#free-tier" target="_blank" rel="noopener noreferrer" className="block pt-4">
+            <a href="https://ai.google.dev/gemini-api/docs/rate-limits?hl=en" target="_blank" rel="noopener noreferrer" className="block pt-4">
                <Button variant="link" className="p-0 h-auto">Learn More <ExternalLink className="ml-2 h-3 w-3" /></Button>
            </a>
        </div>
@@ -54,34 +54,60 @@ const RateLimitsDescription = ({ locale }: { locale: string }) => {
 export default function ApiPage() {
   const t = useTranslations('ApiPage');
   const locale = useLocale();
-  const { toast } = useToast();
-  const { apiStatus, setApiStatus, aiModel, setAiModel, apiKey: storedApiKey, setApiKey } = useScanStore();
+  const { 
+    apiStatus, 
+    setApiStatus, 
+    aiModel, 
+    setAiModel, 
+    apiKey: storedApiKey, 
+    setApiKey,
+    isUsingEnvVar,
+    _hydrated
+  } = useScanStore();
+  
+  const [localApiKey, setLocalApiKey] = useState('');
   const [models, setModels] = useState<Model[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const modelsPerPage = 10;
-  const [apiKeyInput, setApiKeyInput] = useState('');
-  const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
 
+  useEffect(() => {
+    // Only check connection on mount if a key exists (from env or localStorage)
+    if (_hydrated && storedApiKey) {
+      checkApiConnection(storedApiKey);
+    } else if (_hydrated && !storedApiKey) {
+        setApiStatus('error');
+        setError(t('noKey'));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [_hydrated]);
+
+  useEffect(() => {
+    // Sync local input with store if it's not from env var
+    if (!isUsingEnvVar) {
+      setLocalApiKey(storedApiKey || '');
+    }
+  }, [storedApiKey, isUsingEnvVar]);
 
   const checkApiConnection = async (key?: string) => {
+    const keyToCheck = key || storedApiKey;
+
     setIsChecking(true);
     setApiStatus('loading');
     setError(null);
     setModels([]);
-    
-    const keyToCheck = key || storedApiKey;
 
     if (!keyToCheck) {
-        setApiStatus('error');
-        const errorMessage = locale === 'es'
-            ? "No hay ninguna API válida vinculada, por favor introdúcela para utilizar las funciones de IA."
-            : "No valid API key is linked. Please enter it to use the AI features.";
-        setError(errorMessage);
-        setIsChecking(false);
-        return false;
+      setApiStatus('error');
+      setError(t('noKey'));
+      setIsChecking(false);
+      return false;
+    }
+    
+    // If the key is user-provided, save it to the store (and localStorage)
+    if (!isUsingEnvVar && key) {
+        setApiKey(key);
     }
     
     try {
@@ -92,15 +118,14 @@ export default function ApiPage() {
         try {
             const errorData = await response.json();
             errorMsg = errorData.error?.message || errorMsg;
-        } catch (e) {
-            // Not a JSON response
-        }
+        } catch (e) { /* Not a JSON response */ }
         
-        if (errorMsg.toLowerCase().includes('fetch')) {
-            errorMsg = locale === 'es' ? 'Error de red: No se pudo conectar a la API. Verifica tu conexión a internet.' : 'Network Error: Could not connect to the API. Check your internet connection.';
+        if (errorMsg.toLowerCase().includes('api key not valid')) {
+            errorMsg = t('invalidKey');
+        } else if (errorMsg.toLowerCase().includes('fetch')) {
+            errorMsg = locale === 'es' ? 'Error de red: No se pudo conectar a la API.' : 'Network Error: Could not connect to the API.';
         } else {
-             // Generalize other errors
-            errorMsg = locale === 'es' ? 'La clave API no es válida o tiene algún problema.' : 'API Key is invalid or has an issue.';
+            errorMsg = t('invalidKey');
         }
         throw new Error(errorMsg);
       }
@@ -110,7 +135,6 @@ export default function ApiPage() {
         .filter((model: any) => 
             model.supportedGenerationMethods.includes('generateContent') && 
             model.name.includes('gemini') &&
-            !model.name.toLowerCase().includes('preview') &&
             !model.name.toLowerCase().includes('-exp-')
         )
         .map((model: any) => ({
@@ -124,12 +148,12 @@ export default function ApiPage() {
       };
 
       availableModels.sort((a: Model, b: Model) => {
-        const versionA = getVersion(a.displayName);
         const versionB = getVersion(b.displayName);
+        const versionA = getVersion(a.displayName);
         if (versionB !== versionA) {
           return versionB - versionA;
         }
-        return a.displayName.localeCompare(b.displayName);
+        return b.displayName.localeCompare(a.displayName);
       });
       
       const currentModelName = `models/${aiModel}`;
@@ -149,55 +173,19 @@ export default function ApiPage() {
       setApiStatus('error');
       setError(errorMessage);
       setIsChecking(false);
-      console.error("API Connection Error:", err);
       return false;
     }
   };
 
-  useEffect(() => {
-      checkApiConnection();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleSaveApiKey = async () => {
-    if (!apiKeyInput) return;
-    setIsSaving(true);
-  
-    const isValid = await checkApiConnection(apiKeyInput);
-  
-    if (isValid) {
-      try {
-        const response = await fetch('/api/save-api-key', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ apiKey: apiKeyInput }),
-        });
-        if (!response.ok) {
-          const result = await response.json();
-          throw new Error(result.error || 'Failed to save API key.');
-        }
-        setApiKey(apiKeyInput);
-        setApiKeyInput('');
-        await checkApiConnection(apiKeyInput);
-      } catch (error) {
-        const saveError = error instanceof Error ? error.message : 'Failed to save API key.';
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: saveError,
-        });
-      }
-    } else {
-      toast({
-        variant: 'destructive',
-        title: locale === 'es' ? 'Clave API Inválida' : 'Invalid API Key',
-        description: error || (locale === 'es' ? 'La clave API no es válida. Por favor, introduce una API válida.' : t('invalidKeyDescription')),
-      });
-    }
-    setIsSaving(false);
-  };
-
   const getStatusContent = () => {
+    if (!_hydrated && !isUsingEnvVar) {
+        return (
+             <div className="flex items-center text-muted-foreground">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <span>{locale === 'es' ? 'Cargando configuración...' : 'Loading configuration...'}</span>
+            </div>
+        )
+    }
     switch (apiStatus) {
       case 'loading':
         return (
@@ -246,23 +234,11 @@ export default function ApiPage() {
   const rateLimitHintTitleText = locale === 'es' ? 'Consejo sobre el Límite de la API' : 'API Rate Limit Tip';
   const rateLimitHintDescriptionText = locale === 'es' ? 'Si alcanzas el límite de peticiones (rate limit) de la API para un modelo, prueba a cambiar a uno diferente para seguir utilizando la plataforma.' : 'If you reach the API rate limit for a model, try switching to a different one to continue using the platform.';
 
-  const apiKeyInputTitle = storedApiKey 
-    ? (locale === 'es' ? 'Actualizar Clave API' : 'Update API Key') 
-    : (locale === 'es' ? 'Añadir Clave API' : 'Add API Key');
-
-  const apiKeyInputPlaceholder = storedApiKey
-    ? (locale === 'es' ? 'Introduce la nueva clave API Gemini...' : 'Enter the new Gemini API key...')
-    : (locale === 'es' ? 'Introduce tu clave API Gemini...' : 'Enter your Gemini API key...');
-
-  const apiKeySaveButtonText = storedApiKey
-    ? (locale === 'es' ? 'Actualizar' : 'Update')
-    : (locale === 'es' ? 'Guardar' : 'Save');
-
   return (
     <div className="container mx-auto p-0 space-y-8">
       <div className="mb-6">
         <h1 className="text-2xl md:text-3xl font-bold font-headline text-primary">{t('title')}</h1>
-        <p className="text-muted-foreground">{locale === 'es' ? 'Verifica tu clave API Gemini y consulta los modelos disponibles.' : 'Verify your Gemini API key and see the available models.'}</p>
+        <p className="text-muted-foreground">{t('description')}</p>
       </div>
 
        <Card>
@@ -283,46 +259,50 @@ export default function ApiPage() {
       <Card>
         <CardHeader>
           <CardTitle>{t('status')}</CardTitle>
+          {isUsingEnvVar && (
+              <Alert variant="default" className="border-blue-500/50 text-blue-700 dark:text-blue-300 [&>svg]:text-blue-600 dark:[&>svg]:text-blue-400 mt-4">
+                  <ShieldAlert className="h-4 w-4" />
+                  <AlertTitle>{locale === 'es' ? 'Variable de Entorno Detectada' : 'Environment Variable Detected'}</AlertTitle>
+                  <AlertDescription>
+                      {locale === 'es' ? 'La clave API se está utilizando desde una variable de entorno. No se puede cambiar desde aquí.' : 'The API key is being used from an environment variable. It cannot be changed here.'}
+                  </AlertDescription>
+              </Alert>
+          )}
         </CardHeader>
         <CardContent className="space-y-6">
+          {!isUsingEnvVar && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                    <KeyRound className="w-5 h-5 text-muted-foreground" />
+                    <h3 className="text-lg font-semibold">{locale === 'es' ? 'Tu Clave API Gemini' : 'Your Gemini API Key'}</h3>
+                </div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <Input 
+                        type="password"
+                        placeholder={locale === 'es' ? 'Introduce tu clave API...' : 'Enter your API key...'}
+                        value={localApiKey}
+                        onChange={(e) => setLocalApiKey(e.target.value)}
+                        className="flex-grow"
+                        disabled={isChecking}
+                    />
+                    <Button onClick={() => checkApiConnection(localApiKey)} disabled={isChecking || !localApiKey}>
+                      {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      {t('checkButton')}
+                    </Button>
+                </div>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 border rounded-lg">
             <div className="text-sm font-medium">{getStatusContent()}</div>
-            <Button onClick={() => checkApiConnection()} disabled={isChecking}>
-              {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {t('checkButton')}
-            </Button>
+            {isUsingEnvVar && (
+                 <Button onClick={() => checkApiConnection()} disabled={isChecking}>
+                    {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {locale === 'es' ? 'Re-verificar Conexión' : 'Re-check Connection'}
+                </Button>
+            )}
           </div>
           
-            <div className="space-y-4 pt-4 border-t">
-                <h4 className="font-semibold">{apiKeyInputTitle}</h4>
-                 <div className="flex items-center gap-2">
-                      <div className="relative w-full">
-                         <Input 
-                              type={isApiKeyVisible ? 'text' : 'password'}
-                              placeholder={apiKeyInputPlaceholder}
-                              value={apiKeyInput}
-                              onChange={(e) => setApiKeyInput(e.target.value)}
-                              className="pr-10"
-                          />
-                         <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                              onClick={() => setIsApiKeyVisible(prev => !prev)}
-                         >
-                             {isApiKeyVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                             <span className="sr-only">{isApiKeyVisible ? (locale === 'es' ? 'Ocultar clave API' : 'Hide API key') : (locale === 'es' ? 'Mostrar clave API' : 'Show API key')}</span>
-                         </Button>
-                      </div>
-                      <Button onClick={handleSaveApiKey} disabled={!apiKeyInput || isSaving}>
-                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                          {apiKeySaveButtonText}
-                      </Button>
-                 </div>
-            </div>
-
-
           {apiStatus === 'success' && models.length > 0 && (
             <div>
               <h3 className="mb-2 text-lg font-semibold">{t('availableModels')}</h3>
@@ -421,39 +401,18 @@ export default function ApiPage() {
                                         <TableHead>{t('modelName')}</TableHead>
                                         <TableHead>RPM</TableHead>
                                         <TableHead>TPM</TableHead>
-                                        <TableHead>RPD</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                      <TableRow>
-                                        <TableCell>Gemini 2.5 Pro</TableCell>
-                                        <TableCell>5</TableCell>
-                                        <TableCell>125,000</TableCell>
-                                        <TableCell>100</TableCell>
+                                        <TableCell>Gemini 1.5 Pro</TableCell>
+                                        <TableCell>2</TableCell>
+                                        <TableCell>32,768</TableCell>
                                     </TableRow>
                                     <TableRow>
-                                        <TableCell>Gemini 2.5 Flash</TableCell>
-                                        <TableCell>10</TableCell>
-                                        <TableCell>250,000</TableCell>
-                                        <TableCell>250</TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell>Gemini 2.5 Flash-Lite</TableCell>
-                                        <TableCell>15</TableCell>
-                                        <TableCell>250,000</TableCell>
-                                        <TableCell>1,000</TableCell>
-                                    </TableRow>
-                                     <TableRow>
-                                        <TableCell>Gemini 2.0 Flash</TableCell>
+                                        <TableCell>Gemini 1.5 Flash</TableCell>
                                         <TableCell>15</TableCell>
                                         <TableCell>1,000,000</TableCell>
-                                        <TableCell>200</TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell>Gemini 2.0 Flash-Lite</TableCell>
-                                        <TableCell>30</TableCell>
-                                        <TableCell>1,000,000</TableCell>
-                                        <TableCell>200</TableCell>
                                     </TableRow>
                                 </TableBody>
                             </Table>
@@ -467,3 +426,5 @@ export default function ApiPage() {
     </div>
   );
 }
+
+    
