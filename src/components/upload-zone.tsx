@@ -71,7 +71,7 @@ export default function UploadZone({ getRootProps, getInputProps, isDragActive }
       <div
         {...getRootProps()}
         className={cn(
-          'flex flex-col items-center justify-center w-full p-12 border-2 border-dashed rounded-lg cursor-pointer transition-colors h-full bg-card',
+          'flex flex-col items-center justify-center w-full p-12 border-2 border-dashed rounded-xl cursor-pointer transition-colors h-full bg-card',
           isDragActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-primary/5'
         )}
       >
