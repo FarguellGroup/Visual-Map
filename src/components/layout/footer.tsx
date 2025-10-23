@@ -1,12 +1,13 @@
+
 'use client';
 
 import { Separator } from "@/components/ui/separator";
 
 export default function AppFooter() {
-  const version = "2.1"; 
+  const version = "2.2"; 
 
   return (
-    <footer className="w-full mt-auto">
+    <footer className="w-full shrink-0">
         <Separator />
         <div className="flex items-center justify-center px-4 h-14 text-sm text-muted-foreground">
             <p>
@@ -15,7 +16,7 @@ export default function AppFooter() {
                 href="https://github.com/afsh4ck" 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="hover:text-foreground transition-colors font-medium"
+                className="hover:text-primary transition-colors font-medium"
               >
                 afsh4ck
               </a>

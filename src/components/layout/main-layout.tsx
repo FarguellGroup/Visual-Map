@@ -12,6 +12,7 @@ import PortsDetailView from '@/components/details/ports-detail-view';
 import ServicesDetailView from '@/components/details/services-detail-view';
 import ThreatsDetailView from '@/components/details/threats-detail-view';
 import ApiErrorToast from '@/components/api-error-toast';
+import NetworkGraphView from '../details/network-graph-view';
 
 export default function MainLayout({
   children,
@@ -25,20 +26,20 @@ export default function MainLayout({
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="relative flex min-h-screen w-full">
+      <div className="flex w-full h-screen bg-background text-foreground">
         {showSidebar && (
           <Sidebar side="left" collapsible="icon">
             <AppSidebar />
           </Sidebar>
         )}
-        <div className="flex flex-1 flex-col">
+        <div className="flex-1 flex flex-col overflow-hidden">
           <AppHeader />
-          <main className="flex flex-col flex-grow w-full">
-            <div className="container mx-auto flex-grow flex flex-col px-6 py-16">
+          <main className="flex-1 flex flex-col overflow-y-auto">
+            <div className="flex-1 px-6 py-8">
               {children}
             </div>
+            <AppFooter />
           </main>
-          <AppFooter />
         </div>
         <ApiErrorToast />
         {/* Container for off-screen rendering for exports */}
@@ -48,7 +49,8 @@ export default function MainLayout({
               <VulnerabilitiesDetailView hosts={scanResult.hosts} />
               <PortsDetailView hosts={scanResult.hosts} />
               <ServicesDetailView hosts={scanResult.hosts} />
-              <ThreatsDetailView hosts={scanResult.hosts} />
+              <NetworkGraphView hosts={scanResult.hosts} pdfMode={true} />
+              <ThreatsDetailView hosts={scanResult.hosts} pdfMode={true} />
               {/* Explicitly render for PDF with a specific ID */}
               {hasCves && <ThreatsDetailView hosts={scanResult.hosts} pdfMode={true} forceId="pdf-threat-service-dist-chart" />}
             </>

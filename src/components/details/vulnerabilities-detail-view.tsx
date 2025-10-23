@@ -133,7 +133,7 @@ export default function VulnerabilitiesDetailView({ hosts }: { hosts: Host[] }) 
     };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 w-full">
       <Card>
         <CardHeader>
           <CardTitle>{t('hostRiskDistributionTitle')}</CardTitle>
@@ -145,7 +145,11 @@ export default function VulnerabilitiesDetailView({ hosts }: { hosts: Host[] }) 
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" allowDecimals={false} />
                 <YAxis type="category" dataKey="name" width={80} fontSize={12} />
-                <Tooltip cursor={{fill: 'hsl(var(--muted))'}} />
+                <Tooltip 
+                    cursor={{fill: 'hsl(var(--muted))'}} 
+                    contentStyle={{backgroundColor: 'hsl(var(--popover))', color: 'hsl(var(--popover-foreground))', borderRadius: 'var(--radius)', border: '1px solid hsl(var(--border))'}}
+                    itemStyle={{ color: 'hsl(var(--primary))' }}
+                />
                 <Bar dataKey="count" name={t('numberOfHosts')} barSize={20} />
               </BarChart>
             </ResponsiveContainer>

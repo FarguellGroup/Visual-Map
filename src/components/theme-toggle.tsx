@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const t = useTranslations('ThemeToggle');
   const [mounted, setMounted] = React.useState(false);
 
@@ -18,7 +18,7 @@ export function ThemeToggle() {
   }, []);
 
   const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
+    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
   };
 
   if (!mounted) {
@@ -28,7 +28,7 @@ export function ThemeToggle() {
 
   return (
     <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={t('toggleTheme')} className="hover:bg-primary/10 hover:text-primary">
-      {theme === 'dark' ? (
+      {resolvedTheme === 'dark' ? (
         <Sun className="h-[1.2rem] w-[1.2rem]" />
       ) : (
         <Moon className="h-[1.2rem] w-[1.2rem]" />
@@ -36,3 +36,5 @@ export function ThemeToggle() {
     </Button>
   );
 }
+
+    

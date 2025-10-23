@@ -19,8 +19,9 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '..
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useTheme } from 'next-themes';
-import { VmLogo } from '../icons';
 import { getHostname, getOsName } from '@/lib/nmap-parser';
+import { useToast } from '@/hooks/use-toast';
+import { VmLogo } from '../icons';
 
 
 // Extend jsPDF with autoTable
@@ -49,6 +50,19 @@ const getFormattedTimestamp = () => {
     return `${YYYY}-${MM}-${DD}_${HH}-${mm}-${ss}`;
 };
 
+// Helper to process arrays in batches
+const processInBatches = async <T, U>(items: T[], batchSize: number, processItem: (item: T) => Promise<U>): Promise<U[]> => {
+    const results: U[] = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+        const batch = items.slice(i, i + batchSize);
+        const batchResults = await Promise.all(batch.map(processItem));
+        results.push(...batchResults);
+        // Add a small delay to prevent the browser from freezing
+        await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    return results;
+};
+
 export default function AppSidebar() {
   const tHeader = useTranslations('Header');
   const tSidebar = useTranslations('Sidebar');
@@ -62,14 +76,22 @@ export default function AppSidebar() {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingHtml, setIsExportingHtml] = useState(false);
   const [localWeights, setLocalWeights] = useState<RiskWeights>(riskWeights);
-  const { state } = useSidebar();
+  const { state, setOpen } = useSidebar();
+  const [openAccordion, setOpenAccordion] = useState('');
   const locale = useLocale();
   const pathname = usePathname();
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
+  const { toast } = useToast();
 
   useEffect(() => {
     setLocalWeights(riskWeights);
   }, [riskWeights]);
+
+  useEffect(() => {
+    if (state === 'collapsed') {
+      setOpenAccordion('');
+    }
+  }, [state]);
   
   const handleWeightChange = (factor: keyof typeof riskWeights, value: number[]) => {
     setLocalWeights(prev => ({ ...prev, [factor]: value[0] }));
@@ -119,14 +141,22 @@ export default function AppSidebar() {
   const handleExportHtml = useCallback(async () => {
     const { scanResult: currentScanResult, cveCache: currentCveCache } = useScanStore.getState();
     if (!currentScanResult) return;
+    
+    if (currentScanResult.hosts.length > 50) {
+        toast({
+            title: locale === 'es' ? 'Generando Informe HTML' : 'Generating HTML Report',
+            description: locale === 'es' ? 'Esto puede tardar un momento para escaneos grandes...' : 'This may take a moment for large scans...',
+        });
+    }
     setIsExportingHtml(true);
+
     try {
         const { fileName, hosts, summary } = currentScanResult;
         
-        const currentThemeBg = theme === 'dark' ? '#09090b' : '#ffffff';
-        const riskChart = await captureChartAsBase64('risk-distribution-chart', { backgroundColor: currentThemeBg });
-        const portsChart = await captureChartAsBase64('top-ports-chart', { backgroundColor: currentThemeBg });
-        const servicesChart = await captureChartAsBase64('service-distribution-chart', { backgroundColor: currentThemeBg });
+        const reportBgColor = resolvedTheme === 'dark' ? '#09090b' : '#ffffff';
+        const riskChart = await captureChartAsBase64('risk-distribution-chart', { backgroundColor: reportBgColor });
+        const portsChart = await captureChartAsBase64('top-ports-chart', { backgroundColor: reportBgColor });
+        const servicesChart = await captureChartAsBase64('service-distribution-chart', { backgroundColor: reportBgColor });
         
         const allCves = Array.from(currentCveCache.entries())
             .filter(([, entry]) => entry.status === 'loaded' && entry.data)
@@ -135,7 +165,7 @@ export default function AppSidebar() {
             );
 
         const threatsChart = allCves.length > 0 
-            ? await captureChartAsBase64('threat-service-dist-chart', { backgroundColor: currentThemeBg })
+            ? await captureChartAsBase64('threat-service-dist-chart', { backgroundColor: reportBgColor })
             : null;
 
         const topVulnerableHosts = [...hosts]
@@ -172,10 +202,47 @@ export default function AppSidebar() {
         const moonIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`;
         const sunIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>`;
 
+        const generateHostDetailsHtml = async (hostsToProcess: typeof allHostsData) => {
+            const hostChunks = await processInBatches(hostsToProcess, 50, async (host) => {
+                const openPorts = (Array.isArray(host.ports.port) ? host.ports.port : (host.ports.port ? [host.ports.port] : []))
+                    .filter(p => p?.state.state === 'open');
+                
+                return `
+                    <div id="host-${host.address[0].addr.replace(/\./g, '-')}" class="card" style="margin-top: 30px;">
+                      <div style="position: absolute; top: 20px; right: 20px;">
+                          <span class="badge ${getRiskClass(host.riskScore ?? 0)}">${tHostsTable('riskScore')}: ${host.riskScore?.toFixed(0) ?? '0'}</span>
+                      </div>
+                      <h3>Host: ${host.address[0].addr} (${host.hostname})</h3>
+                      ${openPorts.length > 0 ? `
+                        <div class="table-responsive">
+                            <table>
+                            <thead><tr><th>${tDetails('port')}</th><th>${tDetails('protocol')}</th><th>${tDetails('service')}</th><th>${tDetails('product')}</th><th>${tDetails('version')}</th></tr></thead>
+                            <tbody>
+                                ${openPorts.map(p => `
+                                <tr>
+                                    <td>${p.portid}</td>
+                                    <td>${p.protocol}</td>
+                                    <td>${p.service?.name || ''}</td>
+                                    <td>${p.service?.product || ''}</td>
+                                    <td>${p.service?.version || ''}</td>
+                                </tr>
+                                `).join('')}
+                            </tbody>
+                            </table>
+                        </div>
+                      ` : `<p style="color: color-mix(in srgb, var(--foreground) 70%, transparent);">${tDetails('openPorts')}: 0</p>`}
+                    </div>
+                `;
+            });
+            return hostChunks.join('');
+        };
+        
+        const hostDetailsHtml = await generateHostDetailsHtml(allHostsData);
+
 
         const htmlContent = `
             <!DOCTYPE html>
-            <html lang="${locale}" class="${theme === 'dark' ? 'dark' : ''}">
+            <html lang="${locale}" class="${resolvedTheme === 'dark' ? 'dark' : ''}">
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -210,7 +277,7 @@ export default function AppSidebar() {
                     .sun-icon { display: none; }
                     .dark .sun-icon { display: block; }
                     .dark .moon-icon { display: none; }
-                    h1, h2, h3 { color: var(--foreground); font-weight: 600; font-family: 'Space Grotesk', sans-serif; }
+                    h1, h2, h3 { color: var(--foreground); font-weight: 600; }
                     h1 { font-size: 2em; text-align: left; } h2 { font-size: 1.5em; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-top: 40px; } h3 { font-size: 1.2em; }
                     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
                     th, td { padding: 12px 15px; border: 1px solid var(--border); text-align: left; font-size: 14px; }
@@ -232,9 +299,6 @@ export default function AppSidebar() {
                     .logo-text { font-size: 1.2em; font-weight: bold; }
                     @media (max-width: 768px) { body { padding-top: 60px; } header { padding: 10px; } nav ul { display: none; } .container { padding: 10px; } h1 { font-size: 1.5em; } h2 { font-size: 1.2em; } }
                 </style>
-                <link rel="preconnect" href="https://fonts.googleapis.com">
-                <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-                <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&display=swap" rel="stylesheet">
             </head>
             <body>
                 <header>
@@ -318,7 +382,7 @@ export default function AppSidebar() {
                         <div class="chart-container"><h3>${tDetails('hostRiskDistributionTitle')}</h3>${riskChart ? `<img src="${riskChart}">` : `<p class="unavailable">${chartNotAvailableText}</p>`}</div>
                         <div class="chart-container"><h3>${tDetails('topPortsTitle')}</h3>${portsChart ? `<img src="${portsChart}">` : `<p class="unavailable">${chartNotAvailableText}</p>`}</div>
                         <div class="chart-container"><h3>${tDetails('serviceDistributionTitle')}</h3>${servicesChart ? `<img src="${servicesChart}">` : `<p class="unavailable">${chartNotAvailableText}</p>`}</div>
-                        ${allCves.length > 0 && threatsChart ? `<div class="chart-container"><h3>${locale === 'es' ? 'Distribución de Servicios Vulnerables' : 'Vulnerable Services Distribution'}</h3><img src="${threatsChart}"></div>` : ''}
+                        ${allCves.length > 0 && threatsChart ? `<div class="chart-container"><h3>${tDetails('vulnerabilities')}</h3><img src="${threatsChart}"></div>` : ''}
                     </section>
 
                     <section id="all-hosts">
@@ -343,32 +407,7 @@ export default function AppSidebar() {
 
                     <section id="host-details">
                       <h2>${tDetails('hosts')}</h2>
-                      ${allHostsData.map(host => `
-                        <div id="host-${host.address[0].addr.replace(/\./g, '-')}" class="card" style="margin-top: 30px;">
-                          <div style="position: absolute; top: 20px; right: 20px;">
-                              <span class="badge ${getRiskClass(host.riskScore ?? 0)}">${tHostsTable('riskScore')}: ${host.riskScore?.toFixed(0) ?? '0'}</span>
-                          </div>
-                          <h3>Host: ${host.address[0].addr} (${host.hostname})</h3>
-                          ${(Array.isArray(host.ports.port) ? host.ports.port : (host.ports.port ? [host.ports.port] : [])).filter(p => p?.state.state === 'open').length > 0 ? `
-                            <div class="table-responsive">
-                                <table>
-                                <thead><tr><th>${tDetails('port')}</th><th>${tDetails('protocol')}</th><th>${tDetails('service')}</th><th>${tDetails('product')}</th><th>${tDetails('version')}</th></tr></thead>
-                                <tbody>
-                                    ${(Array.isArray(host.ports.port) ? host.ports.port : [host.ports.port]).filter(p => p?.state.state === 'open').map(p => `
-                                    <tr>
-                                        <td>${p.portid}</td>
-                                        <td>${p.protocol}</td>
-                                        <td>${p.service?.name || ''}</td>
-                                        <td>${p.service?.product || ''}</td>
-                                        <td>${p.service?.version || ''}</td>
-                                    </tr>
-                                    `).join('')}
-                                </tbody>
-                                </table>
-                            </div>
-                          ` : `<p style="color: color-mix(in srgb, var(--foreground) 70%, transparent);">${tDetails('openPorts')}: 0</p>`}
-                        </div>
-                      `).join('')}
+                      ${hostDetailsHtml}
                     </section>
                 </div>
                 <script>
@@ -393,325 +432,354 @@ export default function AppSidebar() {
     } finally {
       setIsExportingHtml(false);
     }
-  }, [locale, tDetails, tSummary, tHostsTable, tRiskRanking, theme]);
+  }, [locale, tDetails, tSummary, tHostsTable, tRiskRanking, resolvedTheme, toast]);
 
   const handleExportPdf = useCallback(async () => {
     const { scanResult: currentScanResult, cveCache: currentCveCache } = useScanStore.getState();
-
     if (!currentScanResult) return;
-    setIsExportingPdf(true);
   
-    try {
-      const doc = new jsPDF({
-        orientation: 'p',
-        unit: 'px',
-        format: 'a4',
-      }) as jsPDFWithAutoTable;
-  
-      const primaryColor = '#906BE1';
-      const headingColor = '#111827';
-      const mutedTextColor = '#6b7280';
-      
-      doc.setFont('Helvetica', 'normal');
-      
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 30;
-      let yPos = margin;
-
-      const getRiskColor = (score: number): [number, number, number] => {
-        if (score >= 90) return [239, 68, 68]; // Red
-        if (score >= 75) return [249, 115, 22]; // Orange
-        if (score >= 40) return [251, 191, 36]; // Yellow
-        if (score > 0) return [34, 197, 94]; // Green
-        return [107, 114, 128]; // Gray
-      };
-      
-      const drawCell = (data: any, isCve = false) => {
-        const scoreText = data.cell.text[0];
-        if (scoreText) {
-            const score = Number(scoreText);
-            if (!isNaN(score)) {
-                let riskColor: [number, number, number];
-                if (isCve) {
-                    if (score >= 9.0) riskColor = [239, 68, 68];
-                    else if (score >= 7.0) riskColor = [249, 115, 22];
-                    else if (score >= 4.0) riskColor = [251, 191, 36];
-                    else riskColor = [34, 197, 94];
-                } else {
-                    riskColor = getRiskColor(score);
-                }
-                
-                doc.setFillColor(riskColor[0], riskColor[1], riskColor[2]);
-                const badgeWidth = isCve ? 30 : 25;
-                const badgeHeight = 12;
-                const cell = data.cell;
-                const x = cell.x + (cell.width - badgeWidth) / 2;
-                const y = cell.y + (cell.height - badgeHeight) / 2;
-                doc.roundedRect(x, y, badgeWidth, badgeHeight, 6, 6, 'F');
-                
-                const textColor = (isCve && score < 4.0) || (!isCve && score < 40) ? '#000000' : '#ffffff';
-                doc.setTextColor(textColor);
-
-                doc.setFontSize(9);
-                doc.text(scoreText, cell.x + cell.width / 2, cell.y + cell.height / 2, {
-                    align: 'center',
-                    baseline: 'middle'
-                });
-            }
-        }
-      };
-  
-      // --- Cover Page ---
-      yPos = pageHeight / 3;
-      doc.setFontSize(32);
-      doc.setFont('Helvetica', 'bold');
-      doc.setTextColor(headingColor);
-      doc.text("Visual Map Report", pageWidth / 2, yPos, { align: 'center' });
-      yPos += 40;
-      doc.setFontSize(14);
-      doc.setFont('Helvetica', 'normal');
-      doc.setTextColor(mutedTextColor);
-      doc.text(`File: ${currentScanResult.fileName}`, pageWidth / 2, yPos, { align: 'center' });
-      yPos += 20;
-      doc.text(`Date: ${new Date().toLocaleString(locale)}`, pageWidth / 2, yPos, { align: 'center' });
-      
-      doc.addPage();
-      yPos = margin;
-  
-      // -- Summary --
-      doc.setFontSize(22);
-      doc.setFont('Helvetica', 'bold');
-      doc.setTextColor(headingColor);
-      doc.text('Summary', margin, yPos);
-      yPos += 25;
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Metric', 'Value']],
-        body: [
-          [tSummary('totalHosts'), currentScanResult.summary.hostCount],
-          [tSummary('openPorts'), currentScanResult.summary.openPorts],
-          [tSummary('uniqueServices'), currentScanResult.summary.uniqueServices],
-          [tSummary('highRiskHosts'), currentScanResult.hosts.filter(h => (h.riskScore ?? 0) >= 75).length],
-        ],
-        theme: 'striped',
-        headStyles: { fillColor: primaryColor, textColor: '#ffffff' },
-        styles: { font: 'Helvetica', cellPadding: 8 }
+    if (currentScanResult.hosts.length > 50) {
+      toast({
+        title: locale === 'es' ? 'Generando Informe PDF' : 'Generating PDF Report',
+        description: locale === 'es' ? 'Esto puede tardar un momento para escaneos grandes...' : 'This may take a moment for large scans...',
       });
-      yPos = (doc as any).lastAutoTable.finalY + 30;
-  
-      // -- Top Vulnerable Hosts --
-      const topVulnerableHosts = [...currentScanResult.hosts]
-        .filter(h => (h.riskScore ?? 0) > 0)
-        .sort((a, b) => (b.riskScore ?? 0) - (a.riskScore ?? 0))
-        .slice(0, 10);
-      
-      if (topVulnerableHosts.length > 0) {
-        const topVulnerableHostsData = topVulnerableHosts.map(h => ({...h, hostname: getHostname(h), osName: getOsName(h)}));
-        if (yPos > pageHeight - 120) { doc.addPage(); yPos = margin; }
+    }
+    setIsExportingPdf(true);
+    
+    try {
+        const doc = new jsPDF({
+            orientation: 'p',
+            unit: 'px',
+            format: 'a4',
+        }) as jsPDFWithAutoTable;
+
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const margin = 30;
+        let yPos = margin;
+    
+        // --- Cover Page ---
+        doc.setFillColor('#000000');
+        doc.rect(0, 0, pageWidth, pageHeight, 'F');
+    
+        yPos = pageHeight / 2 - 20; // Center vertically and move up
+        doc.setFontSize(24);
+        doc.setTextColor('#ffffff');
+        doc.setFont('Helvetica', 'bold');
+        doc.text("Visual Map Report", pageWidth / 2, yPos, { align: 'center' });
+    
+        yPos += 30;
+        doc.setFont('Helvetica', 'normal');
+        doc.setFontSize(12);
+        const fileText = locale === 'es' ? 'Archivo' : 'File';
+        const dateText = locale === 'es' ? 'Fecha' : 'Date';
+        doc.text(`${fileText}: ${currentScanResult.fileName}`, pageWidth / 2, yPos, { align: 'center' });
+    
+        yPos += 20;
+        doc.text(`${dateText}: ${new Date().toLocaleString(locale)}`, pageWidth / 2, yPos, { align: 'center' });
+    
+        doc.addPage();
+        yPos = margin;
+    
+        const getRiskColor = (score: number): [number, number, number] => {
+            if (score >= 90) return [239, 68, 68];
+            if (score >= 75) return [249, 115, 22];
+            if (score >= 40) return [251, 191, 36];
+            if (score > 0) return [34, 197, 94];
+            return [107, 114, 128];
+        };
+    
+        const drawCell = (data: any, isCve = false) => {
+            const scoreText = data.cell.text[0];
+            if (scoreText) {
+                const score = Number(scoreText);
+                if (!isNaN(score)) {
+                    let riskColor: [number, number, number];
+                    if (isCve) {
+                        if (score >= 9.0) riskColor = [239, 68, 68];
+                        else if (score >= 7.0) riskColor = [249, 115, 22];
+                        else if (score >= 4.0) riskColor = [251, 191, 36];
+                        else riskColor = [34, 197, 94];
+                    } else {
+                        riskColor = getRiskColor(score);
+                    }
+        
+                    doc.setFillColor(riskColor[0], riskColor[1], riskColor[2]);
+                    const badgeWidth = isCve ? 30 : 25;
+                    const badgeHeight = 12;
+                    const cell = data.cell;
+                    const x = cell.x + (cell.width - badgeWidth) / 2;
+                    const y = cell.y + (cell.height - badgeHeight) / 2;
+                    doc.roundedRect(x, y, badgeWidth, badgeHeight, 6, 6, 'F');
+        
+                    const textColor = (isCve && score < 4.0) || (!isCve && score < 40) ? '#000000' : '#ffffff';
+                    doc.setTextColor(textColor);
+        
+                    doc.setFontSize(9);
+                    doc.text(scoreText, cell.x + cell.width / 2, cell.y + cell.height / 2, {
+                        align: 'center',
+                        baseline: 'middle'
+                    });
+                }
+            }
+        };
+    
+        // -- Summary --
+        const primaryColor = '#906BE1';
+        const summaryTitle = locale === 'es' ? 'Resumen' : 'Summary';
+        const metricTitle = locale === 'es' ? 'Métrica' : 'Metric';
+        const valueTitle = locale === 'es' ? 'Valor' : 'Value';
         doc.setFontSize(22);
         doc.setFont('Helvetica', 'bold');
-        doc.text(tRiskRanking('title'), margin, yPos);
+        doc.setTextColor('#000000');
+        doc.text(summaryTitle, margin, yPos);
         yPos += 25;
         autoTable(doc, {
             startY: yPos,
-            head: [[tHostsTable('ipAddress'), tHostsTable('hostname'), tDetails('os'), tHostsTable('riskScore')]],
-            body: topVulnerableHostsData.map(h => [
+            head: [[metricTitle, valueTitle]],
+            body: [
+                [tSummary('totalHosts'), currentScanResult.summary.hostCount],
+                [tSummary('openPorts'), currentScanResult.summary.openPorts],
+                [tSummary('uniqueServices'), currentScanResult.summary.uniqueServices],
+                [tSummary('highRiskHosts'), currentScanResult.hosts.filter(h => (h.riskScore ?? 0) >= 75).length],
+            ],
+            theme: 'striped',
+            headStyles: { fillColor: primaryColor, textColor: '#ffffff', font: 'Helvetica', fontStyle: 'bold' },
+            styles: { font: 'Helvetica', cellPadding: 8 }
+        });
+        yPos = (doc as any).lastAutoTable.finalY + 30;
+    
+        // -- Top Vulnerable Hosts --
+        const topVulnerableHosts = [...currentScanResult.hosts]
+            .filter(h => (h.riskScore ?? 0) > 0)
+            .sort((a, b) => (b.riskScore ?? 0) - (a.riskScore ?? 0))
+            .slice(0, 10);
+    
+        if (topVulnerableHosts.length > 0) {
+            const topVulnerableHostsData = topVulnerableHosts.map(h => ({ ...h, hostname: getHostname(h), osName: getOsName(h) }));
+            if (yPos > pageHeight - 120) { doc.addPage(); yPos = margin; }
+            doc.setFontSize(22);
+            doc.setFont('Helvetica', 'bold');
+            doc.text(tRiskRanking('title'), margin, yPos);
+            yPos += 25;
+            autoTable(doc, {
+                startY: yPos,
+                head: [[tHostsTable('ipAddress'), tHostsTable('hostname'), tDetails('os'), tHostsTable('riskScore')]],
+                body: topVulnerableHostsData.map(h => [
+                    h.address[0].addr,
+                    h.hostname,
+                    h.osName,
+                    h.riskScore?.toFixed(0) ?? '0'
+                ]),
+                theme: 'striped',
+                headStyles: { fillColor: primaryColor, textColor: '#ffffff', font: 'Helvetica', fontStyle: 'bold' },
+                styles: { font: 'Helvetica', cellPadding: 8, halign: 'center' },
+                columnStyles: { 0: { halign: 'left' }, 1: { halign: 'left' }, 2: { halign: 'left' } },
+                didDrawCell: (data) => {
+                    if (data.column.index === 3 && data.section === 'body') {
+                        drawCell(data);
+                    }
+                }
+            });
+            yPos = (doc as any).lastAutoTable.finalY + 30;
+        }
+    
+        // -- Discovered CVEs --
+        const allCves = Array.from(currentCveCache.entries())
+            .filter(([, entry]) => entry.status === 'loaded' && entry.data)
+            .flatMap(([hostIp, entry]) =>
+                entry.data!.map(cveData => ({ ...cveData, hostIp }))
+            );
+    
+        if (allCves.length > 0) {
+            if (yPos > pageHeight - 120) { doc.addPage(); yPos = margin; }
+            doc.setFontSize(22);
+            doc.setFont('Helvetica', 'bold');
+            const cvesTitle = locale === 'es' ? 'CVEs Descubiertos' : 'Discovered CVEs';
+            const cvssScoreTitle = locale === 'es' ? 'Puntuación CVSS' : 'CVSS Score';
+            doc.text(cvesTitle, margin, yPos);
+            yPos += 25;
+            autoTable(doc, {
+                startY: yPos,
+                head: [['CVE ID', cvssScoreTitle, tDetails('service'), tHostsTable('ipAddress')]],
+                body: allCves.sort((a, b) => (b.cve.cvssScore ?? -1) - (a.cve.cvssScore ?? -1)).map(cve => [
+                    cve.cve.cveId,
+                    cve.cve.cvssScore?.toFixed(1) ?? 'N/A',
+                    `${cve.service.product} ${cve.service.version || ''}`,
+                    cve.hostIp
+                ]),
+                theme: 'striped',
+                headStyles: { fillColor: primaryColor, textColor: '#ffffff', font: 'Helvetica', fontStyle: 'bold' },
+                styles: { font: 'Helvetica', fontSize: 9, cellPadding: 8, halign: 'center' },
+                columnStyles: { 0: { halign: 'left' }, 2: { halign: 'left' }, 3: { halign: 'left' } },
+                didDrawCell: (data) => {
+                    if (data.column.index === 1 && data.section === 'body') {
+                        drawCell(data, true);
+                    }
+                }
+            });
+            yPos = (doc as any).lastAutoTable.finalY + 30;
+        }
+    
+        // -- Visualizations --
+        const addChart = async (elementId: string, title: string) => {
+            if (yPos > pageHeight - 150) { doc.addPage(); yPos = margin; }
+            doc.setFontSize(18);
+            doc.setFont('Helvetica', 'bold');
+            doc.setTextColor('#000000');
+            doc.text(title, margin, yPos);
+            yPos += 15;
+            try {
+              const imgData = await captureChartAsBase64(elementId, { backgroundColor: '#ffffff' });
+              if (imgData) {
+                const imgProps = doc.getImageProperties(imgData);
+                const imgWidth = pageWidth - (margin * 2);
+                const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+                if (yPos + imgHeight > pageHeight - margin) { doc.addPage(); yPos = margin; doc.setFontSize(18); doc.setFont('Helvetica', 'bold'); doc.text(title, margin, yPos); yPos += 15; }
+                doc.addImage(imgData, 'PNG', margin, yPos, imgWidth, imgHeight);
+                yPos += imgHeight + 25;
+              } else {
+                doc.setFontSize(11);
+                doc.setTextColor('#6b7280');
+                doc.text('Chart not available. Navigate to the corresponding page to include it in the report.', margin, yPos);
+                yPos += 20;
+              }
+            } catch (chartError) {
+              console.error("Chart export error:", chartError);
+              doc.setFontSize(11);
+              doc.setTextColor('#6b7280');
+              doc.text('Chart could not be generated.', margin, yPos);
+              yPos += 20;
+            }
+        };
+    
+        if (yPos > pageHeight - 50) { doc.addPage(); yPos = margin; }
+        doc.setFontSize(22);
+        doc.setFont('Helvetica', 'bold');
+        const visualizationsTitle = locale === 'es' ? 'Visualizaciones' : 'Visualizations';
+        doc.text(visualizationsTitle, margin, yPos);
+        yPos += 25;
+    
+        await addChart('risk-distribution-chart', tDetails('hostRiskDistributionTitle'));
+        await addChart('top-ports-chart', tDetails('topPortsTitle'));
+        await addChart('service-distribution-chart', tDetails('serviceDistributionTitle'));
+    
+        if (allCves.length > 0) {
+            await addChart('pdf-threat-service-dist-chart', tDetails('vulnerabilities'));
+        }
+    
+        // -- All Hosts Table --
+        const allHostsSortedByIp = [...currentScanResult.hosts].sort((a, b) => ipToNumber(a.address[0].addr) - ipToNumber(b.address[0].addr));
+        const allHostsData = allHostsSortedByIp.map(h => ({ ...h, hostname: getHostname(h), osName: getOsName(h) }));
+    
+        doc.addPage();
+        yPos = margin;
+        doc.setFontSize(22);
+        doc.setFont('Helvetica', 'bold');
+        doc.text(tHostsTable('title'), margin, yPos);
+        yPos += 25;
+        autoTable(doc, {
+            startY: yPos,
+            head: [[tHostsTable('ipAddress'), tHostsTable('hostname'), tDetails('os'), tHostsTable('openPorts'), tHostsTable('riskScore')]],
+            body: allHostsData.map(h => [
                 h.address[0].addr,
                 h.hostname,
                 h.osName,
+                getOpenPortsCount(h),
                 h.riskScore?.toFixed(0) ?? '0'
             ]),
             theme: 'striped',
-            headStyles: { fillColor: primaryColor, textColor: '#ffffff' },
+            headStyles: { fillColor: primaryColor, textColor: '#ffffff', font: 'Helvetica', fontStyle: 'bold' },
             styles: { font: 'Helvetica', cellPadding: 8, halign: 'center' },
             columnStyles: { 0: { halign: 'left' }, 1: { halign: 'left' }, 2: { halign: 'left' } },
             didDrawCell: (data) => {
-              if (data.column.index === 3 && data.section === 'body') {
-                drawCell(data);
-              }
-            }
+                if (data.column.index === 4 && data.section === 'body') {
+                    drawCell(data);
+                }
+            },
+            pageBreak: 'auto'
         });
         yPos = (doc as any).lastAutoTable.finalY + 30;
-      }
-      
-      // -- Discovered CVEs --
-      const allCves = Array.from(currentCveCache.entries())
-        .filter(([, entry]) => entry.status === 'loaded' && entry.data)
-        .flatMap(([hostIp, entry]) => 
-            entry.data!.map(cveData => ({...cveData, hostIp}))
-        );
-
-      if (allCves.length > 0) {
-        if (yPos > pageHeight - 120) { doc.addPage(); yPos = margin; }
+    
+        // -- Detailed Host Info --
+        const detailedHostInfoTitle = locale === 'es' ? 'Información Detallada de Hosts' : 'Detailed Host Information';
+        if (yPos > pageHeight - 80) { doc.addPage(); yPos = margin; }
         doc.setFontSize(22);
         doc.setFont('Helvetica', 'bold');
-        doc.text(locale === 'es' ? 'CVEs Descubiertos' : 'Discovered CVEs', margin, yPos);
-        yPos += 25;
-        autoTable(doc, {
-            startY: yPos,
-            head: [['CVE ID', 'CVSS', 'Service', 'Host IP']],
-            body: allCves.sort((a,b) => (b.cve.cvssScore ?? -1) - (a.cve.cvssScore ?? -1)).map(cve => [
-                cve.cve.cveId,
-                cve.cve.cvssScore?.toFixed(1) ?? 'N/A',
-                `${cve.service.product} ${cve.service.version || ''}`,
-                cve.hostIp
-            ]),
-            theme: 'striped',
-            headStyles: { fillColor: primaryColor, textColor: '#ffffff' },
-            styles: { font: 'Helvetica', fontSize: 9, cellPadding: 8, halign: 'center' },
-            columnStyles: { 0: { halign: 'left' }, 2: { halign: 'left' }, 3: { halign: 'left' } },
-            didDrawCell: (data) => {
-              if (data.column.index === 1 && data.section === 'body') {
-                drawCell(data, true);
-              }
-            }
-        });
-        yPos = (doc as any).lastAutoTable.finalY + 30;
-      }
-  
-      // -- Visualizations --
-      const addChart = async (elementId: string, title: string) => {
-          if (yPos > pageHeight - 150) { doc.addPage(); yPos = margin; }
-          doc.setFontSize(18);
-          doc.setFont('Helvetica', 'bold');
-          doc.setTextColor(headingColor);
-          doc.text(title, margin, yPos);
-          yPos += 15;
-          try {
-              const imgData = await captureChartAsBase64(elementId, { backgroundColor: '#ffffff'});
-              if (imgData) {
-                  const imgProps = doc.getImageProperties(imgData);
-                  const imgWidth = pageWidth - (margin * 2);
-                  const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-                  if (yPos + imgHeight > pageHeight - margin) { doc.addPage(); yPos = margin; doc.setFontSize(18); doc.setFont('Helvetica', 'bold'); doc.text(title, margin, yPos); yPos += 15; }
-                  doc.addImage(imgData, 'PNG', margin, yPos, imgWidth, imgHeight);
-                  yPos += imgHeight + 25;
-              } else {
-                  doc.setFontSize(11);
-                  doc.setTextColor(mutedTextColor);
-                  doc.text('Chart not available. Navigate to the corresponding page to include it in the report.', margin, yPos);
-                  yPos += 20;
-              }
-          } catch (chartError) { 
-              console.error("Chart export error:", chartError); 
-              doc.setFontSize(11);
-              doc.setTextColor(mutedTextColor);
-              doc.text('Chart could not be generated.', margin, yPos);
-              yPos += 20;
-          }
-      };
-      
-      if (yPos > pageHeight - 50) { doc.addPage(); yPos = margin; }
-      doc.setFontSize(22);
-      doc.setFont('Helvetica', 'bold');
-      const visualizationsTitle = locale === 'es' ? 'Visualizaciones' : 'Visualizations';
-      doc.text(visualizationsTitle, margin, yPos);
-      yPos += 25;
-
-      await addChart('risk-distribution-chart', tDetails('hostRiskDistributionTitle'));
-      await addChart('top-ports-chart', tDetails('topPortsTitle'));
-      await addChart('service-distribution-chart', tDetails('serviceDistributionTitle'));
-      
-      if (allCves.length > 0) {
-        await addChart('pdf-threat-service-dist-chart', locale === 'es' ? 'Distribución de Servicios Vulnerables' : 'Vulnerable Services Distribution');
-      }
-
-
-      // -- All Hosts Table --
-      const allHostsSortedByIp = [...currentScanResult.hosts].sort((a, b) => ipToNumber(a.address[0].addr) - ipToNumber(b.address[0].addr));
-      const allHostsData = allHostsSortedByIp.map(h => ({...h, hostname: getHostname(h), osName: getOsName(h)}));
-
-      doc.addPage();
-      yPos = margin;
-      doc.setFontSize(22);
-      doc.setFont('Helvetica', 'bold');
-      doc.text(tHostsTable('title'), margin, yPos);
-      yPos += 25;
-      autoTable(doc, {
-        startY: yPos,
-        head: [[tHostsTable('ipAddress'), tHostsTable('hostname'), tDetails('os'), tHostsTable('openPorts'), tHostsTable('riskScore')]],
-        body: allHostsData.map(h => [
-          h.address[0].addr,
-          h.hostname,
-          h.osName,
-          getOpenPortsCount(h),
-          h.riskScore?.toFixed(0) ?? '0'
-        ]),
-        theme: 'striped',
-        headStyles: { fillColor: primaryColor, textColor: '#ffffff' },
-        styles: { font: 'Helvetica', cellPadding: 8, halign: 'center' },
-        columnStyles: { 0: { halign: 'left' }, 1: { halign: 'left' }, 2: { halign: 'left' } },
-        didDrawCell: (data) => {
-          if (data.column.index === 4 && data.section === 'body') {
-            drawCell(data);
-          }
-        },
-        pageBreak: 'auto'
-      });
-      yPos = (doc as any).lastAutoTable.finalY + 30;
-  
-      // -- Detailed Host Info --
-      if(yPos > pageHeight - 80) { doc.addPage(); yPos = margin; }
-      doc.setFontSize(22);
-      doc.setFont('Helvetica', 'bold');
-      doc.text('Detailed Host Information', margin, yPos);
-      yPos += 15;
-
-      for (const host of allHostsData) {
-        if (yPos > pageHeight - 100) { doc.addPage(); yPos = margin; }
-        yPos += 20;
-        doc.setFontSize(16);
-        doc.setFont('Helvetica', 'bold');
-        doc.text(`Host: ${host.address[0].addr} (${host.hostname})`, margin, yPos);
+        doc.text(detailedHostInfoTitle, margin, yPos);
         yPos += 15;
-  
-        const openPorts = (Array.isArray(host.ports.port) ? host.ports.port : (host.ports.port ? [host.ports.port] : []))
-          .filter(p => p?.state.state === 'open');
-  
-        if (openPorts.length > 0) {
-          autoTable(doc, {
-            startY: yPos,
-            head: [[tDetails('port'), tDetails('protocol'), tDetails('service'), tDetails('product'), tDetails('version')]],
-            body: openPorts.map(p => [
-              p.portid,
-              p.protocol,
-              p.service?.name || '',
-              p.service?.product || '',
-              p.service?.version || ''
-            ]),
-            theme: 'grid',
-            headStyles: { fillColor: '#4a5568', textColor: '#ffffff'},
-            styles: { font: 'Helvetica', fontSize: 9, cellPadding: 6 },
-            pageBreak: 'auto'
-          });
-          yPos = (doc as any).lastAutoTable.finalY;
-        } else {
-          doc.setFontSize(11);
-          doc.setFont('Helvetica', 'normal');
-          doc.text('No open ports detected for this host.', margin, yPos);
-          yPos += 15;
+    
+        const processHostDetails = async (hosts: typeof allHostsData) => {
+            await processInBatches(hosts, 10, async (host) => {
+                if (yPos > pageHeight - 100) { doc.addPage(); yPos = margin; }
+                yPos += 20;
+                doc.setFontSize(16);
+                doc.setFont('Helvetica', 'bold');
+                doc.text(`Host: ${host.address[0].addr} (${host.hostname})`, margin, yPos);
+                yPos += 15;
+    
+                const openPorts = (Array.isArray(host.ports.port) ? host.ports.port : (host.ports.port ? [host.ports.port] : []))
+                    .filter(p => p?.state.state === 'open');
+    
+                if (openPorts.length > 0) {
+                    autoTable(doc, {
+                        startY: yPos,
+                        head: [[tDetails('port'), tDetails('protocol'), tDetails('service'), tDetails('product'), tDetails('version')]],
+                        body: openPorts.map(p => [
+                            p.portid,
+                            p.protocol,
+                            p.service?.name || '',
+                            p.service?.product || '',
+                            p.service?.version || ''
+                        ]),
+                        theme: 'grid',
+                        headStyles: { fillColor: '#4a5568', textColor: '#ffffff' },
+                        styles: { font: 'Helvetica', fontSize: 9, cellPadding: 6 },
+                        pageBreak: 'auto'
+                    });
+                    yPos = (doc as any).lastAutoTable.finalY;
+                } else {
+                    doc.setFontSize(11);
+                    doc.setFont('Helvetica', 'normal');
+                    doc.text('No open ports detected for this host.', margin, yPos);
+                    yPos += 15;
+                }
+            });
+        };
+    
+        await processHostDetails(allHostsData);
+    
+        const pageCount = (doc as any).internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(9);
+            doc.setTextColor('#6b7280');
+            doc.text(`${tHostsTable('page', { currentPage: i, totalPages: pageCount })}`, pageWidth / 2, pageHeight - 15, { align: 'center' });
         }
-      }
-      
-      const pageCount = (doc as any).internal.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(9);
-        doc.setTextColor(mutedTextColor);
-        doc.text(`${tHostsTable('page', { currentPage: i, totalPages: pageCount })}`, pageWidth / 2, pageHeight - 15, { align: 'center' });
-      }
+    
+        doc.save(`visual-map-report-${getFormattedTimestamp()}.pdf`);
   
-      doc.save(`visual-map-report-${getFormattedTimestamp()}.pdf`);
     } catch (error) {
-      console.error("Error exporting PDF:", error);
+        console.error("Error exporting PDF:", error);
+        toast({
+            variant: 'destructive',
+            title: 'PDF Export Failed',
+            description: locale === 'es' ? 'Ocurrió un error inesperado al generar el PDF.' : 'An unexpected error occurred while generating the PDF.',
+        });
     } finally {
-      setIsExportingPdf(false);
+        setIsExportingPdf(false);
     }
-  }, [locale, tDetails, tSummary, tHostsTable, tRiskRanking, theme]);
+  }, [locale, tDetails, tSummary, tHostsTable, tRiskRanking, toast]);
+
 
   const sidebarTooltip = (text: string) => {
     return state === 'collapsed' ? text : undefined;
+  };
+  
+  const handleAccordionTriggerClick = () => {
+    if (state === 'collapsed') {
+      setOpen(true);
+    }
   };
   
   return (
@@ -804,13 +872,13 @@ export default function AppSidebar() {
                 </SidebarMenu>
             </SidebarGroup>
             <SidebarSeparator className="my-4" />
-            <SidebarGroup>
-                <Accordion type="single" collapsible>
+            <Accordion type="single" collapsible className="w-full" value={openAccordion} onValueChange={setOpenAccordion}>
+                <SidebarGroup>
                     <AccordionItem value="risk-weighting" className="border-none">
                        {state === 'collapsed' ? (
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <AccordionTrigger className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180">
+                                    <AccordionTrigger onClick={handleAccordionTriggerClick} className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180">
                                         <SlidersHorizontal className="h-4 w-4" />
                                     </AccordionTrigger>
                                 </TooltipTrigger>
@@ -820,6 +888,7 @@ export default function AppSidebar() {
                             </Tooltip>
                        ) : (
                           <AccordionTrigger 
+                              onClick={handleAccordionTriggerClick}
                               className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180"
                           >
                             <div className='flex items-center justify-between w-full'>
@@ -876,15 +945,14 @@ export default function AppSidebar() {
                             </Card>
                         </AccordionContent>
                     </AccordionItem>
-                </Accordion>
-            </SidebarGroup>
-            <SidebarGroup>
-                <Accordion type="single" collapsible>
+                </SidebarGroup>
+                <SidebarGroup>
                     <AccordionItem value="export" className="border-none">
                          {state === 'collapsed' ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                   <AccordionTrigger 
+                                      onClick={handleAccordionTriggerClick}
                                       className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180"
                                   >
                                     <Download className="h-4 w-4" />
@@ -894,6 +962,7 @@ export default function AppSidebar() {
                             </Tooltip>
                          ) : (
                             <AccordionTrigger 
+                                onClick={handleAccordionTriggerClick}
                                 className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180"
                             >
                                 <div className='flex items-center justify-between w-full'>
@@ -923,8 +992,8 @@ export default function AppSidebar() {
                             </div>
                         </AccordionContent>
                     </AccordionItem>
-                </Accordion>
-            </SidebarGroup>
+                </SidebarGroup>
+            </Accordion>
         
       </SidebarContent>
     </TooltipProvider>

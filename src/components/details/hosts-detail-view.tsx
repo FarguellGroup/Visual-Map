@@ -113,7 +113,7 @@ export default function HostsDetailView({ hosts }: { hosts: Host[] }) {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="w-full">
         <Card>
             <CardHeader>
                 <CardTitle>{tDetails('hostsDetected', {count: hosts.length})}</CardTitle>

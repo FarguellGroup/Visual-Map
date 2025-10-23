@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -9,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from '@/navigation';
 import { cn } from '@/lib/utils';
-import { ArrowUpDown, ShieldX, Search, RotateCw, Settings, Pause, Play, AlertCircle } from 'lucide-react';
+import { ArrowUpDown, ShieldX, Search, RotateCw, Settings, Pause, Play, AlertCircle, Info } from 'lucide-react';
 import { useScanStore } from '@/store/use-scan-store';
 import { Progress } from '../ui/progress';
 import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recharts';
@@ -262,7 +261,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
 
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 w-full">
         <Card>
             <CardHeader className="flex flex-row items-start justify-between gap-4">
                 <div>
@@ -300,6 +299,17 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
                 <CardContent className='pt-2 space-y-2'>
                     <Progress value={(cveScanProgress.processed / (cveScanProgress.total || 1)) * 100} className="w-full" />
                     <p className='text-sm text-muted-foreground text-center'>{analyzingText}</p>
+                </CardContent>
+            )}
+
+            {showGlobalScanButton && (
+                <CardContent>
+                    <Alert variant='default' className="items-center border-blue-500/50 text-blue-700 dark:text-blue-300 [&>svg]:text-blue-600 dark:[&>svg]:text-blue-400 bg-blue-500/10">
+                         <Info className="h-4 w-4" />
+                         <AlertDescription className='font-medium text-sm'>
+                            {locale === 'es' ? 'Solo se analizarán los servicios que tengan una versión detectada.' : 'Only services with a detected version will be analyzed.'}
+                        </AlertDescription>
+                    </Alert>
                 </CardContent>
             )}
 
@@ -401,14 +411,14 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
                     </CardHeader>
                     <CardContent>
                         <div id={chartId} className={pdfMode ? 'w-[800px] h-[300px]' : ''}>
-                            <ResponsiveContainer width="100%" height={200}>
+                            <ResponsiveContainer width="100%" height={300}>
                                 <PieChart>
-                                    <Pie data={serviceDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label>
+                                    <Pie data={serviceDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
                                         {serviceDistribution.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
-                                    <Tooltip />
+                                    <Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--popover))', color: 'hsl(var(--popover-foreground))', borderRadius: 'var(--radius)', border: '1px solid hsl(var(--border))'}}/>
                                     <Legend />
                                 </PieChart>
                             </ResponsiveContainer>
@@ -447,5 +457,3 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     </div>
   );
 }
-
-    

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import ReactFlow, {
   Controls,
   Background,
@@ -68,10 +68,12 @@ const ipToNumber = (ip: string) => {
   return ip.split('.').reduce((acc, octet, index) => acc + parseInt(octet) * Math.pow(256, 3 - index), 0);
 };
 
+const defaultViewport = { x: 250, y: 100, zoom: 0.75 };
+
 const Graph = ({ hosts }: { hosts: Host[] }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const { fitBounds } = useReactFlow();
+  const { fitView, getNodes, getEdges } = useReactFlow();
   
   const [riskFilter, setRiskFilter] = useState(0);
   const [debouncedRiskFilter] = useDebounce(riskFilter, 500);
@@ -124,33 +126,30 @@ const Graph = ({ hosts }: { hosts: Host[] }) => {
   const onConnect = useCallback((params: any) => setEdges(eds => addEdge(params, eds)), [setEdges]);
 
   const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    const newSelectedNodeId = selectedNodeId === node.id ? null : node.id;
-    setSelectedNodeId(newSelectedNodeId);
+    setSelectedNodeId(node.id);
+    const allNodes = getNodes();
+    const allEdges = getEdges();
+    const connectedEdges = getConnectedEdges([node], allEdges);
+    
+    const nodesToFit = new Set<Node>([node]);
+    connectedEdges.forEach((edge) => {
+        const sourceNode = allNodes.find(n => n.id === edge.source);
+        const targetNode = allNodes.find(n => n.id === edge.target);
+        if(sourceNode) nodesToFit.add(sourceNode);
+        if(targetNode) nodesToFit.add(targetNode);
+    });
 
-    if (newSelectedNodeId) {
-        const connectedEdges = getConnectedEdges([node], edges);
-        const connectedNodeIds = new Set([node.id, ...connectedEdges.flatMap(edge => [edge.source, edge.target])]);
-
-        const includedNodes = nodes.filter(n => connectedNodeIds.has(n.id));
-
-        if (includedNodes.length > 0) {
-            const minX = Math.min(...includedNodes.map(n => n.position.x));
-            const minY = Math.min(...includedNodes.map(n => n.position.y));
-            const maxX = Math.max(...includedNodes.map(n => n.position.x + (n.width || 150)));
-            const maxY = Math.max(...includedNodes.map(n => n.position.y + (n.height || 50)));
-
-            const boundingBox = {
-                x: minX,
-                y: minY,
-                width: maxX - minX,
-                height: maxY - minY,
-            };
-            
-            fitBounds(boundingBox, { padding: 0.3, duration: 800 });
-        }
-    }
-}, [selectedNodeId, nodes, edges, fitBounds]);
+    fitView({
+        nodes: Array.from(nodesToFit),
+        padding: 0.2,
+        duration: 800,
+    });
+  }, [fitView, getNodes, getEdges]);
   
+  const handlePaneClick = useCallback(() => {
+    setSelectedNodeId(null);
+  }, []);
+
   const { filteredNodes, filteredEdges } = useMemo(() => {
     const filteredHosts = hostData.filter(host => {
         const riskScore = host.riskScore ?? 0;
@@ -247,24 +246,32 @@ const Graph = ({ hosts }: { hosts: Host[] }) => {
 
   }, [hostData, debouncedRiskFilter, osFilters, deviceTypeFilters]);
 
-  React.useEffect(() => {
-    const connectedEdges = selectedNodeId ? getConnectedEdges(filteredNodes.filter(n => n.id === selectedNodeId), filteredEdges) : [];
-    
-    const finalNodes = filteredNodes.map(node => {
-      const isDimmed = selectedNodeId
-        ? node.id !== selectedNodeId && !connectedEdges.some(e => e.source === node.id || e.target === node.id)
-        : false;
-      return {
-        ...node,
-        data: {
-          ...node.data,
-          dimmed: isDimmed
+  useEffect(() => {
+      const allGraphNodes = getNodes();
+      
+      const finalNodes = filteredNodes.map(node => {
+        const isSelected = node.id === selectedNodeId;
+        
+        let isRelated = false;
+        if (selectedNodeId) {
+            const selected = allGraphNodes.find(n => n.id === selectedNodeId);
+            if (selected) {
+                 const connectedEdges = getConnectedEdges([selected], filteredEdges);
+                 isRelated = connectedEdges.some(e => e.source === node.id || e.target === node.id);
+            }
         }
-      };
-    });
-    setNodes(finalNodes);
-    setEdges(filteredEdges);
-  }, [filteredNodes, filteredEdges, selectedNodeId, setNodes, setEdges]);
+
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            dimmed: selectedNodeId ? !isSelected && !isRelated : false,
+          }
+        };
+      });
+      setNodes(finalNodes);
+      setEdges(filteredEdges);
+  }, [filteredNodes, filteredEdges, selectedNodeId, setNodes, setEdges, getNodes]);
   
   const handleOsFilterChange = (os: string, checked: boolean) => {
     setOsFilters(prev => checked ? [...prev, os] : prev.filter(o => o !== os));
@@ -302,11 +309,15 @@ const Graph = ({ hosts }: { hosts: Host[] }) => {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeClick={handleNodeClick}
+          onPaneClick={handlePaneClick}
           fitView
+          panOnDrag
+          zoomOnScroll
+          defaultViewport={defaultViewport}
           className="bg-background"
           nodeTypes={nodeTypes}
         >
-          <Controls showInteractive={false} />
+          <Controls />
           <Background gap={12} size={1} />
            <Panel position="top-left" className="p-4 bg-card border rounded-lg shadow-md space-y-4 max-w-xs max-h-[80vh] overflow-y-auto">
                <div className="flex justify-between items-center">
@@ -382,12 +393,14 @@ export default function NetworkGraphView({ hosts, pdfMode = false }: { hosts: Ho
   }
 
   return (
-    <Card>
-      <CardContent className="p-0 relative" style={{ height: 'calc(100vh - 12rem)' }}>
-        <ReactFlowProvider>
-          <Graph hosts={hosts} />
-        </ReactFlowProvider>
-      </CardContent>
-    </Card>
+    <div className='w-full h-full'>
+      <Card className="h-full flex flex-col">
+        <CardContent className="p-0 relative flex-1">
+          <ReactFlowProvider>
+            <Graph hosts={hosts} />
+          </ReactFlowProvider>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

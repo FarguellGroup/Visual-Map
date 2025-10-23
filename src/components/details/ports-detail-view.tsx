@@ -135,7 +135,7 @@ export default function PortsDetailView({ hosts }: { hosts: Host[]}) {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 w-full">
       <Card>
         <CardHeader>
           <CardTitle>{t('topPortsTitle')}</CardTitle>
@@ -147,7 +147,7 @@ export default function PortsDetailView({ hosts }: { hosts: Host[]}) {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="port" interval={0} fontSize={12} />
                       <YAxis allowDecimals={false} />
-                      <Tooltip />
+                      <Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--popover))', color: 'hsl(var(--popover-foreground))', borderRadius: 'var(--radius)', border: '1px solid hsl(var(--border))'}} />
                       <Legend />
                       <Bar dataKey="count" fill="hsl(var(--primary))" name={t('hostCount')} />
                   </BarChart>

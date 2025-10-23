@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import type { Host, Port } from '@/types/nmap';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useLocale, useTranslations } from 'next-intl';
 import { ArrowUpDown } from 'lucide-react';
 import { calculatePortRiskScore } from '@/lib/risk-scorer';
@@ -23,15 +23,6 @@ interface ServiceData {
 
 type SortableKeys = 'hostIp' | 'port' | 'service' | 'product' | 'version' | 'riskScore';
 type SortDirection = 'ascending' | 'descending';
-
-const COLORS = [
-    'hsl(var(--chart-1))',
-    'hsl(var(--chart-2))',
-    'hsl(var(--chart-3))',
-    'hsl(var(--chart-4))',
-    'hsl(var(--chart-5))',
-    '#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#00C49F'
-];
 
 const ipToNumber = (ip: string) => {
     return ip.split('.').reduce((acc, octet, index) => acc + parseInt(octet) * Math.pow(256, 3 - index), 0);
@@ -139,33 +130,38 @@ export default function ServicesDetailView({ hosts }: { hosts: Host[] }) {
     allServices.forEach(s => {
         counts[s.name] = (counts[s.name] || 0) + 1;
     });
-    return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
+    return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value).slice(0, 10).reverse();
   }, [allServices]);
   
   const riskScoreTitle = locale === 'es' ? 'Puntaje de Riesgo' : 'Risk Score';
+  const numberOfHostsTitle = locale === 'es' ? 'Número de Hosts' : 'Number of Hosts';
 
   const handleRowClick = (hostIp: string) => {
     router.push(`/details/host/${hostIp}`);
   };
+  
+  const chartHeight = serviceDistribution.length * 40 + 60;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 w-full">
       <Card>
         <CardHeader>
           <CardTitle>{t('serviceDistributionTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div id="service-distribution-chart">
-            <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                    <Pie data={serviceDistribution.slice(0, 10)} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                        {serviceDistribution.slice(0, 10).map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{fontSize: '12px'}} />
-                </PieChart>
+            <ResponsiveContainer width="100%" height={chartHeight}>
+                <BarChart
+                    data={serviceDistribution}
+                    layout="vertical"
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} />
+                    <YAxis type="category" dataKey="name" width={80} interval={0} fontSize={12} />
+                    <Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--popover))', color: 'hsl(var(--popover-foreground))', borderRadius: 'var(--radius)', border: '1px solid hsl(var(--border))'}} />
+                    <Bar dataKey="value" name={numberOfHostsTitle} fill="hsl(var(--primary))" barSize={20} />
+                </BarChart>
             </ResponsiveContainer>
           </div>
         </CardContent>

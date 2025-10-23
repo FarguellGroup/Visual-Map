@@ -17,7 +17,7 @@ const options = {
       'nmaprun.host.ports.port',
       'nmaprun.host.hostnames.hostname',
       'nmaprun.host.ports.port.script',
-      'nmaprun.host.hostscript.script',
+      'nmaprun.host.hostscript',
       'nmaprun.host.os.osmatch',
     ];
     return arrayPaths.indexOf(jpath) !== -1;
@@ -29,8 +29,13 @@ export async function parseNmapXml(xmlData: string): Promise<Host[]> {
     const parser = new XMLParser(options);
     const jsonObj = parser.parse(xmlData);
 
-    if (!jsonObj.nmaprun || !jsonObj.nmaprun.host) {
-      return [];
+    if (!jsonObj.nmaprun) {
+        return [];
+    }
+    
+    // Handle case where there are no hosts
+    if (!jsonObj.nmaprun.host) {
+        return [];
     }
 
     // The isArray option ensures `jsonObj.nmaprun.host` is always an array

@@ -6,7 +6,7 @@ import type { ExplainVulnerabilityRiskOutput, PentestingNextStepsOutput, NseScri
 import { calculateRiskScores } from '@/lib/risk-scorer';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export const AI_MODEL_NAME = 'gemini-2.5-flash-lite';
+export const AI_MODEL_NAME = 'gemini-1.5-flash-latest';
 
 export type RiskWeights = {
   criticalPorts: number;
@@ -377,7 +377,10 @@ export const useScanStore = create<ScanState>()(
                 const cacheEntry = get().cveCache.get(host.address[0].addr);
                 return hasScannablePorts && (!cacheEntry || cacheEntry.status === 'idle' || cacheEntry.status === 'error');
             });
-            const totalServicesToScan = hostsForScan.reduce((acc, host) => acc + getOpenPortsWithServices(host).length, 0);
+            const totalServicesToScan = hostsForScan.reduce((acc, host) => {
+                const ports = getOpenPortsWithServices(host);
+                return acc + ports.length;
+            }, 0);
             set({ cveScanProgress: { processed: 0, total: totalServicesToScan, isComplete: false } });
         }
 
