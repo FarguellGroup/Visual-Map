@@ -126,7 +126,7 @@ export default function UploadZone({ className }: { className?: string }) {
 
   if (isLoading) {
     return (
-      <div className="flex-grow flex flex-col items-center justify-center gap-4">
+      <div className="flex-grow flex flex-col items-center justify-center gap-4 h-full">
         <Loader2 className={cn('w-16 h-16 animate-spin text-primary')} />
         <p className="text-lg text-muted-foreground">{tLoader('analyzing')}</p>
       </div>
