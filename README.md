@@ -47,12 +47,19 @@ Una vez ejecutado, la aplicación estará disponible en [http://localhost:9002](
 Puedes desplegar la aplicación utilizando Docker. Primero, necesitas tu clave de API de Gemini, que puedes obtener gratis en [Google AI Studio](https://aistudio.google.com/).
 
 ```bash
-# 1. Construye la imagen de Docker
+# 1. Clona el repositorio
+git clone https://github.com/afsh4ck/Visual-Map.git
+cd Visual-Map
+
+# 2. Construye la imagen de Docker
 docker build -t visual-map .
 
-# 2. Ejecuta el contenedor con tu clave de API
-# Reemplaza TU_API_KEY_AQUI con tu clave de API de Gemini
-docker run -p 9002:3000 -e NEXT_PUBLIC_GOOGLE_GENAI_API_KEY="TU_API_KEY_AQUI" -d visual-map
+# 3. Ejecuta el contenedor con tu clave de API
+# Reemplaza TU_API_KEY con tu clave de API de Gemini
+docker run -p 9002:3000 -e NEXT_PUBLIC_GOOGLE_GENAI_API_KEY="TU_API_KEY" -d visual-map
+
+# 4. Comprueba que está levantado
+docker ps
 ```
 Una vez ejecutado, la aplicación estará disponible en [http://localhost:9002](http://localhost:9002).
 
