@@ -1,4 +1,3 @@
-
 const createNextIntlPlugin = require('next-intl/plugin');
 
 const withNextIntl = createNextIntlPlugin('./src/i18n.ts');
@@ -14,9 +13,6 @@ const nextConfig = {
   },
   eslint: {
     ignoreDuringBuilds: true,
-  },
-  experimental: {
-    outputFileTracingRoot: require('path').join(__dirname, '../../'),
   },
   images: {
     remotePatterns: [
