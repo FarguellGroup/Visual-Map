@@ -104,7 +104,7 @@ Consulta todos los puertos abiertos en el objetivo, con una gráfica de los 15 p
 ### Servicios expuestos
 Consulta todos los servicios expuestos en la infraestructura, con una gráfica de distribución de servicios.
 
-<img width="3456" height="1856" alt="VM - Services" src="https://github.com/user-attachments/assets/37bbd2da-5e07-4e6c-9e37-5c73aab7f44e" />
+<img width="3456" height="1860" alt="Vm - Servicios 2" src="https://github.com/user-attachments/assets/a906766c-8269-4e39-965e-2838327e60e5" />
 
 ### Hosts más vulnerables
 Visualiza de manera rápida los hosts más vulnerables de una infraestructura, con un gráfico de distribución de riesgo.
