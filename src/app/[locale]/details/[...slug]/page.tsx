@@ -70,7 +70,8 @@ export default function DetailsPage() {
         case 'vulnerabilities':
             return <ThreatsDetailView hosts={scanResult!.hosts} />;
         case 'network':
-            return <NetworkGraphView hosts={scanResult!.hosts} />;
+            // The graph needs a container with a defined height to render.
+            return <div className="h-full"><NetworkGraphView hosts={scanResult!.hosts} /></div>;
         case 'api':
             return <ApiPage />;
         default:
@@ -80,11 +81,13 @@ export default function DetailsPage() {
 
   return (
     <>
-      <div className="container mx-auto p-0">
+      <div className="p-0 flex flex-col h-full w-full">
         <div className="flex items-center gap-4 mb-8">
           <h1 className="text-2xl md:text-3xl font-bold capitalize font-headline text-primary">{getPageTitle()}</h1>
         </div>
-        {renderContent()}
+        <div className="flex-grow w-full">
+          {renderContent()}
+        </div>
       </div>
       <HostDetailDrawer />
     </>
