@@ -133,7 +133,12 @@ export default function ApiPage() {
         .filter((model: any) => 
             model.supportedGenerationMethods.includes('generateContent') && 
             model.name.includes('gemini') &&
-            !model.name.toLowerCase().includes('-exp-')
+            !model.name.toLowerCase().includes('-exp-') &&
+            !model.name.toLowerCase().includes('-preview') &&
+            !model.name.toLowerCase().includes('-tts') &&
+            !/\d{4}-\d{2}-\d{2}$/.test(model.name.toLowerCase()) &&
+            !/-\d{2}-\d{2}$/.test(model.name.toLowerCase()) &&
+            !/-\d{4}$/.test(model.name.toLowerCase())
         )
         .map((model: any) => ({
             name: model.name,
