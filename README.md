@@ -55,7 +55,6 @@ cd Visual-Map
 docker build -t visual-map .
 
 # 3. Ejecuta el contenedor con tu clave de API
-# Reemplaza TU_API_KEY con tu clave de API de Gemini
 docker run -p 9002:3000 -e NEXT_PUBLIC_GOOGLE_GENAI_API_KEY="TU_API_KEY" -d visual-map
 
 # 4. Comprueba que está levantado
