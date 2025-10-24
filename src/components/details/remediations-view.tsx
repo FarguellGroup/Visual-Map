@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo, useState } from 'react';
@@ -55,8 +54,10 @@ const formatRemediation = (text: string): string => {
         }
         
         const trimmedLine = line.trim();
+        const isBulletedListItem = trimmedLine.match(/^[-*]\s/);
+        const isNumericLooking = /^\d+\.\s/.test(trimmedLine);
         
-        if (trimmedLine.match(/^[-*]\s/)) {
+        if (isBulletedListItem) {
             if (!ulOpen) { closeLists(); html += '<ul class="list-disc pl-5">'; ulOpen = true; }
             html += `<li>${trimmedLine.substring(trimmedLine.indexOf(' ') + 1).trim().replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</li>`;
         } else if (trimmedLine.startsWith('# ')) {
@@ -141,7 +142,7 @@ export default function RemediationsView({ hosts }: { hosts: Host[] }) {
         if (value) {
             const cveId = value.replace('cve-', '');
             const cveItem = allFoundCves.find(item => item.cve.cveId === cveId);
-            if (cveItem) {
+            if (cveItem && remediationCache) {
                 const cacheKey = `${cveItem.cve.cveId}-${locale}`;
                 const entry = remediationCache.get(cacheKey);
                 if (!entry || entry.status === 'idle' || entry.status === 'error') {
@@ -153,6 +154,7 @@ export default function RemediationsView({ hosts }: { hosts: Host[] }) {
     };
 
     const handleGenerateAll = () => {
+        if (!remediationCache) return;
         const cveItemsToFetch = allFoundCves
             .map(item => ({...item, osName: getHostname(item.host)}))
             .filter(item => {
@@ -235,7 +237,7 @@ export default function RemediationsView({ hosts }: { hosts: Host[] }) {
         );
     }
 
-    if (allFoundCves.length === 0 && (cveScanProgress.isComplete || !hasUnscannedHosts)) {
+    if (allFoundCves.length === 0 && (cveScanProgress?.isComplete || !hasUnscannedHosts)) {
         return (
              <div className="flex flex-col items-center justify-center space-y-3 p-4 text-center">
                 <ShieldCheck className="h-8 w-8 text-green-500" />
@@ -284,8 +286,8 @@ export default function RemediationsView({ hosts }: { hosts: Host[] }) {
             <CardContent>
                 <Accordion type="single" collapsible className="w-full" value={openAccordionItem} onValueChange={handleAccordionChange}>
                     {cveRemediations.map(({ cve, hosts: affectedHosts }, index) => {
-                        const cacheKey = `${cve.cveId}-${locale}`;
-                        const remediationEntry = remediationCache.get(cacheKey);
+                        const cacheKey = remediationCache ? `${cve.cveId}-${locale}` : null;
+                        const remediationEntry = cacheKey ? remediationCache.get(cacheKey) : undefined;
                         const remediation = remediationEntry?.data;
                         const error = remediationEntry?.error;
                         const isLoading = remediationEntry?.status === 'loading';
