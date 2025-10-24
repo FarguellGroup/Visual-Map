@@ -7,12 +7,16 @@ import { Sidebar, SidebarProvider } from '@/components/ui/sidebar';
 import AppHeader from '@/components/layout/header';
 import AppSidebar from '@/components/layout/sidebar';
 import AppFooter from '@/components/layout/footer';
-import VulnerabilitiesDetailView from '@/components/details/vulnerabilities-detail-view';
-import PortsDetailView from '@/components/details/ports-detail-view';
-import ServicesDetailView from '@/components/details/services-detail-view';
-import ThreatsDetailView from '@/components/details/threats-detail-view';
 import ApiErrorToast from '@/components/api-error-toast';
-import NetworkGraphView from '../details/network-graph-view';
+import dynamic from 'next/dynamic';
+
+const VulnerabilitiesDetailView = dynamic(() => import('@/components/details/vulnerabilities-detail-view'));
+const PortsDetailView = dynamic(() => import('@/components/details/ports-detail-view'));
+const ServicesDetailView = dynamic(() => import('@/components/details/services-detail-view'));
+const ThreatsDetailView = dynamic(() => import('@/components/details/threats-detail-view'));
+const RemediationsView = dynamic(() => import('@/components/details/remediations-view'));
+const NetworkGraphView = dynamic(() => import('@/components/details/network-graph-view'), { ssr: false });
+
 
 export default function MainLayout({
   children,
@@ -51,6 +55,7 @@ export default function MainLayout({
               <ServicesDetailView hosts={scanResult.hosts} />
               <NetworkGraphView hosts={scanResult.hosts} pdfMode={true} />
               <ThreatsDetailView hosts={scanResult.hosts} pdfMode={true} />
+              <RemediationsView hosts={scanResult.hosts} />
               {/* Explicitly render for PDF with a specific ID */}
               {hasCves && <ThreatsDetailView hosts={scanResult.hosts} pdfMode={true} forceId="pdf-threat-service-dist-chart" />}
             </>

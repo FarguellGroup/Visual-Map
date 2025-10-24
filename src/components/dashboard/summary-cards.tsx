@@ -3,17 +3,18 @@
 
 import { useScanStore } from '@/store/use-scan-store';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Server, ShieldCheck, DoorOpen, AlertTriangle } from 'lucide-react';
+import { Server, ShieldCheck, DoorOpen, AlertTriangle, Skull } from 'lucide-react';
 import React from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Link } from '@/navigation';
 
 export default function SummaryCards() {
-  const { scanResult } = useScanStore();
+  const { scanResult, cveCache } = useScanStore();
   const t = useTranslations('SummaryCards');
+  const locale = useLocale();
 
   const summary = React.useMemo(() => {
-    if (!scanResult) return { hostCount: 0, totalOpenPorts: 0, uniqueServices: 0, topVulnerableCount: 0 };
+    if (!scanResult) return { hostCount: 0, totalOpenPorts: 0, uniqueServices: 0, topVulnerableCount: 0, totalCves: 0 };
     
     const hosts = scanResult.hosts;
     const hostCount = hosts.length;
@@ -36,21 +37,32 @@ export default function SummaryCards() {
     });
 
     const topVulnerableCount = hosts.filter(h => (h.riskScore ?? 0) >= 75).length;
+    
+    const allCves = Array.from(cveCache.values())
+      .filter(entry => entry.status === 'loaded' && entry.data)
+      .flatMap(entry => entry.data!);
+    
+    const uniqueCveIds = new Set(allCves.map(cveItem => cveItem.cve.cveId));
 
     return {
       hostCount,
       totalOpenPorts,
       uniqueServices: services.size,
-      topVulnerableCount
+      topVulnerableCount,
+      totalCves: uniqueCveIds.size,
     };
-  }, [scanResult]);
+  }, [scanResult, cveCache]);
 
   if (!scanResult) return null;
 
   const cardClassName = "transition-all duration-200 hover:bg-muted/50 hover:shadow-md border";
+  const gridColsClass = "lg:grid-cols-5";
+
+  const discoveredCvesTitle = locale === 'es' ? 'CVEs Descubiertos' : 'Discovered CVEs';
+  const discoveredCvesDescription = locale === 'es' ? 'vulnerabilidades encontradas' : 'vulnerabilities found';
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className={`grid gap-4 md:grid-cols-2 ${gridColsClass}`}>
       <Link href="/details/hosts" className="block group">
         <Card className={`${cardClassName} hover:border-primary`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -87,6 +99,18 @@ export default function SummaryCards() {
           </CardContent>
         </Card>
       </Link>
+       <Link href="/details/vulnerabilities" className="block group">
+          <Card className={`${cardClassName} hover:border-destructive hover:bg-destructive/10`}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium transition-colors group-hover:text-destructive">{discoveredCvesTitle}</CardTitle>
+              <Skull className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">{summary.totalCves}</div>
+              <p className="text-xs text-muted-foreground">{discoveredCvesDescription}</p>
+            </CardContent>
+          </Card>
+       </Link>
       <Link href="/details/vulnerable-hosts" className="block group/danger">
        <Card className={`${cardClassName} hover:border-destructive hover:bg-destructive/10`}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

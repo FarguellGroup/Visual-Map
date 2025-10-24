@@ -106,4 +106,18 @@ export const CveDetailsOutputSchema = z.object({
 });
 export type CveDetailsOutput = z.infer<typeof CveDetailsOutputSchema>;
 
-    
+
+export const RemediationInputSchema = z.object({
+  cveId: z.string().describe('The CVE identifier (e.g., "CVE-2021-44228").'),
+  cveDescription: z.string().describe('A brief, clear description of the vulnerability.'),
+  serviceName: z.string().describe('The name of the vulnerable service (e.g., "Apache httpd").'),
+  serviceVersion: z.string().describe('The version of the vulnerable service (e.g., "2.4.49").'),
+  osName: z.string().describe('The operating system of the host (e.g., "Linux 3.10 - 4.11").'),
+  locale: z.string().describe('The language for the response ("en" or "es").'),
+});
+export type RemediationInput = z.infer<typeof RemediationInputSchema>;
+
+export const RemediationOutputSchema = z.object({
+  remediation: z.string().describe('A step-by-step guide in Markdown on how to remediate the vulnerability. Include commands if applicable.'),
+});
+export type RemediationOutput = z.infer<typeof RemediationOutputSchema>;

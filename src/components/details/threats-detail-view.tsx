@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -6,15 +7,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useLocale, useTranslations } from 'next-intl';
-import { useRouter } from '@/navigation';
+import { useRouter, Link } from '@/navigation';
 import { cn } from '@/lib/utils';
-import { ArrowUpDown, ShieldX, Search, RotateCw, Settings, Pause, Play, AlertCircle, Info } from 'lucide-react';
+import { ArrowUpDown, ShieldX, Search, RotateCw, Settings, Pause, Play, AlertCircle, Info, Group } from 'lucide-react';
 import { useScanStore } from '@/store/use-scan-store';
 import { Progress } from '../ui/progress';
-import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Legend, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { Button } from '../ui/button';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { getHostname } from '@/lib/nmap-parser';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const getCveRiskColorClass = (score: number | string | null): string => {
     const numericScore = typeof score === 'string' ? parseFloat(score) : score;
@@ -30,12 +32,11 @@ const COLORS = [
 ];
 
 type SortDirection = 'ascending' | 'descending';
-type SortableKeys = 'service' | 'cveId' | 'cvssScore' | 'hostIp' | 'hostname';
+type SortableKeys = 'cveId' | 'cvssScore' | 'affectedHost' | 'service';
 
 const ipToNumber = (ip: string) => {
     return ip.split('.').reduce((acc, octet, index) => acc + parseInt(octet) * Math.pow(256, 3 - index), 0);
 };
-
 
 const ResumeScanButton = () => {
     const locale = useLocale();
@@ -68,10 +69,8 @@ const ResumeScanButton = () => {
     )
 }
 
-
 export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: { hosts: Host[], pdfMode?: boolean, forceId?: string }) {
     const t = useTranslations('DetailsPage');
-    const tHostsTable = useTranslations('HostsTable');
     const router = useRouter();
     const locale = useLocale();
     
@@ -89,6 +88,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     } = useScanStore();
     
     const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: SortDirection }>({ key: 'cvssScore', direction: 'descending' });
+    const [selectedHostIp, setSelectedHostIp] = useState<string>('all');
 
     const handleFetchAllCves = () => {
         fetchCvesForHost(hosts, locale);
@@ -102,43 +102,38 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
       fetchCvesForHost(hosts, locale);
     }
 
-    const { allFoundCves, vulnerableServices, serviceDistribution, hasUnscannedHosts } = useMemo(() => {
+    const { allCves, serviceDistribution, hasUnscannedHosts, uniqueCveCount, affectedHostOptions } = useMemo(() => {
         if (!cveCache) {
-             return { allFoundCves: [], vulnerableServices: [], serviceDistribution: [], hasUnscannedHosts: true };
+             return { allCves: [], serviceDistribution: [], hasUnscannedHosts: true, uniqueCveCount: 0, affectedHostOptions: [] };
         }
-        let allCves: { host: Host, service: Service, portId: string, cve: any }[] = [];
-        let servicesWithCves = new Map<string, { service: Service, cves: any[], hostCount: number, hosts: Set<string> }>();
-        let unscannedCount = 0;
+
+        const cveList: { cveInfo: any; host: Host, service: Service; portId: string }[] = [];
+        const uniqueCveIds = new Set<string>();
+        const affectedHosts = new Map<string, { label: string, value: string }>();
 
         hosts.forEach(host => {
             const cveEntry = cveCache.get(host.address[0].addr);
-            if (!cveEntry) {
-                unscannedCount++;
-            }
             if (cveEntry?.status === 'loaded' && cveEntry.data) {
+                if (cveEntry.data.length > 0 && !affectedHosts.has(host.address[0].addr)) {
+                     affectedHosts.set(host.address[0].addr, {
+                        value: host.address[0].addr,
+                        label: `${getHostname(host)} (${host.address[0].addr})`
+                    });
+                }
                 cveEntry.data.forEach(cveItem => {
-                    // Filter out potential error objects
                     if (cveItem.cve && cveItem.cve.cveId) {
-                        allCves.push({ host, service: cveItem.service, portId: cveItem.portId, cve: cveItem.cve });
-                        const serviceKey = `${cveItem.service.product}@${cveItem.service.version}`;
-                        if (!servicesWithCves.has(serviceKey)) {
-                            servicesWithCves.set(serviceKey, { service: cveItem.service, cves: [], hostCount: 0, hosts: new Set() });
-                        }
-                        const entry = servicesWithCves.get(serviceKey)!;
-                        entry.cves.push(cveItem.cve);
-                        entry.hosts.add(host.address[0].addr);
-                        entry.hostCount = entry.hosts.size;
+                        uniqueCveIds.add(cveItem.cve.cveId);
+                        cveList.push({ cveInfo: cveItem.cve, host, service: cveItem.service, portId: cveItem.portId });
                     }
                 });
             }
         });
         
-        const vulnerableServices = Array.from(servicesWithCves.values()).sort((a, b) => b.cves.length - a.cves.length);
-        
         const serviceCounts: { [key: string]: number } = {};
-        vulnerableServices.forEach(item => {
-            if (item.service.name) {
-                serviceCounts[item.service.name] = (serviceCounts[item.service.name] || 0) + 1;
+        cveList.forEach(item => {
+            const serviceName = item.service.name;
+            if (serviceName) {
+                serviceCounts[serviceName] = (serviceCounts[serviceName] || 0) + 1;
             }
         });
         const serviceDistribution = Object.entries(serviceCounts).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value).slice(0, 5);
@@ -148,12 +143,14 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
             return !entry || entry.status === 'idle' || entry.status === 'error';
         });
 
+        const sortedHostOptions = Array.from(affectedHosts.values()).sort((a,b) => a.label.localeCompare(b.label));
 
         return { 
-            allFoundCves: allCves, 
-            vulnerableServices, 
+            allCves: cveList,
             serviceDistribution,
-            hasUnscannedHosts: hasUnscanned
+            hasUnscannedHosts: hasUnscanned,
+            uniqueCveCount: uniqueCveIds.size,
+            affectedHostOptions: sortedHostOptions,
         };
     }, [hosts, cveCache]);
     
@@ -166,7 +163,12 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
 
 
     const sortedCves = useMemo(() => {
-        let sortableItems = [...allFoundCves];
+        let sortableItems = [...allCves];
+
+        if (selectedHostIp !== 'all') {
+            sortableItems = sortableItems.filter(item => item.host.address[0].addr === selectedHostIp);
+        }
+
         if (sortConfig !== null) {
             sortableItems.sort((a, b) => {
                 let aValue: string | number;
@@ -174,24 +176,20 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
 
                 switch (sortConfig.key) {
                     case 'service':
-                        aValue = `${a.service.product} ${a.service.version}`.trim().toLowerCase();
-                        bValue = `${b.service.product} ${b.service.version}`.trim().toLowerCase();
+                        aValue = `${a.service.product || a.service.name} ${a.service.version || ''}`.trim().toLowerCase();
+                        bValue = `${b.service.product || b.service.name} ${b.service.version || ''}`.trim().toLowerCase();
                         break;
                     case 'cveId':
-                        aValue = a.cve.cveId.toLowerCase();
-                        bValue = b.cve.cveId.toLowerCase();
+                        aValue = a.cveInfo.cveId.toLowerCase();
+                        bValue = b.cveInfo.cveId.toLowerCase();
                         break;
                     case 'cvssScore':
-                        aValue = a.cve.cvssScore !== null ? parseFloat(a.cve.cvssScore) : -1;
-                        bValue = b.cve.cvssScore !== null ? parseFloat(b.cve.cvssScore) : -1;
+                        aValue = a.cveInfo.cvssScore !== null ? parseFloat(a.cveInfo.cvssScore) : -1;
+                        bValue = b.cveInfo.cvssScore !== null ? parseFloat(b.cveInfo.cvssScore) : -1;
                         if (isNaN(aValue)) aValue = -1;
                         if (isNaN(bValue)) bValue = -1;
                         break;
-                    case 'hostname':
-                        aValue = getHostname(a.host);
-                        bValue = getHostname(b.host);
-                        break;
-                    case 'hostIp':
+                    case 'affectedHost':
                         aValue = ipToNumber(a.host.address[0].addr);
                         bValue = ipToNumber(b.host.address[0].addr);
                         break;
@@ -209,7 +207,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
             });
         }
         return sortableItems;
-    }, [allFoundCves, sortConfig]);
+    }, [allCves, sortConfig, selectedHostIp]);
 
     const requestSort = (key: SortableKeys) => {
         let direction: SortDirection = 'ascending';
@@ -226,20 +224,15 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
         return <ArrowUpDown className="ml-2 h-4 w-4" />;
     };
 
-    const handleRowClick = (hostIp: string) => {
-        router.push(`/details/host/${hostIp}`);
-    };
-
     const cvesTitleText = locale === 'es' ? 'CVEs Descubiertos' : 'Discovered CVEs';
-    const cvesTitle = allFoundCves.length > 0 
-        ? `${cvesTitleText} (${allFoundCves.length})` 
+    const cvesTitle = uniqueCveCount > 0 
+        ? `${cvesTitleText} (${uniqueCveCount})` 
         : cvesTitleText;
 
     const cvesDescription = locale === 'es' ? 'Busca vulnerabilidades y CVEs en los hosts descubiertos mediante IA.' : 'Search for vulnerabilities and CVEs on discovered hosts using AI.';
     const vulnerableServicesTitle = locale === 'es' ? 'Principales Servicios Vulnerables' : 'Top Vulnerable Services';
     const serviceTitle = t('service');
-    const hostCountTitle = t('hostCount');
-    const cveCountTitle = locale === 'es' ? 'CVEs' : 'CVEs';
+    const affectedHostTitle = locale === 'es' ? 'Host Afectado' : 'Affected Host';
     const cvssScoreTitle = locale === 'es' ? 'Puntaje CVSS' : 'CVSS Score';
     const noCvesFound = locale === 'es' ? 'No se encontraron CVEs para los servicios detectados en este escaneo.' : 'No CVEs found for the detected services in this scan.';
     const vulnerableServicesDistributionTitle = locale === 'es' ? 'Distribución de Servicios Vulnerables' : 'Vulnerable Services Distribution';
@@ -258,17 +251,35 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     const chartId = forceId || (pdfMode ? 'pdf-threat-service-dist-chart' : 'threat-service-dist-chart');
     const scanStoppedError = locale === 'es' ? 'El escaneo se detuvo debido a un error de la API (rate limit). Inténtalo de nuevo más tarde.' : 'Scan stopped due to API rate limit. Please try again later.';
     const configureApiButtonText = locale === 'es' ? 'Configurar API' : 'Configure API';
+    const allHostsText = locale === 'es' ? 'Todos los Hosts' : 'All Hosts';
 
 
   return (
     <div className="space-y-8 w-full">
         <Card>
-            <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                     <CardTitle>{cvesTitle}</CardTitle>
                     <CardDescription>{cvesDescription}</CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {affectedHostOptions.length > 0 && (
+                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <Select value={selectedHostIp} onValueChange={setSelectedHostIp}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder={t('filterByHost')} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">{allHostsText}</SelectItem>
+                                    {affectedHostOptions.map(option => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
                     {showGlobalScanButton && (
                         <Button onClick={handleFetchAllCves} size="sm">
                             <Search className="mr-2 h-4 w-4" />
@@ -338,51 +349,55 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
             <CardContent>
                 {sortedCves.length > 0 ? (
                     <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead onClick={() => requestSort('service')} className="cursor-pointer">
-                                        <div className="flex items-center">{serviceTitle} {getSortIcon('service')}</div>
-                                    </TableHead>
-                                    <TableHead onClick={() => requestSort('cveId')} className="cursor-pointer">
-                                        <div className="flex items-center">CVE ID {getSortIcon('cveId')}</div>
-                                    </TableHead>
-                                    <TableHead onClick={() => requestSort('cvssScore')} className="cursor-pointer">
-                                        <div className="flex items-center">{cvssScoreTitle} {getSortIcon('cvssScore')}</div>
-                                    </TableHead>
-                                     <TableHead onClick={() => requestSort('hostname')} className="cursor-pointer">
-                                        <div className="flex items-center">{tHostsTable('hostname')} {getSortIcon('hostname')}</div>
-                                    </TableHead>
-                                    <TableHead onClick={() => requestSort('hostIp')} className="cursor-pointer">
-                                        <div className="flex items-center">{t('hostIp')} {getSortIcon('hostIp')}</div>
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {sortedCves.map((item, index) => {
-                                    const score = item.cve.cvssScore !== null ? parseFloat(item.cve.cvssScore) : null;
-                                    const displayScore = score !== null && !isNaN(score) ? score.toFixed(1) : 'N/A';
-                                    const hostname = getHostname(item.host);
-                                    return (
-                                        <TableRow key={index} onClick={() => handleRowClick(item.host.address[0].addr)} className="cursor-pointer">
-                                            <TableCell className="font-medium">{item.service.product} {item.service.version}</TableCell>
-                                            <TableCell>
-                                                <a href={`https://nvd.nist.gov/vuln/detail/${item.cve.cveId}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
-                                                    {item.cve.cveId}
-                                                </a>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="default" className={cn("border-transparent", getCveRiskColorClass(score))}>
-                                                    {displayScore}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>{hostname}</TableCell>
-                                            <TableCell className="font-mono">{item.host.address[0].addr}</TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
+                      <Table>
+                          <TableHeader>
+                              <TableRow>
+                                  <TableHead onClick={() => requestSort('cveId')} className="cursor-pointer">
+                                      <div className="flex items-center">CVE ID {getSortIcon('cveId')}</div>
+                                  </TableHead>
+                                  <TableHead onClick={() => requestSort('cvssScore')} className="cursor-pointer">
+                                      <div className="flex items-center">{cvssScoreTitle} {getSortIcon('cvssScore')}</div>
+                                  </TableHead>
+                                   <TableHead onClick={() => requestSort('service')} className="cursor-pointer">
+                                      <div className="flex items-center">{serviceTitle} {getSortIcon('service')}</div>
+                                  </TableHead>
+                                  <TableHead onClick={() => requestSort('affectedHost')} className="cursor-pointer">
+                                      <div className="flex items-center">{affectedHostTitle} {getSortIcon('affectedHost')}</div>
+                                  </TableHead>
+                              </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                              {sortedCves.map((item, index) => {
+                                  const score = item.cveInfo.cvssScore !== null ? parseFloat(item.cveInfo.cvssScore) : null;
+                                  const displayScore = score !== null && !isNaN(score) ? score.toFixed(1) : 'N/A';
+                                  
+                                  const hostname = getHostname(item.host);
+                                  const serviceText = `${item.service.product || item.service.name} ${item.service.version || ''}`.trim();
+
+                                  return (
+                                    <TableRow key={`${item.cveInfo.cveId}-${item.host.address[0].addr}-${index}`} className="cursor-default">
+                                        <TableCell>
+                                            <a href={`https://nvd.nist.gov/vuln/detail/${item.cveInfo.cveId}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                                                {item.cveInfo.cveId}
+                                            </a>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="default" className={cn("border-transparent", getCveRiskColorClass(score))}>
+                                                {displayScore}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="font-medium">{serviceText}</TableCell>
+                                        <TableCell>
+                                            <Link href={`/details/host/${item.host.address[0].addr}`} className='text-primary hover:underline'>
+                                                {item.host.address[0].addr}
+                                                {hostname !== 'N/A' && <span className='text-muted-foreground'> ({hostname})</span>}
+                                            </Link>
+                                        </TableCell>
+                                    </TableRow>
+                                  );
+                              })}
+                          </TableBody>
+                      </Table>
                     </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center space-y-3 p-4 text-center min-h-[150px]">
@@ -403,57 +418,30 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
             </CardContent>
         </Card>
 
-        {vulnerableServices.length > 0 && (
-            <>
-                <Card>
-                    <CardHeader>
-                    <CardTitle>{vulnerableServicesDistributionTitle}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div id={chartId} className={pdfMode ? 'w-[800px] h-[300px]' : ''}>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <PieChart>
-                                    <Pie data={serviceDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
-                                        {serviceDistribution.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--popover))', color: 'hsl(var(--popover-foreground))', borderRadius: 'var(--radius)', border: '1px solid hsl(var(--border))'}} itemStyle={{ color: 'hsl(var(--primary))' }}/>
-                                    <Legend />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{vulnerableServicesTitle} ({vulnerableServices.length})</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>{serviceTitle}</TableHead>
-                                        <TableHead>{hostCountTitle}</TableHead>
-                                        <TableHead>{cveCountTitle}</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {vulnerableServices.map((item, index) => (
-                                        <TableRow key={index}>
-                                            <TableCell className="font-medium">{item.service.product} {item.service.version}</TableCell>
-                                            <TableCell>{item.hostCount}</TableCell>
-                                            <TableCell>{item.cves.length}</TableCell>
-                                        </TableRow>
+        {allCves.length > 0 && (
+            <Card>
+                <CardHeader>
+                <CardTitle>{vulnerableServicesDistributionTitle}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div id={chartId} className={pdfMode ? 'w-[800px] h-[300px]' : ''}>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                                <Pie data={serviceDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                                    {serviceDistribution.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                     ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
-            </>
+                                </Pie>
+                                <RechartsTooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--popover))', color: 'hsl(var(--popover-foreground))', borderRadius: 'var(--radius)', border: '1px solid hsl(var(--border))'}} itemStyle={{ color: 'hsl(var(--primary))' }}/>
+                                <Legend />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </CardContent>
+            </Card>
         )}
     </div>
   );
 }
+
+    

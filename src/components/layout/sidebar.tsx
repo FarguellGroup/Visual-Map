@@ -1,11 +1,12 @@
 
+
 'use client';
 
 import { SidebarHeader, SidebarContent, SidebarGroup, SidebarSeparator, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '../ui/button';
-import { Download, Loader2, Home, AlertTriangle, Shield, Server, DoorOpen, Network, Skull, SlidersHorizontal, ChevronDown, KeyRound } from 'lucide-react';
+import { Download, Loader2, Home, AlertTriangle, Shield, Server, DoorOpen, Network, Skull, SlidersHorizontal, ChevronDown, KeyRound, HeartPulse } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useScanStore, type RiskWeights } from '@/store/use-scan-store';
 import { useState, useCallback, useEffect } from 'react';
@@ -63,6 +64,211 @@ const processInBatches = async <T, U>(items: T[], batchSize: number, processItem
     return results;
 };
 
+const formatRemediationForHtml = (text: string): string => {
+    if (!text) return '';
+
+    const lines = text.split('\n');
+    let html = '';
+    let olOpen = false;
+    let ulOpen = false;
+    let codeBlockOpen = false;
+    let codeLang = '';
+    
+    let olCounter = 1;
+
+    const closeLists = () => {
+        if (olOpen) { html += '</ol>'; olOpen = false; }
+        if (ulOpen) { html += '</ul>'; ulOpen = false; }
+    };
+
+    lines.forEach(line => {
+        if (line.trim().startsWith('```')) {
+            if (codeBlockOpen) {
+                html += '</code></pre></div>';
+                codeBlockOpen = false;
+            } else {
+                closeLists();
+                codeLang = line.trim().substring(3);
+                html += `<div class="code-block-container"><span class="code-lang">${codeLang}</span><pre><code>`;
+                codeBlockOpen = true;
+            }
+            return;
+        }
+
+        if (codeBlockOpen) {
+            html += line.replace(/</g, "&lt;").replace(/>/g, "&gt;") + '\n';
+            return;
+        }
+        
+        const trimmedLine = line.trim();
+        const isNumericListItem = trimmedLine.match(/^\d+\.\s/);
+        
+        if (isNumericListItem) {
+            if (!olOpen) { closeLists(); html += '<ol>'; olOpen = true; olCounter = 1; }
+            html += `<li>${trimmedLine.substring(trimmedLine.indexOf('.') + 1).trim().replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</li>`;
+        } else if (trimmedLine.match(/^[-*]\s/)) {
+             if (olOpen) {
+                html = html.slice(0, -5); // Remove closing </li>
+                html += `<ul><li>${trimmedLine.substring(trimmedLine.indexOf(' ') + 1).trim().replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</li></ul></li>`;
+            } else {
+                if (!ulOpen) { closeLists(); html += '<ul>'; ulOpen = true; }
+                html += `<li>${trimmedLine.substring(trimmedLine.indexOf(' ') + 1).trim().replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</li>`;
+            }
+        } else if (trimmedLine.startsWith('# ')) {
+            closeLists();
+            html += `<h3>${trimmedLine.substring(2)}</h3>`;
+        } else if (trimmedLine.startsWith('## ')) {
+            closeLists();
+            html += `<h4>${trimmedLine.substring(3)}</h4>`;
+        } else if (trimmedLine.startsWith('### ')) {
+            closeLists();
+            html += `<h5>${trimmedLine.substring(4)}</h5>`;
+        } else if (trimmedLine) {
+            closeLists();
+            html += `<p>${trimmedLine.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')}</p>`;
+        }
+    });
+
+    closeLists();
+    return html;
+};
+
+
+const formatRemediationForPdf = (doc: jsPDF, text: string, startY: number, pageHeight: number, margin: number, pageWidth: number): number => {
+    let yPos = startY;
+
+    if (!text) return yPos;
+
+    const lines = text.replace(/\r\n/g, '\n').split('\n');
+
+    const checkPageBreak = (neededHeight: number) => {
+        if (yPos + neededHeight > pageHeight - margin) {
+            doc.addPage();
+            yPos = margin;
+        }
+    };
+
+    let inCodeBlock = false;
+    let codeBlockContent = '';
+    let codeBlockLang = '';
+
+    const renderCodeBlock = () => {
+        if (codeBlockContent) {
+            const codeLines = doc.splitTextToSize(codeBlockContent.trim(), pageWidth - (margin * 2) - 10);
+            const langHeight = codeBlockLang ? 5 : 0;
+            const blockHeight = (codeLines.length * 4.5) + 10 + langHeight + 5; // Added 5 for top padding
+
+            checkPageBreak(blockHeight + 15);
+
+            doc.setFillColor(230, 230, 230);
+            doc.roundedRect(margin, yPos, pageWidth - (margin * 2), blockHeight, 3, 3, 'F');
+
+            let textY = yPos + 7;
+            if (codeBlockLang) {
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'italic');
+                doc.setTextColor(100, 100, 100);
+                doc.text(codeBlockLang, margin + 5, textY);
+                textY += 5;
+            }
+            
+            doc.setFont('courier', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(0, 0, 0);
+            doc.text(codeLines, margin + 5, textY + 5); // Added 5 for top padding
+            
+            yPos += blockHeight + 10;
+            codeBlockContent = '';
+            codeBlockLang = '';
+        }
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+
+        if (line.trim().startsWith('```')) {
+            if (inCodeBlock) {
+                renderCodeBlock();
+            } else {
+                codeBlockLang = line.trim().substring(3);
+            }
+            inCodeBlock = !inCodeBlock;
+            continue;
+        }
+
+        if (inCodeBlock) {
+            codeBlockContent += line + '\n';
+            continue;
+        }
+
+        if (line.trim() === '') {
+            checkPageBreak(3);
+            yPos += 3;
+            continue;
+        }
+
+        let fontSize = 10;
+        let fontStyle = 'normal';
+        const indentMatch = line.match(/^(\s*)/);
+        const indent = indentMatch ? indentMatch[0].length * 2 : 0;
+        let currentX = margin + indent;
+        let lineHeight = fontSize * 1.2;
+
+        let processedLine = line.trim();
+        
+        const isBulletedListItem = processedLine.startsWith('- ') || processedLine.startsWith('* ');
+
+        if (isBulletedListItem) {
+            processedLine = `• ${processedLine.substring(2)}`;
+            currentX += 5;
+        } else if (processedLine.startsWith('# ')) { 
+            fontSize = 16; fontStyle = 'bold'; processedLine = processedLine.substring(2); 
+        } else if (processedLine.startsWith('## ')) { 
+            fontSize = 14; fontStyle = 'bold'; processedLine = processedLine.substring(3); 
+        } else if (processedLine.startsWith('### ')) { 
+            fontSize = 12; fontStyle = 'bold'; processedLine = processedLine.substring(4); 
+        }
+        
+        const parts = processedLine.split(/(\*\*.*?\*\*|`[^`]+`)/g).filter(part => part);
+        const splitText = doc.setFontSize(fontSize).splitTextToSize(parts.join(''), pageWidth - currentX - margin);
+
+        checkPageBreak(splitText.length * lineHeight);
+        
+        splitText.forEach((lineChunk: string, index: number) => {
+            let chunkX = currentX;
+            if (index > 0 && isBulletedListItem) { // Indent wrapped lines of list items
+                chunkX += 10;
+            }
+            const chunkParts = lineChunk.split(/(\*\*.*?\*\*|`[^`]+`)/g).filter(part => part);
+            chunkParts.forEach(part => {
+                const isBold = part.startsWith('**') && part.endsWith('**');
+                const isCode = part.startsWith('`') && part.endsWith('`');
+                const cleanPart = part.replace(/\*\*|`/g, '');
+                 
+                if (isBold) {
+                    doc.setFont('helvetica', 'bold');
+                } else if (isCode) {
+                    doc.setFont('courier', 'normal');
+                } else {
+                    doc.setFont('helvetica', fontStyle);
+                }
+                
+                doc.text(cleanPart, chunkX, yPos);
+                chunkX += doc.getStringUnitWidth(cleanPart) * fontSize / doc.internal.scaleFactor;
+            });
+            yPos += lineHeight;
+        });
+        
+        yPos += isBulletedListItem ? 1 : 2;
+    }
+
+    renderCodeBlock();
+    yPos += 25; // Increased space after code block
+    return yPos;
+};
+
+
+
 export default function AppSidebar() {
   const tHeader = useTranslations('Header');
   const tSidebar = useTranslations('Sidebar');
@@ -72,7 +278,7 @@ export default function AppSidebar() {
   const tRiskRanking = useTranslations('RiskRanking');
   const tApi = useTranslations('ApiPage');
   
-  const { scanResult, riskWeights, setRiskWeights, setScanResult, cveCache } = useScanStore();
+  const { scanResult, riskWeights, setRiskWeights, setScanResult, cveCache, remediationCache } = useScanStore();
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingHtml, setIsExportingHtml] = useState(false);
   const [localWeights, setLocalWeights] = useState<RiskWeights>(riskWeights);
@@ -139,7 +345,7 @@ export default function AppSidebar() {
   };
 
   const handleExportHtml = useCallback(async () => {
-    const { scanResult: currentScanResult, cveCache: currentCveCache } = useScanStore.getState();
+    const { scanResult: currentScanResult, cveCache: currentCveCache, remediationCache: currentRemediationCache } = useScanStore.getState();
     if (!currentScanResult) return;
     
     if (currentScanResult.hosts.length > 50) {
@@ -165,11 +371,11 @@ export default function AppSidebar() {
             );
 
         const threatsChart = allCves.length > 0 
-            ? await captureChartAsBase64('threat-service-dist-chart', { backgroundColor: reportBgColor })
+            ? await captureChartAsBase64('pdf-threat-service-dist-chart', { backgroundColor: reportBgColor })
             : null;
 
         const topVulnerableHosts = [...hosts]
-            .filter(h => (h.riskScore ?? 0) >= 60)
+            .filter(h => (h.riskScore ?? 0) >= 70)
             .sort((a, b) => (b.riskScore ?? 0) - (a.riskScore ?? 0));
         
         const allHostsSorted = [...hosts].sort((a,b) => ipToNumber(a.address[0].addr) - ipToNumber(b.address[0].addr));
@@ -196,11 +402,13 @@ export default function AppSidebar() {
         const summaryTitle = tSummary('totalHosts').includes('Total') ? 'Summary' : 'Resumen';
         const cvesTitle = locale === 'es' ? 'CVEs Descubiertos' : 'Discovered CVEs';
         const cvssTitle = locale === 'es' ? 'Puntaje CVSS' : 'CVSS Score';
+        const remediationsTitle = locale === 'es' ? 'Remediaciones' : 'Remediations';
 
         const chartNotAvailableText = locale === 'es' ? 'Gráfico no disponible. Navegue a la página correspondiente para incluirlo en el informe.' : 'Chart not available. Navigate to the corresponding page to include it in the report.';
         
         const moonIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`;
         const sunIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>`;
+        const faviconDataUri = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#906BE1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" fill="#906BE1" /></svg>');
 
         const generateHostDetailsHtml = async (hostsToProcess: typeof allHostsData) => {
             const hostChunks = await processInBatches(hostsToProcess, 50, async (host) => {
@@ -230,7 +438,7 @@ export default function AppSidebar() {
                             </tbody>
                             </table>
                         </div>
-                      ` : `<p style="color: color-mix(in srgb, var(--foreground) 70%, transparent);">${tDetails('openPorts')}: 0</p>`}
+                      ` : `<p style="color: var(--muted-foreground);">${tDetails('openPorts')}: 0</p>`}
                     </div>
                 `;
             });
@@ -238,6 +446,25 @@ export default function AppSidebar() {
         };
         
         const hostDetailsHtml = await generateHostDetailsHtml(allHostsData);
+
+        const allRemediations = Array.from(currentRemediationCache.entries())
+            .filter(([, entry]) => entry.status === 'loaded' && entry.data)
+            .map(([cveId, entry]) => ({ cveId: cveId.replace(/-\w{2}$/, ''), remediation: entry.data!.remediation }));
+
+        const remediationsHtml = allRemediations.length > 0 ? `
+            <section id="remediations">
+                <h2>${remediationsTitle}</h2>
+                ${allRemediations.map(rem => `
+                    <div class="card" style="margin-top: 20px;">
+                        <h3>${rem.cveId}</h3>
+                        <div class="prose">${formatRemediationForHtml(rem.remediation)}</div>
+                    </div>
+                `).join('')}
+            </section>
+        ` : '';
+
+        const uniqueCveIds = new Set(allCves.map(cveItem => cveItem.cve.cveId));
+        const totalCvesCount = uniqueCveIds.size;
 
 
         const htmlContent = `
@@ -247,37 +474,46 @@ export default function AppSidebar() {
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Visual Map Report</title>
+                <link rel="icon" href="${faviconDataUri}" type="image/svg+xml">
                 <style>
                     :root {
                         --background-light: #ffffff; --foreground-light: #020817; --border-light: #e4e4e7;
-                        --card-light: #ffffff; --muted-light: #f4f4f5; --link-light: #906BE1;
+                        --card-light: #ffffff; --muted-light: #f4f4f5; --link-light: #906BE1; --muted-foreground-light: #64748b;
+                        --primary-light: #906BE1; --primary-light-hover: #a17ff3; --primary-light-bg: rgba(144, 107, 225, 0.1);
+                        --danger-light: #EF4444; --danger-light-hover: #F87171; --danger-light-bg: rgba(239, 68, 68, 0.1);
+                        
                         --background-dark: #09090b; --foreground-dark: #f8fafc; --border-dark: #27272a;
-                        --card-dark: #18181b; --muted-dark: #27272a; --link-dark: #906BE1;
-                    }
-                    .dark { 
-                        --background: var(--background-dark); --foreground: var(--foreground-dark); 
-                        --border: var(--border-dark); --card-bg: var(--card-dark); --muted-bg: var(--muted-dark);
-                        --link-color: var(--link-dark);
+                        --card-dark: #09090b; --muted-dark: #18181b; --link-dark: #906BE1; --muted-foreground-dark: #a1a1aa;
+                        --primary-dark: #906BE1; --primary-dark-hover: #a17ff3; --primary-dark-bg: rgba(144, 107, 225, 0.1);
+                        --danger-dark: #F87171; --danger-dark-hover: #FFAFAF; --danger-dark-bg: rgba(248, 113, 113, 0.1);
                     }
                     html { 
                         --background: var(--background-light); --foreground: var(--foreground-light); 
                         --border: var(--border-light); --card-bg: var(--card-light); --muted-bg: var(--muted-light);
-                        --link-color: var(--link-light);
+                        --link-color: var(--link-light); --muted-foreground: var(--muted-foreground-light);
+                        --primary: var(--primary-light); --primary-hover: var(--primary-light-hover); --primary-bg: var(--primary-light-bg);
+                        --danger: var(--danger-light); --danger-hover: var(--danger-light-hover); --danger-bg: var(--danger-light-bg);
+                    }
+                    html.dark { 
+                        --background: var(--background-dark); --foreground: var(--foreground-dark); 
+                        --border: var(--border-dark); --card-bg: var(--card-dark); --muted-bg: var(--muted-dark);
+                        --link-color: var(--link-dark); --muted-foreground: var(--muted-foreground-dark);
+                        --primary: var(--primary-dark); --primary-hover: var(--primary-dark-hover); --primary-bg: var(--primary-dark-bg);
+                        --danger: var(--danger-dark); --danger-hover: var(--danger-dark-hover); --danger-bg: var(--danger-dark-bg);
                     }
                     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; color: var(--foreground); background-color: var(--background); margin: 0; padding-top: 80px; transition: color 0.2s, background-color 0.2s; }
                     .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
                     header { position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background-color: color-mix(in srgb, var(--background) 80%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); z-index: 1000; }
                     nav { display: flex; align-items: center; gap: 20px; }
                     nav ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 20px; }
-                    nav a { text-decoration: none; color: color-mix(in srgb, var(--foreground) 60%, transparent); font-weight: 500; font-size: 14px; transition: color 0.2s; }
+                    nav a { text-decoration: none; color: var(--muted-foreground); font-weight: 500; font-size: 14px; transition: color 0.2s; }
                     nav a:hover { color: var(--foreground); }
-                    #theme-toggle { background: none; border: none; cursor: pointer; color: color-mix(in srgb, var(--foreground) 60%, transparent); padding: 5px; }
+                    #theme-toggle { background: none; border: none; cursor: pointer; color: var(--muted-foreground); padding: 5px; }
                     #theme-toggle:hover { color: var(--foreground); }
                     #theme-toggle svg { width: 20px; height: 20px; }
-                    .sun-icon { display: none; }
-                    .dark .sun-icon { display: block; }
-                    .dark .moon-icon { display: none; }
-                    h1, h2, h3 { color: var(--foreground); font-weight: 600; }
+                    .sun-icon { display: none; } .moon-icon { display: block; }
+                    html.dark .sun-icon { display: block; } html.dark .moon-icon { display: none; }
+                    h1, h2, h3, h4, h5 { color: var(--foreground); font-weight: 600; }
                     h1 { font-size: 2em; text-align: left; } h2 { font-size: 1.5em; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-top: 40px; } h3 { font-size: 1.2em; }
                     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
                     th, td { padding: 12px 15px; border: 1px solid var(--border); text-align: left; font-size: 14px; }
@@ -288,15 +524,33 @@ export default function AppSidebar() {
                     .badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; color: white; }
                     .badge-red { background-color: #EF4444; } .badge-orange { background-color: #F97316; } .badge-yellow { background-color: #FBBF24; color: #000; } .badge-gray { background-color: #6B7280; } .badge-green { background-color: #22C55E; }
                     .grid-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-top: 20px; }
-                    .card { position: relative; padding: 20px; border: 1px solid var(--border); border-radius: 8px; background-color: var(--card-bg); }
-                    .card-title { font-weight: 500; margin-bottom: 10px; color: color-mix(in srgb, var(--foreground) 70%, transparent); } .card-value { font-size: 2.5em; font-weight: bold; }
+                    .card { position: relative; padding: 20px; border: 1px solid var(--border); border-radius: 8px; background-color: var(--card-bg); text-decoration: none; color: inherit; display: block; }
+                    .card-link { transition: border-color 0.2s, background-color 0.2s; }
+                    .card-link:hover { border-color: var(--primary); background-color: var(--primary-bg); }
+                    .card-link:hover .card-title { color: var(--primary); }
+                    .card-danger:hover { border-color: var(--danger); background-color: var(--danger-bg); }
+                    .card-danger:hover .card-title { color: var(--danger); }
+                    .card-title { font-weight: 500; margin-bottom: 10px; color: var(--muted-foreground); transition: color 0.2s; }
+                    .card-value { font-size: 2.5em; font-weight: bold; }
+                    .card-value-danger { color: var(--danger); }
                     .chart-container { margin-top: 20px; padding: 20px; border: 1px solid var(--border); border-radius: 8px; text-align: center; background-color: var(--background); }
                     .chart-container img { max-width: 100%; height: auto; }
-                    .chart-container .unavailable { color: color-mix(in srgb, var(--foreground) 70%, transparent); }
+                    .chart-container .unavailable { color: var(--muted-foreground); }
                     .table-responsive { overflow-x: auto; }
                     .logo { display: flex; align-items: center; gap: 10px; }
                     .logo svg { width: 24px; height: 24px; }
                     .logo-text { font-size: 1.2em; font-weight: bold; }
+                    .prose { line-height: 1.7; }
+                    .prose p { margin-top: 1em; margin-bottom: 1em; }
+                    .prose h3, .prose h4, .prose h5 { margin-top: 1.5em; margin-bottom: 0.5em; }
+                    .prose ul, .prose ol { padding-left: 20px; margin-top: 1em; margin-bottom: 1em; }
+                    .prose li { margin-bottom: 0.5em; }
+                    .prose strong { font-weight: 600; color: var(--foreground); }
+                    .prose .code-block-container { margin: 1em 0; position: relative; }
+                    .prose pre { white-space: pre-wrap; word-wrap: break-word; background-color: var(--muted-bg); padding: 1em; padding-top: 2.5em; border-radius: 0.5rem; }
+                    .prose .code-lang { font-size: 0.8em; color: var(--muted-foreground); position: absolute; top: 10px; left: 10px; }
+                    .prose code { font-family: monospace; }
+                    .prose .inline-code { background-color: var(--muted-bg); padding: 0.2em 0.4em; border-radius: 0.3rem; }
                     @media (max-width: 768px) { body { padding-top: 60px; } header { padding: 10px; } nav ul { display: none; } .container { padding: 10px; } h1 { font-size: 1.5em; } h2 { font-size: 1.2em; } }
                 </style>
             </head>
@@ -310,9 +564,10 @@ export default function AppSidebar() {
                         <ul>
                             <li><a href="#summary">${summaryTitle}</a></li>
                             ${topVulnerableHosts.length > 0 ? `<li><a href="#vulnerable-hosts">${tRiskRanking('title')}</a></li>` : ''}
-                            ${allCves.length > 0 ? `<li><a href="#cves">${cvesTitle}</a></li>` : ''}
-                            <li><a href="#visualizations">${visualizationsTitle}</a></li>
                             <li><a href="#all-hosts">${tHostsTable('title')}</a></li>
+                            <li><a href="#visualizations">${visualizationsTitle}</a></li>
+                            ${allCves.length > 0 ? `<li><a href="#cves">${cvesTitle}</a></li>` : ''}
+                            ${allRemediations.length > 0 ? `<li><a href="#remediations">${remediationsTitle}</a></li>` : ''}
                         </ul>
                         <button id="theme-toggle" title="Toggle theme">
                             <span class="moon-icon">${moonIcon}</span>
@@ -323,18 +578,27 @@ export default function AppSidebar() {
 
                 <div class="container">
                     <h1>Visual Map Report</h1>
-                    <p style="color: color-mix(in srgb, var(--foreground) 70%, transparent);"><strong>File:</strong> ${fileName} | <strong>Date:</strong> ${new Date().toLocaleString(locale)}</p>
+                    <p style="color: var(--muted-foreground);"><strong>File:</strong> ${fileName} | <strong>Date:</strong> ${new Date().toLocaleString(locale)}</p>
 
                     <section id="summary">
                         <h2>${summaryTitle}</h2>
                         <div class="grid-summary">
-                            <div class="card"><div class="card-title">${tSummary('totalHosts')}</div><div class="card-value">${summary.hostCount}</div></div>
-                            <div class="card"><div class="card-title">${tSummary('openPorts')}</div><div class="card-value">${summary.openPorts}</div></div>
-                            <div class="card"><div class="card-title">${tSummary('uniqueServices')}</div><div class="card-value">${summary.uniqueServices}</div></div>
-                            <div class="card"><div class="card-title">${tSummary('highRiskHosts')}</div><div class="card-value">${hosts.filter(h => (h.riskScore ?? 0) >= 75).length}</div></div>
+                            <a href="#all-hosts" class="card card-link"><div class="card-title">${tSummary('totalHosts')}</div><div class="card-value">${summary.hostCount}</div></a>
+                            <a href="#visualizations" class="card card-link"><div class="card-title">${tSummary('openPorts')}</div><div class="card-value">${summary.openPorts}</div></a>
+                            <a href="#visualizations" class="card card-link"><div class="card-title">${tSummary('uniqueServices')}</div><div class="card-value">${summary.uniqueServices}</div></a>
+                            <a href="#vulnerable-hosts" class="card card-link card-danger">
+                                <div class="card-title">${tSummary('highRiskHosts')}</div>
+                                <div class="card-value card-value-danger">${hosts.filter(h => (h.riskScore ?? 0) >= 75).length}</div>
+                            </a>
+                            ${totalCvesCount > 0 ? `
+                                <a href="#cves" class="card card-link card-danger">
+                                    <div class="card-title">${cvesTitle}</div>
+                                    <div class="card-value card-value-danger">${totalCvesCount}</div>
+                                </a>
+                            ` : ''}
                         </div>
                     </section>
-
+                    
                     ${topVulnerableHostsData.length > 0 ? `
                     <section id="vulnerable-hosts">
                         <h2>${tRiskRanking('title')}</h2>
@@ -355,35 +619,6 @@ export default function AppSidebar() {
                         </div>
                     </section>
                     ` : ''}
-                    
-                    ${allCves.length > 0 ? `
-                    <section id="cves">
-                        <h2>${cvesTitle}</h2>
-                        <div class="table-responsive">
-                            <table>
-                                <thead><tr><th>CVE ID</th><th>${cvssTitle}</th><th>${tDetails('service')}</th><th>${tHostsTable('ipAddress')}</th></tr></thead>
-                                <tbody>
-                                    ${allCves.sort((a,b) => (b.cve.cvssScore ?? -1) - (a.cve.cvssScore ?? -1)).map(cve => `
-                                        <tr>
-                                            <td><a href="https://nvd.nist.gov/vuln/detail/${cve.cve.cveId}" target="_blank">${cve.cve.cveId}</a></td>
-                                            <td><span class="badge ${getCveRiskClass(cve.cve.cvssScore)}">${cve.cve.cvssScore?.toFixed(1) ?? 'N/A'}</span></td>
-                                            <td>${cve.service.product} ${cve.service.version || ''} (Port ${cve.portId})</td>
-                                            <td><a href="#host-${cve.hostIp.replace(/\./g, '-')}">${cve.hostIp}</a></td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-                    ` : ''}
-                    
-                    <section id="visualizations">
-                        <h2>${visualizationsTitle}</h2>
-                        <div class="chart-container"><h3>${tDetails('hostRiskDistributionTitle')}</h3>${riskChart ? `<img src="${riskChart}">` : `<p class="unavailable">${chartNotAvailableText}</p>`}</div>
-                        <div class="chart-container"><h3>${tDetails('topPortsTitle')}</h3>${portsChart ? `<img src="${portsChart}">` : `<p class="unavailable">${chartNotAvailableText}</p>`}</div>
-                        <div class="chart-container"><h3>${tDetails('serviceDistributionTitle')}</h3>${servicesChart ? `<img src="${servicesChart}">` : `<p class="unavailable">${chartNotAvailableText}</p>`}</div>
-                        ${allCves.length > 0 && threatsChart ? `<div class="chart-container"><h3>${tDetails('vulnerabilities')}</h3><img src="${threatsChart}"></div>` : ''}
-                    </section>
 
                     <section id="all-hosts">
                         <h2>${tHostsTable('title')} (${hosts.length})</h2>
@@ -405,6 +640,37 @@ export default function AppSidebar() {
                         </div>
                     </section>
 
+                    <section id="visualizations">
+                        <h2>${visualizationsTitle}</h2>
+                        <div class="chart-container"><h3>${tDetails('hostRiskDistributionTitle')}</h3>${riskChart ? `<img src="${riskChart}">` : `<p class="unavailable">${chartNotAvailableText}</p>`}</div>
+                        <div class="chart-container"><h3>${tDetails('topPortsTitle')}</h3>${portsChart ? `<img src="${portsChart}">` : `<p class="unavailable">${chartNotAvailableText}</p>`}</div>
+                        <div class="chart-container"><h3>${tDetails('serviceDistributionTitle')}</h3>${servicesChart ? `<img src="${servicesChart}">` : `<p class="unavailable">${chartNotAvailableText}</p>`}</div>
+                        ${allCves.length > 0 && threatsChart ? `<div class="chart-container"><h3>${tDetails('vulnerabilities')}</h3><img src="${threatsChart}"></div>` : ''}
+                    </section>
+                    
+                    ${allCves.length > 0 ? `
+                    <section id="cves">
+                        <h2>${cvesTitle}</h2>
+                        <div class="table-responsive">
+                            <table>
+                                <thead><tr><th>CVE ID</th><th>${cvssTitle}</th><th>${tDetails('service')}</th><th>${tHostsTable('ipAddress')}</th></tr></thead>
+                                <tbody>
+                                    ${allCves.sort((a,b) => (b.cve.cvssScore ?? -1) - (a.cve.cvssScore ?? -1)).map(cve => `
+                                        <tr>
+                                            <td><a href="https://nvd.nist.gov/vuln/detail/${cve.cve.cveId}" target="_blank">${cve.cve.cveId}</a></td>
+                                            <td><span class="badge ${getCveRiskClass(cve.cve.cvssScore)}">${cve.cve.cvssScore?.toFixed(1) ?? 'N/A'}</span></td>
+                                            <td>${cve.service.product} ${cve.service.version || ''} (Port ${cve.portId})</td>
+                                            <td><a href="#host-${cve.hostIp.replace(/\./g, '-')}">${cve.hostIp}</a></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    ` : ''}
+
+                    ${remediationsHtml}
+
                     <section id="host-details">
                       <h2>${tDetails('hosts')}</h2>
                       ${hostDetailsHtml}
@@ -413,8 +679,16 @@ export default function AppSidebar() {
                 <script>
                     const themeToggle = document.getElementById('theme-toggle');
                     const html = document.documentElement;
+                    
+                    const setHtmlClass = (isDark) => {
+                        html.classList.toggle('dark', isDark);
+                    };
+
+                    // Set initial theme based on class
+                    setHtmlClass(html.classList.contains('dark'));
+                    
                     themeToggle.addEventListener('click', () => {
-                        html.classList.toggle('dark');
+                        setHtmlClass(!html.classList.contains('dark'));
                     });
                 </script>
             </body>
@@ -435,7 +709,7 @@ export default function AppSidebar() {
   }, [locale, tDetails, tSummary, tHostsTable, tRiskRanking, resolvedTheme, toast]);
 
   const handleExportPdf = useCallback(async () => {
-    const { scanResult: currentScanResult, cveCache: currentCveCache } = useScanStore.getState();
+    const { scanResult: currentScanResult, cveCache: currentCveCache, remediationCache: currentRemediationCache } = useScanStore.getState();
     if (!currentScanResult) return;
   
     if (currentScanResult.hosts.length > 50) {
@@ -523,40 +797,57 @@ export default function AppSidebar() {
                 }
             }
         };
+
+        const allCves = Array.from(currentCveCache.entries())
+            .filter(([, entry]) => entry.status === 'loaded' && entry.data)
+            .flatMap(([hostIp, entry]) =>
+                entry.data!.map(cveData => ({ ...cveData, hostIp }))
+            );
+        
+        const uniqueCveIds = new Set(allCves.map(cveItem => cveItem.cve.cveId));
+        const totalCvesCount = uniqueCveIds.size;
     
         // -- Summary --
         const primaryColor = '#906BE1';
         const summaryTitle = locale === 'es' ? 'Resumen' : 'Summary';
         const metricTitle = locale === 'es' ? 'Métrica' : 'Metric';
         const valueTitle = locale === 'es' ? 'Valor' : 'Value';
+        const cvesTitle = locale === 'es' ? 'CVEs Descubiertos' : 'Discovered CVEs';
         doc.setFontSize(22);
         doc.setFont('Helvetica', 'bold');
         doc.setTextColor('#000000');
         doc.text(summaryTitle, margin, yPos);
         yPos += 25;
+        
+        const summaryBody = [
+            [tSummary('totalHosts'), currentScanResult.summary.hostCount],
+            [tSummary('openPorts'), currentScanResult.summary.openPorts],
+            [tSummary('uniqueServices'), currentScanResult.summary.uniqueServices],
+            [tSummary('highRiskHosts'), currentScanResult.hosts.filter(h => (h.riskScore ?? 0) >= 75).length],
+        ];
+
+        if (totalCvesCount > 0) {
+            summaryBody.push([cvesTitle, totalCvesCount]);
+        }
+
         autoTable(doc, {
             startY: yPos,
             head: [[metricTitle, valueTitle]],
-            body: [
-                [tSummary('totalHosts'), currentScanResult.summary.hostCount],
-                [tSummary('openPorts'), currentScanResult.summary.openPorts],
-                [tSummary('uniqueServices'), currentScanResult.summary.uniqueServices],
-                [tSummary('highRiskHosts'), currentScanResult.hosts.filter(h => (h.riskScore ?? 0) >= 75).length],
-            ],
+            body: summaryBody,
             theme: 'striped',
             headStyles: { fillColor: primaryColor, textColor: '#ffffff', font: 'Helvetica', fontStyle: 'bold' },
             styles: { font: 'Helvetica', cellPadding: 8 }
         });
-        yPos = (doc as any).lastAutoTable.finalY + 30;
-    
+        yPos = doc.lastAutoTable.finalY + 30;
+
         // -- Top Vulnerable Hosts --
         const topVulnerableHosts = [...currentScanResult.hosts]
-            .filter(h => (h.riskScore ?? 0) > 0)
-            .sort((a, b) => (b.riskScore ?? 0) - (a.riskScore ?? 0))
-            .slice(0, 10);
-    
-        if (topVulnerableHosts.length > 0) {
-            const topVulnerableHostsData = topVulnerableHosts.map(h => ({ ...h, hostname: getHostname(h), osName: getOsName(h) }));
+            .filter(h => (h.riskScore ?? 0) >= 70)
+            .sort((a, b) => (b.riskScore ?? 0) - (a.riskScore ?? 0));
+        
+        const topVulnerableHostsData = topVulnerableHosts.map(h => ({ ...h, hostname: getHostname(h), osName: getOsName(h) }));
+
+        if (topVulnerableHostsData.length > 0) {
             if (yPos > pageHeight - 120) { doc.addPage(); yPos = margin; }
             doc.setFontSize(22);
             doc.setFont('Helvetica', 'bold');
@@ -581,45 +872,40 @@ export default function AppSidebar() {
                     }
                 }
             });
-            yPos = (doc as any).lastAutoTable.finalY + 30;
+            yPos = doc.lastAutoTable.finalY + 30;
         }
+
+        // -- All Hosts Table --
+        const allHostsSortedByIp = [...currentScanResult.hosts].sort((a, b) => ipToNumber(a.address[0].addr) - ipToNumber(b.address[0].addr));
+        const allHostsData = allHostsSortedByIp.map(h => ({ ...h, hostname: getHostname(h), osName: getOsName(h) }));
     
-        // -- Discovered CVEs --
-        const allCves = Array.from(currentCveCache.entries())
-            .filter(([, entry]) => entry.status === 'loaded' && entry.data)
-            .flatMap(([hostIp, entry]) =>
-                entry.data!.map(cveData => ({ ...cveData, hostIp }))
-            );
-    
-        if (allCves.length > 0) {
-            if (yPos > pageHeight - 120) { doc.addPage(); yPos = margin; }
-            doc.setFontSize(22);
-            doc.setFont('Helvetica', 'bold');
-            const cvesTitle = locale === 'es' ? 'CVEs Descubiertos' : 'Discovered CVEs';
-            const cvssScoreTitle = locale === 'es' ? 'Puntuación CVSS' : 'CVSS Score';
-            doc.text(cvesTitle, margin, yPos);
-            yPos += 25;
-            autoTable(doc, {
-                startY: yPos,
-                head: [['CVE ID', cvssScoreTitle, tDetails('service'), tHostsTable('ipAddress')]],
-                body: allCves.sort((a, b) => (b.cve.cvssScore ?? -1) - (a.cve.cvssScore ?? -1)).map(cve => [
-                    cve.cve.cveId,
-                    cve.cve.cvssScore?.toFixed(1) ?? 'N/A',
-                    `${cve.service.product} ${cve.service.version || ''}`,
-                    cve.hostIp
-                ]),
-                theme: 'striped',
-                headStyles: { fillColor: primaryColor, textColor: '#ffffff', font: 'Helvetica', fontStyle: 'bold' },
-                styles: { font: 'Helvetica', fontSize: 9, cellPadding: 8, halign: 'center' },
-                columnStyles: { 0: { halign: 'left' }, 2: { halign: 'left' }, 3: { halign: 'left' } },
-                didDrawCell: (data) => {
-                    if (data.column.index === 1 && data.section === 'body') {
-                        drawCell(data, true);
-                    }
+        if (yPos > pageHeight - 120) { doc.addPage(); yPos = margin; }
+        doc.setFontSize(22);
+        doc.setFont('Helvetica', 'bold');
+        doc.text(tHostsTable('title'), margin, yPos);
+        yPos += 25;
+        autoTable(doc, {
+            startY: yPos,
+            head: [[tHostsTable('ipAddress'), tHostsTable('hostname'), tDetails('os'), tHostsTable('openPorts'), tHostsTable('riskScore')]],
+            body: allHostsData.map(h => [
+                h.address[0].addr,
+                h.hostname,
+                h.osName,
+                getOpenPortsCount(h),
+                h.riskScore?.toFixed(0) ?? '0'
+            ]),
+            theme: 'striped',
+            headStyles: { fillColor: primaryColor, textColor: '#ffffff', font: 'Helvetica', fontStyle: 'bold' },
+            styles: { font: 'Helvetica', cellPadding: 8, halign: 'center' },
+            columnStyles: { 0: { halign: 'left' }, 1: { halign: 'left' }, 2: { halign: 'left' } },
+            didDrawCell: (data) => {
+                if (data.column.index === 4 && data.section === 'body') {
+                    drawCell(data);
                 }
-            });
-            yPos = (doc as any).lastAutoTable.finalY + 30;
-        }
+            },
+            pageBreak: 'auto'
+        });
+        yPos = doc.lastAutoTable.finalY + 30;
     
         // -- Visualizations --
         const addChart = async (elementId: string, title: string) => {
@@ -664,42 +950,64 @@ export default function AppSidebar() {
         await addChart('top-ports-chart', tDetails('topPortsTitle'));
         await addChart('service-distribution-chart', tDetails('serviceDistributionTitle'));
     
+        // -- Discovered CVEs --
         if (allCves.length > 0) {
             await addChart('pdf-threat-service-dist-chart', tDetails('vulnerabilities'));
-        }
-    
-        // -- All Hosts Table --
-        const allHostsSortedByIp = [...currentScanResult.hosts].sort((a, b) => ipToNumber(a.address[0].addr) - ipToNumber(b.address[0].addr));
-        const allHostsData = allHostsSortedByIp.map(h => ({ ...h, hostname: getHostname(h), osName: getOsName(h) }));
-    
-        doc.addPage();
-        yPos = margin;
-        doc.setFontSize(22);
-        doc.setFont('Helvetica', 'bold');
-        doc.text(tHostsTable('title'), margin, yPos);
-        yPos += 25;
-        autoTable(doc, {
-            startY: yPos,
-            head: [[tHostsTable('ipAddress'), tHostsTable('hostname'), tDetails('os'), tHostsTable('openPorts'), tHostsTable('riskScore')]],
-            body: allHostsData.map(h => [
-                h.address[0].addr,
-                h.hostname,
-                h.osName,
-                getOpenPortsCount(h),
-                h.riskScore?.toFixed(0) ?? '0'
-            ]),
-            theme: 'striped',
-            headStyles: { fillColor: primaryColor, textColor: '#ffffff', font: 'Helvetica', fontStyle: 'bold' },
-            styles: { font: 'Helvetica', cellPadding: 8, halign: 'center' },
-            columnStyles: { 0: { halign: 'left' }, 1: { halign: 'left' }, 2: { halign: 'left' } },
-            didDrawCell: (data) => {
-                if (data.column.index === 4 && data.section === 'body') {
-                    drawCell(data);
+
+            if (yPos > pageHeight - 120) { doc.addPage(); yPos = margin; }
+            doc.setFontSize(22);
+            doc.setFont('Helvetica', 'bold');
+            const cvssScoreTitle = locale === 'es' ? 'Puntuación CVSS' : 'CVSS Score';
+            doc.text(cvesTitle, margin, yPos);
+            yPos += 25;
+            autoTable(doc, {
+                startY: yPos,
+                head: [['CVE ID', cvssScoreTitle, tDetails('service'), tHostsTable('ipAddress')]],
+                body: allCves.sort((a, b) => (b.cve.cvssScore ?? -1) - (a.cve.cvssScore ?? -1)).map(cve => [
+                    cve.cve.cveId,
+                    cve.cve.cvssScore?.toFixed(1) ?? 'N/A',
+                    `${cve.service.product} ${cve.service.version || ''}`,
+                    cve.hostIp
+                ]),
+                theme: 'striped',
+                headStyles: { fillColor: primaryColor, textColor: '#ffffff', font: 'Helvetica', fontStyle: 'bold' },
+                styles: { font: 'Helvetica', fontSize: 9, cellPadding: 8, halign: 'center' },
+                columnStyles: { 0: { halign: 'left' }, 2: { halign: 'left' }, 3: { halign: 'left' } },
+                didDrawCell: (data) => {
+                    if (data.column.index === 1 && data.section === 'body') {
+                        drawCell(data, true);
+                    }
                 }
-            },
-            pageBreak: 'auto'
-        });
-        yPos = (doc as any).lastAutoTable.finalY + 30;
+            });
+            yPos = doc.lastAutoTable.finalY + 30;
+        }
+
+        // -- Remediations --
+        const allRemediations = Array.from(currentRemediationCache.entries())
+            .filter(([, entry]) => entry.status === 'loaded' && entry.data)
+            .map(([cveId, entry]) => ({ cveId: cveId.replace(/-\w{2}$/, ''), remediation: entry.data!.remediation }));
+
+        if (allRemediations.length > 0) {
+            if (yPos > pageHeight - 80) { doc.addPage(); yPos = margin; }
+            doc.setFontSize(22);
+            doc.setFont('Helvetica', 'bold');
+            const remediationsTitle = locale === 'es' ? 'Remediaciones' : 'Remediations';
+            doc.text(remediationsTitle, margin, yPos);
+            yPos += 25;
+
+            for (const rem of allRemediations) {
+                if (yPos > pageHeight - 60) { doc.addPage(); yPos = margin; }
+                
+                doc.setFontSize(16);
+                doc.setFont('Helvetica', 'bold');
+                doc.text(rem.cveId, margin, yPos);
+                yPos += 20;
+
+                yPos = formatRemediationForPdf(doc, rem.remediation, yPos, pageHeight, margin, pageWidth);
+                yPos += 15; // Space between remediations
+            };
+            yPos += 15;
+        }
     
         // -- Detailed Host Info --
         const detailedHostInfoTitle = locale === 'es' ? 'Información Detallada de Hosts' : 'Detailed Host Information';
@@ -710,7 +1018,7 @@ export default function AppSidebar() {
         yPos += 15;
     
         const processHostDetails = async (hosts: typeof allHostsData) => {
-            await processInBatches(hosts, 10, async (host) => {
+             for (const host of hosts) {
                 if (yPos > pageHeight - 100) { doc.addPage(); yPos = margin; }
                 yPos += 20;
                 doc.setFontSize(16);
@@ -737,14 +1045,14 @@ export default function AppSidebar() {
                         styles: { font: 'Helvetica', fontSize: 9, cellPadding: 6 },
                         pageBreak: 'auto'
                     });
-                    yPos = (doc as any).lastAutoTable.finalY;
+                    yPos = doc.lastAutoTable.finalY;
                 } else {
                     doc.setFontSize(11);
                     doc.setFont('Helvetica', 'normal');
                     doc.text('No open ports detected for this host.', margin, yPos);
                     yPos += 15;
                 }
-            });
+            };
         };
     
         await processHostDetails(allHostsData);
@@ -781,6 +1089,8 @@ export default function AppSidebar() {
       setOpen(true);
     }
   };
+
+  const remediationsTitle = locale === 'es' ? 'Remediaciones' : 'Remediations';
   
   return (
     <TooltipProvider>
@@ -843,6 +1153,14 @@ export default function AppSidebar() {
                                 <span className="group-data-[collapsible=icon]:hidden flex-1 flex items-center justify-between">
                                     {tDetails('vulnerabilities')}
                                 </span>
+                            </SidebarMenuButton>
+                        </Link>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <Link href="/details/remediations" className='w-full'>
+                            <SidebarMenuButton isActive={pathname.startsWith('/details/remediations')} tooltip={sidebarTooltip(remediationsTitle)}>
+                                <HeartPulse />
+                                <span className="group-data-[collapsible=icon]:hidden">{remediationsTitle}</span>
                             </SidebarMenuButton>
                         </Link>
                     </SidebarMenuItem>
