@@ -61,7 +61,7 @@ docker run -p 9002:3000 -e NEXT_PUBLIC_GOOGLE_GENAI_API_KEY="TU_API_KEY" -d visu
 docker ps --format "table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"               
 
 CONTAINER ID   IMAGE        STATUS        PORTS
-6fa2599b045a   visual-map   Up 25 hours   9002/tcp, 0.0.0.0:9002->3000/tcp, :::9002->3000/tcp
+6fa2599b045a   visual-map   Up 1 minute   9002/tcp, 0.0.0.0:9002->3000/tcp, :::9002->3000/tcp
 
 # 5. Detener y eliminar contenedor (al finalizar)
 docker stop {container-id}
