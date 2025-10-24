@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useParams } from 'next/navigation';
@@ -12,6 +13,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import HostDetailDrawer from '@/components/dashboard/host-detail-drawer';
 import NetworkGraphView from '@/components/details/network-graph-view';
 import ThreatsDetailView from '@/components/details/threats-detail-view';
+import RemediationsView from '@/components/details/remediations-view';
 import ApiPage from '../api/page';
 
 export default function DetailsPage() {
@@ -43,6 +45,9 @@ export default function DetailsPage() {
     if (page === 'vulnerabilities') {
         return locale === 'es' ? 'CVEs y Vulnerabilidades' : 'CVEs & Vulnerabilities';
     }
+    if (page === 'remediations') {
+        return locale === 'es' ? 'Remediaciones' : 'Remediations';
+    }
 
     const pageTitles: { [key: string]: string } = {
         hosts: t('hosts'),
@@ -69,6 +74,8 @@ export default function DetailsPage() {
             return <VulnerabilitiesDetailView hosts={scanResult!.hosts} />;
         case 'vulnerabilities':
             return <ThreatsDetailView hosts={scanResult!.hosts} />;
+        case 'remediations':
+            return <RemediationsView hosts={scanResult!.hosts} />;
         case 'network':
             // The graph needs a container with a defined height to render.
             return <div className="h-full"><NetworkGraphView hosts={scanResult!.hosts} /></div>;
