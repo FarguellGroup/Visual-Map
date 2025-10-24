@@ -105,7 +105,10 @@
     "highRisk": "High Risk",
     "networkGraph": "Network Graph",
     "api": "API",
-    "configureApi": "Configure API"
+    "configureApi": "Configure API",
+    "remediations": "Remediations",
+    "generateRemediations": "Generate Remediations",
+    "filterByHost": "Filter by Host"
   },
   "ApiPage": {
     "title": "API Configuration",
@@ -128,5 +131,3 @@
     "getApiKeyButton": "Get API Key"
   }
 }
-
-    
