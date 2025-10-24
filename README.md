@@ -87,7 +87,7 @@ Esta herramienta utiliza un módulo de inteligencia artificial a través de la A
 
 Para usar la IA, debes proporcionar tu clave API al ejecutar el contenedor de Docker como se muestra en la sección de despliegue. En el apartado "Configuración de la API" podrás verificar el estado de tu clave y seleccionar el modelo de Gemini que prefieras. Si ejecutas la aplicación en modo desarrollo (`npm run dev`), podrás introducir la clave directamente en la interfaz.
 
-<img width="3456" height="1858" alt="VM - API" src="https://github.com/user-attachments/assets/479c2814-f2b5-4560-b84a-c8105b646241" />
+<img width="3456" height="1856" alt="VM - API" src="https://github.com/user-attachments/assets/fcda6130-8fcf-4765-8ff3-cb18e3700461" />
 
 # Cómo Usar
 
@@ -99,7 +99,7 @@ Arrastra y suelta tu archivo XML de Nmap en la zona de carga, o haz clic para se
 ## 2. Dashboard Principal
 Una vez procesado, obtendrás una vista general con tarjetas resumen y una tabla con todos los dispositivos ordenados por criticidad.
 
-<img width="3456" height="1860" alt="VM - Dashboard" src="https://github.com/user-attachments/assets/5ef1a7e3-cbeb-45fa-a4f0-7433b44d87fa" />
+<img width="3456" height="1856" alt="VM - Dashboard" src="https://github.com/user-attachments/assets/4791a3d4-7ac5-4fa4-a4c2-a44b3b7e7df8" />
 
 ## 3. Vistas Detalladas
 Usa el menú lateral para navegar por las distintas secciones y profundizar en la información de tu escaneo.
@@ -107,32 +107,38 @@ Usa el menú lateral para navegar por las distintas secciones y profundizar en l
 ### Hosts descubiertos
 Un listado de todos los hosts descubiertos en el escaneo de Nmap, incluyendo la IP, nombre del host, sistema operativo, puertos abiertos y puntaje de crédito.
 
-<img width="3454" height="1856" alt="VM - Hosts" src="https://github.com/user-attachments/assets/089b925d-42c1-432b-bf1e-98d3458be133" />
+<img width="3456" height="1860" alt="VM - Hosts" src="https://github.com/user-attachments/assets/4138c030-399a-40dc-a9ba-f4e4388cf607" />
 
 ### Puertos abiertos
 Consulta todos los puertos abiertos en el objetivo, con una gráfica de los 15 puertos abiertos más comunes.
 
-<img width="3456" height="1858" alt="VM - Puertos" src="https://github.com/user-attachments/assets/946e22f6-856b-41e4-b8b2-0c4b54a0c6c2" />
+<img width="3456" height="1854" alt="VM - Puertos" src="https://github.com/user-attachments/assets/9ea568e9-4eef-48a9-a6a4-0c64bb7fbc23" />
 
 ### Servicios expuestos
 Consulta todos los servicios expuestos en la infraestructura, con una gráfica de distribución de servicios.
 
-<img width="3456" height="1860" alt="Vm - Servicios 2" src="https://github.com/user-attachments/assets/a906766c-8269-4e39-965e-2838327e60e5" />
+<img width="3456" height="1856" alt="Vm - Servicios" src="https://github.com/user-attachments/assets/8a08e1b7-5a22-48ca-88ad-1565a387f4dd" />
 
 ### Hosts más vulnerables
 Visualiza de manera rápida los hosts más vulnerables de una infraestructura, con un gráfico de distribución de riesgo.
 
-<img width="3456" height="1858" alt="VM - Vulns" src="https://github.com/user-attachments/assets/260f6517-03b3-4a27-9c72-b3676ec64fc0" />
+<img width="3456" height="1856" alt="VM - Vulns" src="https://github.com/user-attachments/assets/44ae4203-8d1b-4917-84f4-700482880eea" />
 
 ### CVEs y Vulnerabilidades
-Escanea todos los servicios expuestos y detecta todos los CVEs asociados, con su puntuación CVSS. Puedes iniciar la búsqueda de CVEs para todos los hosts desde esta vista.
+Escanea todos los servicios expuestos y detecta todos los CVEs asociados, con su puntuación CVSS. Puedes iniciar la búsqueda de CVEs para todos los hosts desde esta vista y filtrar por cada host que tenga CVEs asociados.
 
-<img width="3456" height="1856" alt="VM - CVEs" src="https://github.com/user-attachments/assets/fd8510cb-57fb-4ae6-b0b7-f19accab2c22" />
+<img width="3456" height="1856" alt="VM - CVEs" src="https://github.com/user-attachments/assets/4663b0ef-09f2-4b43-8c93-1d66ca0a9976" />
+
+### Remediaciones
+Después de escanear los CVEs en esta sección podrás generar remediaciones para todos los CVEs con IA. Estas remediaciones aparecerán en los informes HTML y PDF.
+
+<img width="3454" height="1442" alt="VM - Remediaciones 1" src="https://github.com/user-attachments/assets/f1b0069e-e331-4074-91ba-6d538d4eb4f2" />
+<img width="3456" height="1858" alt="VM - Remediaciones 2" src="https://github.com/user-attachments/assets/ce42a197-e892-427c-97cd-36778fa59957" />
 
 ### Grafo de red
 Visualiza un esquema de la red y las relaciones entre los hosts de manera super simple, identificando posibles rutas de pivoting.
 
-<img width="3456" height="1858" alt="VM - Grafo" src="https://github.com/user-attachments/assets/d88b69a3-871e-426d-9bf0-e140f54de3aa" />
+<img width="3456" height="1856" alt="VM - Grafo" src="https://github.com/user-attachments/assets/0dfe475c-5ba4-4225-a852-c6871884eea6" />
 
 ## 4. Profundiza en cada Host
 Haz clic en cualquier host para acceder a su página de detalle, donde encontrarás:
@@ -141,13 +147,13 @@ Haz clic en cualquier host para acceder a su página de detalle, donde encontrar
 -   Tablas de puertos y scripts NSE.
 -   Resumen de scripts NSE y recomendaciones de pentesting con IA.
 
-<img width="3456" height="1858" alt="VM - Host 1" src="https://github.com/user-attachments/assets/c5c5097f-41dc-4bc5-9bf4-7c92d38ac861" />
-<img width="3456" height="1858" alt="VM - Host 2" src="https://github.com/user-attachments/assets/cb8ffb13-6748-4130-8784-8fe809504516" />
+<img width="3456" height="1856" alt="VM - Host 1" src="https://github.com/user-attachments/assets/e21fe72c-759b-4f38-bfee-5275f25f7c7e" />
+<img width="3456" height="1816" alt="VM - Host 2" src="https://github.com/user-attachments/assets/89fa35dc-95d7-44de-8f78-83277af2ac04" />
 
-## 5. Configura y Personaliza
+
+## 5. Configuración y exportación
 -   **Ajusta los Pesos de Riesgo**: Modifica la importancia que se le da a cada factor (CVEs, puertos críticos, etc.) en el cálculo del riesgo.
--   **Gestiona tu API**: Desde la sección API, verifica tu clave de Gemini, cámbiala si es necesario y selecciona el modelo de IA que prefieras usar.
 -   **Exporta los Resultados**: Genera informes profesionales en formato JSON, PDF o HTML con un solo clic.
 
-<img width="3456" height="1856" alt="VM - Ponderación" src="https://github.com/user-attachments/assets/f2d04606-44eb-43ed-81f5-84e921ce0df3" />
-<img width="3456" height="2096" alt="visual-reports" src="https://github.com/user-attachments/assets/594fa34f-f42e-4bc0-9a92-a4dd4c0db242" />
+<img width="3456" height="1858" alt="VM - Ponderación" src="https://github.com/user-attachments/assets/1fa56c0c-523c-4c27-a086-b1892e9cbd86" />
+<img width="3456" height="1860" alt="VM - Report HTML" src="https://github.com/user-attachments/assets/e7bbd441-cb9d-4c42-ba41-bb448f3192e6" />
