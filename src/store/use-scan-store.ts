@@ -2,11 +2,12 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Host, Port, Script, Service, CveData, CveInfo } from '@/types/nmap';
-import type { ExplainVulnerabilityRiskOutput, PentestingNextStepsOutput, NseScriptsSummaryOutput, CveDetailsOutput, CveDetailsInput, ExplainVulnerabilityRiskInput, PentestingNextStepsInput, NseScriptsSummaryInput } from '@/ai/types';
+import type { ExplainVulnerabilityRiskOutput, PentestingNextStepsOutput, NseScriptsSummaryOutput, CveDetailsOutput, CveDetailsInput, ExplainVulnerabilityRiskInput, PentestingNextStepsInput, NseScriptsSummaryInput, RemediationInput, RemediationOutput } from '@/ai/types';
 import { calculateRiskScores } from '@/lib/risk-scorer';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getOsName } from '@/lib/nmap-parser';
 
-export const AI_MODEL_NAME = 'gemini-1.5-flash-latest';
+export const AI_MODEL_NAME = 'gemini-2.5-flash-lite';
 
 export type RiskWeights = {
   criticalPorts: number;
@@ -32,6 +33,7 @@ type AiCacheEntry<T> = {
 };
 
 export type CveCacheEntry = AiCacheEntry<CveData[]>;
+export type RemediationCacheEntry = AiCacheEntry<RemediationOutput>;
 
 type CveScanProgress = {
     processed: number;
@@ -70,6 +72,7 @@ type ScanState = {
   pentestingStepsCache: AiCache<PentestingNextStepsOutput>;
   nseSummaryCache: AiCache<NseScriptsSummaryOutput>;
   cveCache: AiCache<CveData[]>;
+  remediationCache: AiCache<RemediationOutput>;
   riskWeights: RiskWeights;
   cveScanProgress: CveScanProgress;
   isCveScanRunning: boolean;
@@ -88,6 +91,8 @@ type ScanState = {
   setApiKey: (key: string | null) => void;
   setApiError: (error: string | null) => void;
   fetchCvesForHost: (hosts: Host | Host[], locale: string) => Promise<void>;
+  fetchRemediation: (cveData: { cve: CveInfo, service: Service, osName: string }, locale: string) => Promise<void>;
+  fetchAllRemediations: (cveItems: { cve: CveInfo, service: Service, osName: string }[], locale: string) => Promise<void>;
   pauseCveScan: () => void;
   fetchVulnerabilityExplanation: (host: Host, locale: string) => Promise<void>;
   fetchPentestingNextSteps: (host: Host, locale: string) => Promise<void>;
@@ -237,6 +242,7 @@ export const useScanStore = create<ScanState>()(
       pentestingStepsCache: new Map(),
       nseSummaryCache: new Map(),
       cveCache: new Map(),
+      remediationCache: new Map(),
       riskWeights: defaultRiskWeights,
       cveScanProgress: { processed: 0, total: 0, isComplete: false },
       isCveScanRunning: false,
@@ -276,6 +282,7 @@ export const useScanStore = create<ScanState>()(
           newState.pentestingStepsCache = new Map();
           newState.nseSummaryCache = new Map();
           newState.cveCache = new Map();
+          newState.remediationCache = new Map();
           newState.isCveScanRunning = false;
           newState.cveScanProgress = { processed: 0, total: 0, isComplete: false };
           newState.isCveScanPaused = false;
@@ -293,6 +300,7 @@ export const useScanStore = create<ScanState>()(
           pentestingStepsCache: new Map(), 
           nseSummaryCache: new Map(), 
           cveCache: new Map(),
+          remediationCache: new Map(),
           riskWeights: defaultRiskWeights,
           cveScanProgress: { processed: 0, total: 0, isComplete: false },
           isCveScanRunning: false,
@@ -472,6 +480,65 @@ export const useScanStore = create<ScanState>()(
             }
         }
       },
+
+      fetchRemediation: async (cveData, locale) => {
+        const cacheKey = `${cveData.cve.cveId}-${locale}`;
+        const cache = get().remediationCache;
+        if (cache.get(cacheKey)?.status === 'loading' || cache.get(cacheKey)?.status === 'loaded') return;
+
+        const controller = new AbortController();
+        const promise = (async () => {
+            try {
+                const input: RemediationInput = {
+                    cveId: cveData.cve.cveId,
+                    cveDescription: cveData.cve.description,
+                    serviceName: cveData.service.product || cveData.service.name,
+                    serviceVersion: cveData.service.version || 'unknown',
+                    osName: cveData.osName,
+                    locale: locale as 'en' | 'es',
+                };
+
+                const outputSchema = { remediation: "A step-by-step guide..." };
+                const prompt = `You are a cybersecurity remediation expert. Provide a detailed, step-by-step guide to remediate the following vulnerability. Be specific and include ALL relevant commands in markdown code blocks. Always provide commands where applicable. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nDetails:\n\`\`\`json\n${JSON.stringify(input)}\`\`\``;
+
+                const result = await callGemini<RemediationInput, RemediationOutput>(prompt, controller.signal);
+                if ('error' in result) { throw new Error(result.error); }
+                if ('aborted' in result) { return; }
+
+                set(state => ({
+                    remediationCache: new Map(state.remediationCache).set(cacheKey, { status: 'loaded', data: result as RemediationOutput })
+                }));
+
+            } catch (err) {
+                 set(state => ({
+                    remediationCache: new Map(state.remediationCache).set(cacheKey, { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' })
+                }));
+            }
+        })();
+
+        set(state => ({
+            remediationCache: new Map(state.remediationCache).set(cacheKey, { status: 'loading', promise })
+        }));
+        await promise;
+      },
+      
+      fetchAllRemediations: async (cveItems, locale) => {
+        const { fetchRemediation } = get();
+        // Do not await each call, let them run in parallel up to a limit
+        const CONCURRENCY_LIMIT = 5;
+        const promises: Promise<void>[] = [];
+
+        for (const cveItem of cveItems) {
+            const promise = fetchRemediation(cveItem, locale);
+            promises.push(promise);
+            if (promises.length >= CONCURRENCY_LIMIT) {
+                await Promise.all(promises);
+                promises.length = 0;
+            }
+        }
+        await Promise.all(promises);
+      },
+
 
       fetchVulnerabilityExplanation: async (host, locale) => {
         const cacheKey = `${host.address[0].addr}-${locale}`;
