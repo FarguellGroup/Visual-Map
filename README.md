@@ -4,6 +4,28 @@ Visual Map es una plataforma web Next.js que te permite subir escaneos XML de Nm
 
 ![Visual-Map Banner](https://github.com/user-attachments/assets/d6f4e607-9243-4aa2-a11a-8df4f7183c3b)
 
+## Índice
+
+- [Visual Map](#visual-map)
+- [Características](#caracteristicas)
+- [Instalación y despliegue](#instalacion-y-despliegue)
+  - [Despliegue con Docker](#despliegue-con-docker)
+  - [Generación del XML con Nmap](#generacion-del-xml-con-nmap)
+  - [Configuración de la API de Gemini](#configuracion-de-la-api-de-gemini)
+- [Cómo Usar](#como-usar)
+  - [1. Sube tu Escaneo](#1-sube-tu-escaneo)
+  - [2. Dashboard Principal](#2-dashboard-principal)
+  - [3. Vistas Detalladas](#3-vistas-detalladas)
+    - [Hosts descubiertos](#hosts-descubiertos)
+    - [Puertos abiertos](#puertos-abiertos)
+    - [Servicios expuestos](#servicios-expuestos)
+    - [Hosts más vulnerables](#hosts-mas-vulnerables)
+    - [CVEs y Vulnerabilidades](#cves-y-vulnerabilidades)
+    - [Remediaciones](#remediaciones)
+    - [Grafo de red](#grafo-de-red)
+  - [4. Profundiza en cada Host](#4-profundiza-en-cada-host)
+  - [5. Configuración y exportación](#5-configuracion-y-exportacion)
+
 ## Características
 
 **📊 Dashboard Interactivo** - Estadísticas clave, hosts priorizados por criticidad y tabla completa de dispositivos descubiertos.
