@@ -418,7 +418,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
-                                    <Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--popover))', color: 'hsl(var(--popover-foreground))', borderRadius: 'var(--radius)', border: '1px solid hsl(var(--border))'}}/>
+                                    <Tooltip cursor={{fill: 'hsl(var(--muted))'}} contentStyle={{backgroundColor: 'hsl(var(--popover))', color: 'hsl(var(--popover-foreground))', borderRadius: 'var(--radius)', border: '1px solid hsl(var(--border))'}} itemStyle={{ color: 'hsl(var(--primary))' }}/>
                                     <Legend />
                                 </PieChart>
                             </ResponsiveContainer>
