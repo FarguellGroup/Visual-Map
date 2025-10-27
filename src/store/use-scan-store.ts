@@ -7,7 +7,7 @@ import { calculateRiskScores } from '@/lib/risk-scorer';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getOsName } from '@/lib/nmap-parser';
 
-export const AI_MODEL_NAME = 'gemini-2.5-flash-lite';
+export const AI_MODEL_NAME = 'gemini-1.5-flash';
 
 export type RiskWeights = {
   criticalPorts: number;
@@ -64,6 +64,7 @@ type AbortableScan = {
 type ScanState = {
   scanResult: ScanResult | null;
   selectedHost: Host | null;
+  hostFilter: string | null;
   apiStatus: ApiStatus;
   apiError: string | null;
   aiModel: string;
@@ -83,6 +84,7 @@ type ScanState = {
   setScanResult: (fileName: string, hosts: Host[], weights?: RiskWeights, resetCache?: boolean) => void;
   clearScanResult: () => void;
   setSelectedHost: (host: Host | null) => void;
+  setHostFilter: (hostIp: string | null) => void;
   clearExplanationCache: () => void;
   clearPentestingStepsCache: () => void;
   clearNseSummaryCache: () => void;
@@ -233,6 +235,7 @@ export const useScanStore = create<ScanState>()(
     (set, get) => ({
       scanResult: null,
       selectedHost: null,
+      hostFilter: null,
       apiStatus: 'idle',
       apiError: null,
       aiModel: AI_MODEL_NAME,
@@ -287,6 +290,7 @@ export const useScanStore = create<ScanState>()(
           newState.cveScanProgress = { processed: 0, total: 0, isComplete: false };
           newState.isCveScanPaused = false;
           newState.remainingHostsToScan = [];
+          newState.hostFilter = null;
         }
         set(newState);
       },
@@ -296,6 +300,7 @@ export const useScanStore = create<ScanState>()(
         set({ 
           scanResult: null, 
           selectedHost: null, 
+          hostFilter: null,
           explanationCache: new Map(), 
           pentestingStepsCache: new Map(), 
           nseSummaryCache: new Map(), 
@@ -312,6 +317,7 @@ export const useScanStore = create<ScanState>()(
       },
 
       setSelectedHost: (host) => set({ selectedHost: host }),
+      setHostFilter: (hostIp) => set({ hostFilter: hostIp }),
       clearExplanationCache: () => set({ explanationCache: new Map() }),
       clearPentestingStepsCache: () => set({ pentestingStepsCache: new Map() }),
       clearNseSummaryCache: () => set({ nseSummaryCache: new Map() }),
@@ -329,6 +335,8 @@ export const useScanStore = create<ScanState>()(
           explanationCache: new Map(),
           pentestingStepsCache: new Map(),
           nseSummaryCache: new Map(),
+          cveCache: new Map(),
+          remediationCache: new Map(),
         });
       },
 
@@ -484,7 +492,7 @@ export const useScanStore = create<ScanState>()(
       fetchRemediation: async (cveData, locale) => {
         const cacheKey = `${cveData.cve.cveId}-${locale}`;
         const cache = get().remediationCache;
-        if (cache.get(cacheKey)?.status === 'loading' || cache.get(cacheKey)?.status === 'loaded') return;
+        if (cache?.get(cacheKey)?.status === 'loading' || cache?.get(cacheKey)?.status === 'loaded') return;
 
         const controller = new AbortController();
         const promise = (async () => {
@@ -499,7 +507,7 @@ export const useScanStore = create<ScanState>()(
                 };
 
                 const outputSchema = { remediation: "A step-by-step guide..." };
-                const prompt = `You are a cybersecurity remediation expert. Provide a detailed, step-by-step guide to remediate the following vulnerability. Be specific and include ALL relevant commands in markdown code blocks. Always provide commands where applicable. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nDetails:\n\`\`\`json\n${JSON.stringify(input)}\`\`\``;
+                const prompt = `You are a cybersecurity remediation expert. Provide a detailed, step-by-step guide to remediate the following vulnerability. Use markdown for formatting: headings (#, ##), bullet points (-), bold text (**text**), and code blocks (\`\`\`lang\ncode\`\`\`). Do not use numbered lists. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nDetails:\n\`\`\`json\n${JSON.stringify(input)}\`\`\``;
 
                 const result = await callGemini<RemediationInput, RemediationOutput>(prompt, controller.signal);
                 if ('error' in result) { throw new Error(result.error); }
