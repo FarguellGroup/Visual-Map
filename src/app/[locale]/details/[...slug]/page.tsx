@@ -1,29 +1,37 @@
-
 'use client';
 
 import { useParams } from 'next/navigation';
 import { useRouter } from '@/navigation';
 import { useScanStore } from '@/store/use-scan-store';
-import { useEffect } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import HostsDetailView from '@/components/details/hosts-detail-view';
 import PortsDetailView from '@/components/details/ports-detail-view';
 import ServicesDetailView from '@/components/details/services-detail-view';
 import VulnerabilitiesDetailView from '@/components/details/vulnerabilities-detail-view';
 import { useLocale, useTranslations } from 'next-intl';
 import HostDetailDrawer from '@/components/dashboard/host-detail-drawer';
-import NetworkGraphView from '@/components/details/network-graph-view';
 import ThreatsDetailView from '@/components/details/threats-detail-view';
 import RemediationsView from '@/components/details/remediations-view';
 import ApiPage from '../api/page';
+import dynamic from 'next/dynamic';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
+import { Check, ChevronsUpDown } from 'lucide-react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { getHostname } from '@/lib/nmap-parser';
+import { cn } from '@/lib/utils';
+
+const NetworkGraphView = dynamic(() => import('@/components/details/network-graph-view'), { ssr: false });
 
 export default function DetailsPage() {
   const params = useParams();
   const slug = (params.slug || []) as string[];
   const page = slug[0] || 'hosts';
-  const { scanResult, setSelectedHost } = useScanStore();
+  const { scanResult, setSelectedHost, hostFilter, setHostFilter, cveCache } = useScanStore();
   const router = useRouter();
   const t = useTranslations('DetailsPage');
   const locale = useLocale();
+  const [popoverOpen, setPopoverOpen] = useState(false);
 
   useEffect(() => {
     // Do not redirect if we are on the API page.
@@ -36,6 +44,36 @@ export default function DetailsPage() {
     // Close the host detail drawer when navigating between detail pages
     setSelectedHost(null);
   }, [page, setSelectedHost]);
+
+  const hostOptions = useMemo(() => {
+    if (!scanResult) return [];
+
+    let hostsToShow = scanResult.hosts;
+    
+    if (page === 'vulnerabilities' || page === 'remediations') {
+        const affectedHostIps = new Set<string>();
+        hostsToShow.forEach(host => {
+            const entry = cveCache.get(host.address[0].addr);
+            if (entry?.status === 'loaded' && entry.data && entry.data.length > 0) {
+                affectedHostIps.add(host.address[0].addr);
+            }
+        });
+        hostsToShow = scanResult.hosts.filter(h => affectedHostIps.has(h.address[0].addr));
+    }
+    
+    const options = hostsToShow.map(h => {
+        const hostname = getHostname(h);
+        const label = hostname !== 'N/A'
+          ? `${hostname} (${h.address[0].addr})`
+          : h.address[0].addr;
+        return { value: h.address[0].addr, label };
+    }).sort((a, b) => a.label.localeCompare(b.label));
+    
+    options.unshift({ value: 'all', label: locale === 'es' ? 'Todos los hosts' : 'All hosts' });
+    return options;
+  }, [scanResult, cveCache, page, locale]);
+
+  const showFilter = ['hosts', 'ports', 'services', 'vulnerabilities', 'remediations'].includes(page) && hostOptions.length > 1;
 
   const getPageTitle = () => {
     // Hardcoding titles as requested to fix translation key issue.
@@ -85,12 +123,68 @@ export default function DetailsPage() {
             return <p>{t('pageNotFound')}</p>;
     }
   };
+  
+  const customFilter = (value: string, search: string) => {
+    // The `value` is the `label` from `CommandItem` which is "hostname (ip)"
+    // `search` is the user's input.
+    // We check if the search term is in the label.
+    return value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
+  };
 
   return (
     <>
       <div className="p-0 flex flex-col h-full w-full">
-        <div className="flex items-center gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <h1 className="text-2xl md:text-3xl font-bold capitalize font-headline text-primary">{getPageTitle()}</h1>
+          {showFilter && (
+            <div className="w-full sm:w-auto sm:min-w-[250px]">
+                <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={popoverOpen}
+                      className="w-full justify-between"
+                    >
+                      {hostFilter
+                        ? hostOptions.find((h) => h.value === hostFilter)?.label
+                        : (locale === 'es' ? 'Filtrar por host...' : 'Filter by host...')}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0">
+                    <Command filter={customFilter}>
+                      <CommandInput placeholder={locale === 'es' ? 'Buscar host o IP...' : 'Search host or IP...'} />
+                      <CommandList>
+                        <CommandEmpty>{locale === 'es' ? 'No se encontró ningún host.' : 'No host found.'}</CommandEmpty>
+                        <CommandGroup>
+                          {hostOptions.map((h) => (
+                            <CommandItem
+                              key={h.value}
+                              value={h.label}
+                              onSelect={(currentValue) => {
+                                const selectedOption = hostOptions.find(opt => opt.label.toLowerCase() === currentValue);
+                                const newValue = selectedOption ? selectedOption.value : null;
+                                setHostFilter(newValue === 'all' ? null : newValue);
+                                setPopoverOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  (hostFilter === h.value || (!hostFilter && h.value === 'all')) ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {h.label}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+            </div>
+          )}
         </div>
         <div className="flex-grow w-full">
           {renderContent()}
