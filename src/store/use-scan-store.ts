@@ -81,7 +81,7 @@ type ScanState = {
   isUsingEnvVar: boolean;
   remainingHostsToScan: Host[];
   abortableCveScan: AbortableScan | null;
-  setScanResult: (fileName: string, hosts: Host[], weights?: RiskWeights, resetCache?: boolean) => void;
+  setScanResult: (fileName: string, hosts: Host[], weights?: RiskWeights, resetCaches?: boolean) => void;
   clearScanResult: () => void;
   setSelectedHost: (host: Host | null) => void;
   setHostFilter: (hostIp: string | null) => void;
@@ -101,8 +101,6 @@ type ScanState = {
   fetchNseSummary: (host: Host, locale: string) => Promise<void>;
   hostHasNseScripts: (hostIp: string) => boolean;
   setApiStatus: (status: ApiStatus) => void;
-  _hydrated: boolean;
-  setHydrated: (hydrated: boolean) => void;
 };
 
 // --- API Call Functions ---
@@ -252,15 +250,13 @@ export const useScanStore = create<ScanState>()(
       isCveScanPaused: false,
       remainingHostsToScan: [],
       abortableCveScan: null,
-      _hydrated: false,
-      setHydrated: (hydrated) => set({ _hydrated: hydrated }),
 
-      setScanResult: (fileName, hosts, weights, resetCache = true) => {
+      setScanResult: (fileName, hosts, weights, resetCaches = false) => {
         const finalWeights = weights || get().riskWeights;
         const hostsToProcess = get().scanResult?.originalHosts || hosts;
 
         const cveCache = get().cveCache;
-        const hostsWithCves = (resetCache ? hosts : hostsToProcess).map(host => {
+        const hostsWithCves = hostsToProcess.map(host => {
             const cachedCves = cveCache.get(host.address[0].addr);
             const cachedData = cachedCves?.status === 'loaded' ? cachedCves.data : [];
             return { ...host, cves: cachedData };
@@ -273,14 +269,14 @@ export const useScanStore = create<ScanState>()(
         const newState: Partial<ScanState> = {
           scanResult: {
             fileName: get().scanResult?.fileName || fileName,
+            originalHosts: hostsToProcess, 
             hosts: scoredHosts,
-            originalHosts: hosts,
             summary
           },
           riskWeights: finalWeights,
         };
 
-        if (resetCache) {
+        if (resetCaches) {
           newState.explanationCache = new Map();
           newState.pentestingStepsCache = new Map();
           newState.nseSummaryCache = new Map();
@@ -291,6 +287,13 @@ export const useScanStore = create<ScanState>()(
           newState.isCveScanPaused = false;
           newState.remainingHostsToScan = [];
           newState.hostFilter = null;
+        } else {
+            // If we are not resetting, ensure we don't wipe existing caches.
+            newState.explanationCache = get().explanationCache;
+            newState.pentestingStepsCache = get().pentestingStepsCache;
+            newState.nseSummaryCache = get().nseSummaryCache;
+            newState.cveCache = get().cveCache;
+            newState.remediationCache = get().remediationCache;
         }
         set(newState);
       },
@@ -330,18 +333,14 @@ export const useScanStore = create<ScanState>()(
       },
       
       setAiModel: (model: string) => {
-        set({ 
-          aiModel: model,
-          explanationCache: new Map(),
-          pentestingStepsCache: new Map(),
-          nseSummaryCache: new Map(),
-          cveCache: new Map(),
-          remediationCache: new Map(),
-        });
+        set({ aiModel: model });
+        const { scanResult, riskWeights } = get();
+        if (scanResult) {
+            get().setScanResult(scanResult.fileName, scanResult.originalHosts, riskWeights, false);
+        }
       },
 
       setApiKey: (key: string | null) => {
-        // Don't allow overwriting the env var key
         if(get().isUsingEnvVar) return;
         set({ apiKey: key });
       },
@@ -640,16 +639,27 @@ export const useScanStore = create<ScanState>()(
       },
     }),
     {
-      name: 'visual-map-storage', // name of the item in the storage (must be unique)
+      name: 'visual-map-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        apiKey: state.isUsingEnvVar ? null : state.apiKey, // Don't persist API key if it's from env var
+        apiKey: state.isUsingEnvVar ? undefined : state.apiKey,
         aiModel: state.aiModel,
-        riskWeights: state.riskWeights
+        riskWeights: state.riskWeights,
+        cveCache: state.cveCache,
+        remediationCache: state.remediationCache,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
-          state.setHydrated(true);
+          const cveCacheFromStorage = (state as any).cveCache;
+          const remediationCacheFromStorage = (state as any).remediationCache;
+
+          state.cveCache = cveCacheFromStorage instanceof Map ? cveCacheFromStorage : new Map(Object.entries(cveCacheFromStorage || {}));
+          state.remediationCache = remediationCacheFromStorage instanceof Map ? remediationCacheFromStorage : new Map(Object.entries(remediationCacheFromStorage || {}));
+
+          state.isCveScanRunning = false;
+          state.isCveScanPaused = false;
+          state.remainingHostsToScan = [];
+          state.cveScanProgress = { processed: 0, total: 0, isComplete: get().cveScanProgress.isComplete || false };
         }
       }
     }
