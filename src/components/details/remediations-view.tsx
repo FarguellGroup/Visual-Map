@@ -11,10 +11,8 @@ import { Button } from '../ui/button';
 import { Search, Loader2, AlertTriangle, ShieldCheck, Sparkles, CheckCircle2, XCircle, Group } from 'lucide-react';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { getHostname } from '@/lib/nmap-parser';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Link } from '@/navigation';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 
 
 interface RemediationProps {
@@ -55,7 +53,6 @@ const formatRemediation = (text: string): string => {
         
         const trimmedLine = line.trim();
         const isBulletedListItem = trimmedLine.match(/^[-*]\s/);
-        const isNumericLooking = /^\d+\.\s/.test(trimmedLine);
         
         if (isBulletedListItem) {
             if (!ulOpen) { closeLists(); html += '<ul class="list-disc pl-5">'; ulOpen = true; }
@@ -101,9 +98,9 @@ export default function RemediationsView({ hosts }: { hosts: Host[] }) {
         remediationCache,
         fetchRemediation,
         fetchAllRemediations,
+        hostFilter,
     } = useScanStore();
 
-    const [selectedHostIp, setSelectedHostIp] = useState<string>('all');
     const [openAccordionItem, setOpenAccordionItem] = useState<string | undefined>(undefined);
     
     const { allFoundCves, hasUnscannedHosts, affectedHostOptions } = useMemo(() => {
@@ -173,9 +170,9 @@ export default function RemediationsView({ hosts }: { hosts: Host[] }) {
     };
 
     const cveRemediations = useMemo(() => {
-        const filteredByHost = selectedHostIp === 'all'
+        const filteredByHost = !hostFilter
             ? allFoundCves
-            : allFoundCves.filter(item => item.host.address[0].addr === selectedHostIp);
+            : allFoundCves.filter(item => item.host.address[0].addr === hostFilter);
         
         const cveMap = new Map<string, { cve: any; hosts: Host[] }>();
 
@@ -190,11 +187,10 @@ export default function RemediationsView({ hosts }: { hosts: Host[] }) {
         });
 
         return Array.from(cveMap.values()).sort((a, b) => (b.cve.cvssScore ?? -1) - (a.cve.cvssScore ?? -1));
-    }, [allFoundCves, selectedHostIp]);
+    }, [allFoundCves, hostFilter]);
     
     const remediationsTitle = locale === 'es' ? 'Remediaciones' : 'Remediations';
     const generateAllButtonText = locale === 'es' ? 'Generar Todas' : 'Generate All';
-    const allHostsText = locale === 'es' ? 'Todos los Hosts' : 'All Hosts';
     const cardDescriptionText = locale === 'es' ? 'Para generar remediaciones, primero debes escanear todos los hosts.' : 'To generate remediations, you must first scan all hosts.';
     const cardTitleText = locale === 'es' ? 'Remediaciones' : 'Remediations';
 
@@ -259,23 +255,6 @@ export default function RemediationsView({ hosts }: { hosts: Host[] }) {
                         </CardDescription>
                     </div>
                     <div className="flex items-center gap-2 w-full sm:w-auto">
-                         {affectedHostOptions.length > 0 && (
-                            <div className="w-full sm:w-auto sm:min-w-[200px]">
-                                <Select value={selectedHostIp} onValueChange={setSelectedHostIp}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={t('filterByHost')} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">{allHostsText}</SelectItem>
-                                        {affectedHostOptions.map(option => (
-                                            <SelectItem key={option.value} value={option.value}>
-                                                {option.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
                         <Button onClick={handleGenerateAll} variant="default">
                             <Sparkles className="mr-2 h-4 w-4" />
                             {generateAllButtonText}
