@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -5,11 +6,12 @@ import type { Host } from '@/types/nmap';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from '@/navigation';
-import { ArrowUpDown } from 'lucide-react';
+import { ArrowUpDown, Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getHostname, getOsName } from '@/lib/nmap-parser';
+import { useScanStore } from '@/store/use-scan-store';
 
 const getRiskColorClass = (score: number): string => {
     if (score >= 90) return 'bg-red-600 hover:bg-red-700 text-white';
@@ -38,6 +40,8 @@ export default function HostsDetailView({ hosts }: { hosts: Host[] }) {
   const router = useRouter();
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: SortDirection } | null>(null);
 
+  const { hostFilter } = useScanStore();
+
   const hostData = useMemo(() => {
     if (!hosts) {
       return [];
@@ -49,8 +53,13 @@ export default function HostsDetailView({ hosts }: { hosts: Host[] }) {
     }));
   }, [hosts]);
 
+  const filteredHostData = useMemo(() => {
+    if (!hostFilter) return hostData;
+    return hostData.filter(h => h.address[0].addr === hostFilter);
+  }, [hostData, hostFilter]);
+
   const sortedHosts = useMemo(() => {
-    let sortableItems = [...hostData];
+    let sortableItems = [...filteredHostData];
     if (sortConfig !== null) {
       sortableItems.sort((a, b) => {
         let aValue: string | number;
@@ -91,7 +100,7 @@ export default function HostsDetailView({ hosts }: { hosts: Host[] }) {
       });
     }
     return sortableItems;
-  }, [hostData, sortConfig]);
+  }, [filteredHostData, sortConfig]);
 
   const requestSort = (key: SortableKeys) => {
     let direction: SortDirection = 'ascending';
@@ -116,7 +125,7 @@ export default function HostsDetailView({ hosts }: { hosts: Host[] }) {
     <div className="w-full">
         <Card>
             <CardHeader>
-                <CardTitle>{tDetails('hostsDetected', {count: hosts.length})}</CardTitle>
+                <CardTitle>{tDetails('hostsDetected', {count: filteredHostData.length})}</CardTitle>
             </CardHeader>
             <CardContent>
                 <div className="overflow-x-auto">
