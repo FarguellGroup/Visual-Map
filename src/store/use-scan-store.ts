@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Host, Port, Script, Service, CveData, CveInfo } from '@/types/nmap';
-import type { ExplainVulnerabilityRiskOutput, PentestingNextStepsOutput, NseScriptsSummaryOutput, CveDetailsOutput, CveDetailsInput, ExplainVulnerabilityRiskInput, PentestingNextStepsInput, NseScriptsSummaryInput, RemediationInput, RemediationOutput } from '@/ai/types';
+import type { ExplainVulnerabilityRiskOutput, PentestingNextStepsOutput, NseScriptsSummaryOutput, CveDetailsOutput, CveDetailsInput, ExplainVulnerabilityRiskInput, PentestingNextStepsInput, NseScriptsSummaryInput, RemediationInput, RemediationOutput, ExecutiveSummaryInput, ExecutiveSummaryOutput, AttackPathsInput, AttackPathsOutput } from '@/ai/types';
 import { calculateRiskScores } from '@/lib/risk-scorer';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getOsName } from '@/lib/nmap-parser';
@@ -74,6 +74,8 @@ type ScanState = {
   nseSummaryCache: AiCache<NseScriptsSummaryOutput>;
   cveCache: AiCache<CveData[]>;
   remediationCache: AiCache<RemediationOutput>;
+  executiveSummaryCache: AiCache<ExecutiveSummaryOutput>;
+  attackPathsCache: AiCache<AttackPathsOutput>;
   riskWeights: RiskWeights;
   cveScanProgress: CveScanProgress;
   isCveScanRunning: boolean;
@@ -99,6 +101,8 @@ type ScanState = {
   fetchVulnerabilityExplanation: (host: Host, locale: string) => Promise<void>;
   fetchPentestingNextSteps: (host: Host, locale: string) => Promise<void>;
   fetchNseSummary: (host: Host, locale: string) => Promise<void>;
+  fetchExecutiveSummary: (scanResult: ScanResult, locale: string) => Promise<void>;
+  fetchAttackPaths: (hosts: Host[], locale: string) => Promise<void>;
   hostHasNseScripts: (hostIp: string) => boolean;
   setApiStatus: (status: ApiStatus) => void;
 };
@@ -244,6 +248,8 @@ export const useScanStore = create<ScanState>()(
       nseSummaryCache: new Map(),
       cveCache: new Map(),
       remediationCache: new Map(),
+      executiveSummaryCache: new Map(),
+      attackPathsCache: new Map(),
       riskWeights: defaultRiskWeights,
       cveScanProgress: { processed: 0, total: 0, isComplete: false },
       isCveScanRunning: false,
@@ -282,18 +288,21 @@ export const useScanStore = create<ScanState>()(
           newState.nseSummaryCache = new Map();
           newState.cveCache = new Map();
           newState.remediationCache = new Map();
+          newState.executiveSummaryCache = new Map();
+          newState.attackPathsCache = new Map();
           newState.isCveScanRunning = false;
           newState.cveScanProgress = { processed: 0, total: 0, isComplete: false };
           newState.isCveScanPaused = false;
           newState.remainingHostsToScan = [];
           newState.hostFilter = null;
         } else {
-            // If we are not resetting, ensure we don't wipe existing caches.
             newState.explanationCache = get().explanationCache;
             newState.pentestingStepsCache = get().pentestingStepsCache;
             newState.nseSummaryCache = get().nseSummaryCache;
             newState.cveCache = get().cveCache;
             newState.remediationCache = get().remediationCache;
+            newState.executiveSummaryCache = get().executiveSummaryCache;
+            newState.attackPathsCache = get().attackPathsCache;
         }
         set(newState);
       },
@@ -309,6 +318,8 @@ export const useScanStore = create<ScanState>()(
           nseSummaryCache: new Map(), 
           cveCache: new Map(),
           remediationCache: new Map(),
+          executiveSummaryCache: new Map(),
+          attackPathsCache: new Map(),
           riskWeights: defaultRiskWeights,
           cveScanProgress: { processed: 0, total: 0, isComplete: false },
           isCveScanRunning: false,
@@ -334,10 +345,6 @@ export const useScanStore = create<ScanState>()(
       
       setAiModel: (model: string) => {
         set({ aiModel: model });
-        const { scanResult, riskWeights } = get();
-        if (scanResult) {
-            get().setScanResult(scanResult.fileName, scanResult.originalHosts, riskWeights, false);
-        }
       },
 
       setApiKey: (key: string | null) => {
@@ -637,29 +644,103 @@ export const useScanStore = create<ScanState>()(
         set(state => ({ nseSummaryCache: new Map(state.nseSummaryCache).set(cacheKey, { status: 'loading', promise }) }));
         await promise;
       },
+
+      fetchExecutiveSummary: async (scanResult, locale) => {
+          const cacheKey = `summary-${locale}`;
+          const cache = get().executiveSummaryCache;
+          if (cache.get(cacheKey)?.promise) return cache.get(cacheKey)!.promise;
+
+          const controller = new AbortController();
+          const promise = (async () => {
+              try {
+                  const scanData = JSON.stringify(scanResult);
+                  const input: ExecutiveSummaryInput = { scanData, locale: locale as 'en' | 'es' };
+                  const outputSchema = { overallAssessment: "...", criticalFindings: ["..."], strategicRecommendations: ["..."] };
+                  const prompt = `You are a CISO. Provide a high-level executive summary of the provided Nmap scan results. Focus on overall security posture, critical findings, and strategic recommendations. Respond in ${input.locale}. The output must be a single, valid JSON object adhering to this schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nScan Data:\n${input.scanData}`;
+
+                  const result = await callGemini<ExecutiveSummaryInput, ExecutiveSummaryOutput>(prompt, controller.signal);
+                  if ('error' in result) { throw new Error(result.error); }
+                  if ('aborted' in result) { return; }
+                  set(state => ({ executiveSummaryCache: new Map(state.executiveSummaryCache).set(cacheKey, { status: 'loaded', data: result as ExecutiveSummaryOutput }) }));
+              } catch (err) {
+                  set(state => ({ executiveSummaryCache: new Map(state.executiveSummaryCache).set(cacheKey, { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' }) }));
+              }
+          })();
+          set(state => ({ executiveSummaryCache: new Map(state.executiveSummaryCache).set(cacheKey, { status: 'loading', promise }) }));
+          await promise;
+      },
+      
+      fetchAttackPaths: async (hosts, locale) => {
+          const cacheKey = `attack-path-${locale}`;
+          const cache = get().attackPathsCache;
+          if (cache.get(cacheKey)?.promise) return cache.get(cacheKey)!.promise;
+
+          const controller = new AbortController();
+          const promise = (async () => {
+              try {
+                  // Filter for high-risk hosts to optimize the prompt
+                  const vulnerableHosts = hosts
+                    .filter(h => (h.riskScore ?? 0) >= 60)
+                    .map(h => ({ ip: h.address[0].addr, ports: h.ports, riskScore: h.riskScore }));
+
+                  if (vulnerableHosts.length === 0) {
+                      set(state => ({ attackPathsCache: new Map(state.attackPathsCache).set(cacheKey, { status: 'loaded', data: { paths: [] } }) }));
+                      return;
+                  }
+                  
+                  const hostsData = JSON.stringify(vulnerableHosts);
+                  const input: AttackPathsInput = { hosts: hostsData, locale: locale as 'en' | 'es' };
+                  const outputSchema = { paths: [{ source: "ip_address", target: "ip_address", description: "A detailed step-by-step explanation...", command: "nmap -p..." }] };
+                  const prompt = `You are a security strategist. Analyze the provided network hosts (only high-risk hosts with risk score >= 60 are included) to identify potential attack paths where a compromise of one host could lead to another. Consider open ports, services, and risk scores. Provide a list of the most plausible paths. For each path, provide a detailed step-by-step explanation of how an attacker might move from the source to the target, including specific services, ports, and potential exploits. Also include a relevant, copy-pasteable command if applicable. Respond in ${input.locale}. The output must be a single, valid JSON object adhering to this schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nHosts Data:\n${input.hosts}`;
+
+                  const result = await callGemini<AttackPathsInput, AttackPathsOutput>(prompt, controller.signal);
+                  if ('error' in result) { throw new Error(result.error); }
+                  if ('aborted' in result) { return; }
+                  set(state => ({ attackPathsCache: new Map(state.attackPathsCache).set(cacheKey, { status: 'loaded', data: result as AttackPathsOutput }) }));
+              } catch (err) {
+                  set(state => ({ attackPathsCache: new Map(state.attackPathsCache).set(cacheKey, { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' }) }));
+              }
+          })();
+          set(state => ({ attackPathsCache: new Map(state.attackPathsCache).set(cacheKey, { status: 'loading', promise }) }));
+          await promise;
+      },
     }),
     {
       name: 'visual-map-storage',
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({
-        apiKey: state.isUsingEnvVar ? undefined : state.apiKey,
-        aiModel: state.aiModel,
-        riskWeights: state.riskWeights,
-        cveCache: state.cveCache,
-        remediationCache: state.remediationCache,
-      }),
+      partialize: (state) => {
+        const serializeCache = (cache: any) => {
+            if (cache instanceof Map) {
+                return Array.from(cache.entries());
+            }
+            return cache; // Already an array, return as is.
+        };
+        return {
+            apiKey: state.isUsingEnvVar ? undefined : state.apiKey,
+            aiModel: state.aiModel,
+            riskWeights: state.riskWeights,
+            cveCache: serializeCache(state.cveCache),
+            remediationCache: serializeCache(state.remediationCache),
+            executiveSummaryCache: serializeCache(state.executiveSummaryCache),
+            attackPathsCache: serializeCache(state.attackPathsCache),
+        }
+      },
       onRehydrateStorage: () => (state) => {
         if (state) {
-          const cveCacheFromStorage = (state as any).cveCache;
-          const remediationCacheFromStorage = (state as any).remediationCache;
-
-          state.cveCache = cveCacheFromStorage instanceof Map ? cveCacheFromStorage : new Map(Object.entries(cveCacheFromStorage || {}));
-          state.remediationCache = remediationCacheFromStorage instanceof Map ? remediationCacheFromStorage : new Map(Object.entries(remediationCacheFromStorage || {}));
-
+          state.explanationCache = new Map();
+          state.pentestingStepsCache = new Map();
+          state.nseSummaryCache = new Map();
+          state.cveCache = new Map(state.cveCache);
+          state.remediationCache = new Map(state.remediationCache);
+          state.executiveSummaryCache = new Map(state.executiveSummaryCache);
+          state.attackPathsCache = new Map(state.attackPathsCache);
+          
           state.isCveScanRunning = false;
           state.isCveScanPaused = false;
           state.remainingHostsToScan = [];
-          state.cveScanProgress = { processed: 0, total: 0, isComplete: get().cveScanProgress.isComplete || false };
+          state.cveScanProgress = { processed: 0, total: 0, isComplete: get().cveScanProgress?.isComplete || false };
+          state.isUsingEnvVar = !!process.env.NEXT_PUBLIC_GOOGLE_GENAI_API_KEY;
+          state.apiKey = state.isUsingEnvVar ? process.env.NEXT_PUBLIC_GOOGLE_GENAI_API_KEY : state.apiKey;
         }
       }
     }

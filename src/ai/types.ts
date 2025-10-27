@@ -121,3 +121,34 @@ export const RemediationOutputSchema = z.object({
   remediation: z.string().describe('A step-by-step guide in Markdown on how to remediate the vulnerability. Include commands if applicable.'),
 });
 export type RemediationOutput = z.infer<typeof RemediationOutputSchema>;
+
+export const ExecutiveSummaryInputSchema = z.object({
+  scanData: z.string().describe('A JSON string representing the entire Nmap scan result, including all hosts, ports, services, and vulnerabilities.'),
+  locale: z.string().describe('The language for the response ("en" or "es").'),
+});
+export type ExecutiveSummaryInput = z.infer<typeof ExecutiveSummaryInputSchema>;
+
+export const ExecutiveSummaryOutputSchema = z.object({
+  overallAssessment: z.string().describe('A high-level overview of the network\'s security posture, in Markdown format.'),
+  criticalFindings: z.array(z.string()).describe('A bulleted list of the most critical and urgent security findings.'),
+  strategicRecommendations: z.array(z.string()).describe('A bulleted list of high-level strategic recommendations to improve security.'),
+});
+export type ExecutiveSummaryOutput = z.infer<typeof ExecutiveSummaryOutputSchema>;
+
+export const AttackPathsInputSchema = z.object({
+  hosts: z.string().describe('A JSON string representing the list of hosts, their open ports, services, and risk scores.'),
+  locale: z.string().describe('The language for the response ("en" or "es").'),
+});
+export type AttackPathsInput = z.infer<typeof AttackPathsInputSchema>;
+
+const AttackPathSchema = z.object({
+  source: z.string().describe('The IP address of the source host in the attack path.'),
+  target: z.string().describe('The IP address of the target host in the attack path.'),
+  description: z.string().describe('A detailed step-by-step explanation of how an attacker might move from the source to the target, including specific services, ports, and potential exploits.'),
+  command: z.string().optional().describe('A specific, copy-pasteable command to execute a key step in the attack path, if applicable.'),
+});
+
+export const AttackPathsOutputSchema = z.object({
+  paths: z.array(AttackPathSchema).describe('An array of potential attack paths identified in the network.'),
+});
+export type AttackPathsOutput = z.infer<typeof AttackPathsOutputSchema>;

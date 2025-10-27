@@ -6,7 +6,7 @@ import { SidebarHeader, SidebarContent, SidebarGroup, SidebarSeparator, SidebarM
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '../ui/button';
-import { Download, Loader2, Home, AlertTriangle, Shield, Server, DoorOpen, Network, Skull, SlidersHorizontal, ChevronDown, KeyRound, HeartPulse } from 'lucide-react';
+import { Download, Loader2, Home, AlertTriangle, Shield, Server, DoorOpen, Network, Skull, SlidersHorizontal, ChevronDown, KeyRound, HeartPulse, FileText, Route } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useScanStore, type RiskWeights } from '@/store/use-scan-store';
 import { useState, useCallback, useEffect } from 'react';
@@ -23,6 +23,7 @@ import { useTheme } from 'next-themes';
 import { getHostname, getOsName } from '@/lib/nmap-parser';
 import { useToast } from '@/hooks/use-toast';
 import { VmLogo } from '../icons';
+import JSZip from 'jszip';
 
 
 // Extend jsPDF with autoTable
@@ -281,6 +282,7 @@ export default function AppSidebar() {
   const { scanResult, riskWeights, setRiskWeights, setScanResult, cveCache, remediationCache } = useScanStore();
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingHtml, setIsExportingHtml] = useState(false);
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
   const [localWeights, setLocalWeights] = useState<RiskWeights>(riskWeights);
   const { state, setOpen } = useSidebar();
   const [openAccordion, setOpenAccordion] = useState('');
@@ -323,6 +325,109 @@ export default function AppSidebar() {
     link.download = `visual-map-report-${getFormattedTimestamp()}.json`;
     link.click();
   }, []);
+
+  const handleExportCsv = useCallback(async () => {
+    const { scanResult: currentScanResult, cveCache: currentCveCache } = useScanStore.getState();
+    if (!currentScanResult) return;
+
+    setIsExportingCsv(true);
+
+    try {
+        const zip = new JSZip();
+
+        // 1. Hosts CSV
+        const hostsHeader = ["ipAddress", "hostname", "osName", "openPortsCount", "riskScore"];
+        const hostsRows = currentScanResult.hosts.map(h => [
+            h.address[0].addr,
+            getHostname(h),
+            getOsName(h),
+            getOpenPortsCount(h),
+            h.riskScore?.toFixed(0) ?? '0'
+        ]);
+        let hostsCsv = hostsHeader.join(',') + '\n';
+        hostsRows.forEach(row => {
+            hostsCsv += row.join(',') + '\n';
+        });
+        zip.file("hosts.csv", hostsCsv);
+        
+        // 2. Ports CSV
+        const portsHeader = ["hostIp", "portId", "protocol", "serviceName", "product", "version"];
+        let portsCsv = portsHeader.join(',') + '\n';
+        currentScanResult.hosts.forEach(host => {
+            const ports = Array.isArray(host.ports.port) ? host.ports.port : (host.ports.port ? [host.ports.port] : []);
+            ports.filter(p => p.state.state === 'open').forEach(p => {
+                const row = [
+                    host.address[0].addr,
+                    p.portid,
+                    p.protocol,
+                    p.service?.name || '',
+                    p.service?.product || '',
+                    p.service?.version || ''
+                ];
+                portsCsv += row.map(item => `"${item.toString().replace(/"/g, '""')}"`).join(',') + '\n';
+            });
+        });
+        zip.file("ports.csv", portsCsv);
+
+        // 3. Services CSV
+        const servicesHeader = ["hostIp", "portId", "serviceName", "product", "version"];
+        let servicesCsv = servicesHeader.join(',') + '\n';
+        currentScanResult.hosts.forEach(host => {
+            const ports = Array.isArray(host.ports.port) ? host.ports.port : (host.ports.port ? [host.ports.port] : []);
+            ports.filter(p => p.state.state === 'open' && p.service).forEach(p => {
+                const row = [
+                    host.address[0].addr,
+                    p.portid,
+                    p.service!.name,
+                    p.service!.product || '',
+                    p.service!.version || ''
+                ];
+                servicesCsv += row.map(item => `"${item.toString().replace(/"/g, '""')}"`).join(',') + '\n';
+            });
+        });
+        zip.file("services.csv", servicesCsv);
+
+        // 4. CVEs CSV
+        const allCves = Array.from(currentCveCache.values())
+            .filter(entry => entry.status === 'loaded' && entry.data)
+            .flatMap(entry => entry.data!);
+
+        if (allCves.length > 0) {
+            const cvesHeader = ["cveId", "cvssScore", "description", "service", "version", "portId", "hostIp"];
+            let cvesCsv = cvesHeader.join(',') + '\n';
+            allCves.forEach(cveItem => {
+                 const row = [
+                    cveItem.cve.cveId,
+                    cveItem.cve.cvssScore ?? 'N/A',
+                    cveItem.cve.description,
+                    cveItem.service.product || cveItem.service.name,
+                    cveItem.service.version || '',
+                    cveItem.portId,
+                    currentScanResult.hosts.find(h => h.cves?.some(c => c.cve.cveId === cveItem.cve.cveId))?.address[0].addr || ''
+                ];
+                cvesCsv += row.map(item => `"${item.toString().replace(/"/g, '""')}"`).join(',') + '\n';
+            });
+            zip.file("cves.csv", cvesCsv);
+        }
+
+        const content = await zip.generateAsync({ type: "blob" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(content);
+        link.download = `visual-map-csv-export-${getFormattedTimestamp()}.zip`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+
+    } catch (error) {
+        console.error("Error exporting to CSV:", error);
+        toast({
+            variant: 'destructive',
+            title: 'CSV Export Failed',
+            description: locale === 'es' ? 'Ocurrió un error al generar los archivos CSV.' : 'An error occurred while generating the CSV files.',
+        });
+    } finally {
+        setIsExportingCsv(false);
+    }
+  }, [locale, toast]);
 
   const captureChartAsBase64 = async (elementId: string, options?: { backgroundColor?: string | null }) => {
     const element = document.getElementById(elementId) as HTMLElement;
@@ -1091,6 +1196,10 @@ export default function AppSidebar() {
   };
 
   const remediationsTitle = locale === 'es' ? 'Remediaciones' : 'Remediations';
+  const executiveSummaryTitle = locale === 'es' ? 'Resumen Ejecutivo' : 'Executive Summary';
+  const attackPathsTitle = locale === 'es' ? 'Rutas de Ataque' : 'Attack Paths';
+  
+  const isAnyExportRunning = isExportingPdf || isExportingHtml || isExportingCsv;
   
   return (
     <TooltipProvider>
@@ -1114,6 +1223,15 @@ export default function AppSidebar() {
                             </SidebarMenuButton>
                         </Link>
                     </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <Link href="/details/executive-summary" className='w-full'>
+                            <SidebarMenuButton isActive={pathname.startsWith('/details/executive-summary')} tooltip={sidebarTooltip(executiveSummaryTitle)}>
+                                <FileText />
+                                <span className="group-data-[collapsible=icon]:hidden">{executiveSummaryTitle}</span>
+                            </SidebarMenuButton>
+                        </Link>
+                    </SidebarMenuItem>
+                    <SidebarSeparator className="my-2" />
                     <SidebarMenuItem>
                         <Link href="/details/hosts" className='w-full'>
                             <SidebarMenuButton isActive={pathname.startsWith('/details/hosts')} tooltip={sidebarTooltip(tDetails('hosts'))}>
@@ -1169,6 +1287,14 @@ export default function AppSidebar() {
                             <SidebarMenuButton isActive={pathname.startsWith('/details/network')} tooltip={sidebarTooltip(tDetails('networkGraph'))}>
                                 <Network />
                                 <span className="group-data-[collapsible=icon]:hidden">{tDetails('networkGraph')}</span>
+                            </SidebarMenuButton>
+                        </Link>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <Link href="/details/attack-paths" className='w-full'>
+                            <SidebarMenuButton isActive={pathname.startsWith('/details/attack-paths')} tooltip={sidebarTooltip(attackPathsTitle)}>
+                                <Route />
+                                <span className="group-data-[collapsible=icon]:hidden">{attackPathsTitle}</span>
                             </SidebarMenuButton>
                         </Link>
                     </SidebarMenuItem>
@@ -1294,18 +1420,21 @@ export default function AppSidebar() {
                          )}
                         <AccordionContent>
                             <div className="mt-4 flex flex-col items-center justify-center gap-2">
-                                <Button variant="outline" size="sm" onClick={handleExportJson} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs" disabled={isExportingPdf || isExportingHtml}>
+                                <Button variant="outline" size="sm" onClick={handleExportJson} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs" disabled={isAnyExportRunning}>
                                     <Download />
                                     {tSidebar('exportJson')}
                                 </Button>
-                                <Button variant="outline" size="sm" onClick={handleExportHtml} disabled={isExportingPdf || isExportingHtml} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
+                                <Button variant="outline" size="sm" onClick={handleExportHtml} disabled={isAnyExportRunning} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
                                     {isExportingHtml ? <Loader2 className="animate-spin" /> : <Download />}
                                     {tSidebar('exportHtml')}
                                 </Button>
-
-                                <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={isExportingPdf || isExportingHtml} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
+                                <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={isAnyExportRunning} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
                                     {isExportingPdf ? <Loader2 className="animate-spin" /> : <Download />}
                                     {tSidebar('exportPdf')}
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={isAnyExportRunning} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
+                                    {isExportingCsv ? <Loader2 className="animate-spin" /> : <Download />}
+                                    {tSidebar('exportCsv')}
                                 </Button>
                             </div>
                         </AccordionContent>
@@ -1317,3 +1446,4 @@ export default function AppSidebar() {
     </TooltipProvider>
   );
 }
+

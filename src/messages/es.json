@@ -3,7 +3,8 @@
   "Header": {
     "title": "Visual Map",
     "newScan": "Nuevo Escaneo",
-    "language": "Idioma"
+    "language": "Idioma",
+    "search": "Buscar..."
   },
   "Footer": {},
   "UploadZone": {
@@ -72,7 +73,8 @@
     "export": "Exportar",
     "exportJson": "Exportar JSON",
     "exportPdf": "Exportar PDF",
-    "exportHtml": "Exportar HTML"
+    "exportHtml": "Exportar HTML",
+    "exportCsv": "Exportar CSV (ZIP)"
   },
   "Pagination": {
     "previous": "Anterior",
@@ -108,7 +110,9 @@
     "configureApi": "Configurar API",
     "remediations": "Remediaciones",
     "generateRemediations": "Generar Remediaciones",
-    "filterByHost": "Filtrar por Host"
+    "filterByHost": "Filtrar por Host",
+    "executiveSummary": "Resumen Ejecutivo",
+    "attackPaths": "Rutas de Ataque"
   },
   "ApiPage": {
     "title": "Configuración de API",
@@ -129,5 +133,29 @@
     "getApiKeyTitle": "Obtén tu clave API",
     "getApiKeyDescription": "Necesitas una clave API de Gemini válida para usar las funciones de IA.",
     "getApiKeyButton": "Obtener Clave API"
+  },
+  "GlobalSearch": {
+    "placeholder": "Buscar IP, host, servicio, CVE...",
+    "noResults": "No se encontraron resultados.",
+    "recentSearches": "Búsquedas Recientes",
+    "cves": "CVEs",
+    "hosts": "Hosts",
+    "services": "Servicios"
+  },
+  "ExecutiveSummary": {
+    "generating": "Generando resumen ejecutivo con IA...",
+    "title": "Resumen Ejecutivo Generado por IA",
+    "description": "Este es un resumen de alto nivel de los resultados del escaneo, generado por IA. Proporciona una visión general de la postura de seguridad, los hallazgos clave y las recomendaciones estratégicas.",
+    "error": "No se pudo generar el resumen ejecutivo.",
+    "overallAssessment": "Evaluación General de Seguridad",
+    "criticalFindings": "Principales Hallazgos Críticos",
+    "strategicRecommendations": "Recomendaciones Estratégicas"
+  },
+  "NetworkGraph": {
+    "analyzePaths": "Analizar Rutas de Ataque con IA",
+    "analyzing": "Analizando rutas...",
+    "analysisComplete": "Análisis Completado",
+    "analysisError": "Error en el Análisis",
+    "noPathsFound": "La IA no identificó posibles rutas de ataque."
   }
 }

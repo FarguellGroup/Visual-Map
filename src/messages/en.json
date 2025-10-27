@@ -3,7 +3,8 @@
   "Header": {
     "title": "Visual Map",
     "newScan": "New Scan",
-    "language": "Language"
+    "language": "Language",
+    "search": "Search..."
   },
   "Footer": {},
   "UploadZone": {
@@ -72,7 +73,8 @@
     "export": "Export",
     "exportJson": "Export JSON",
     "exportPdf": "Export PDF",
-    "exportHtml": "Export HTML"
+    "exportHtml": "Export HTML",
+    "exportCsv": "Export CSV (ZIP)"
   },
   "Pagination": {
     "previous": "Previous",
@@ -108,7 +110,9 @@
     "configureApi": "Configure API",
     "remediations": "Remediations",
     "generateRemediations": "Generate Remediations",
-    "filterByHost": "Filter by Host"
+    "filterByHost": "Filter by Host",
+    "executiveSummary": "Executive Summary",
+    "attackPaths": "Attack Paths"
   },
   "ApiPage": {
     "title": "API Configuration",
@@ -129,5 +133,29 @@
     "getApiKeyTitle": "Get your API Key",
     "getApiKeyDescription": "You need a valid Gemini API key to use the AI features.",
     "getApiKeyButton": "Get API Key"
+  },
+  "GlobalSearch": {
+    "placeholder": "Search IP, host, service, CVE...",
+    "noResults": "No results found.",
+    "recentSearches": "Recent Searches",
+    "cves": "CVEs",
+    "hosts": "Hosts",
+    "services": "Services"
+  },
+  "ExecutiveSummary": {
+    "generating": "Generating executive summary with AI...",
+    "title": "AI-Generated Executive Summary",
+    "description": "This is an AI-generated summary of the scan results. It provides a high-level overview of the security posture, key findings, and strategic recommendations.",
+    "error": "Failed to generate executive summary.",
+    "overallAssessment": "Overall Security Assessment",
+    "criticalFindings": "Key Critical Findings",
+    "strategicRecommendations": "Strategic Recommendations"
+  },
+  "NetworkGraph": {
+    "analyzePaths": "Analyze Attack Paths with AI",
+    "analyzing": "Analyzing paths...",
+    "analysisComplete": "Analysis Complete",
+    "analysisError": "Analysis Error",
+    "noPathsFound": "AI did not identify any potential attack paths."
   }
 }

@@ -17,7 +17,6 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import type { Host } from '@/types/nmap';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   Server,
   Smartphone,
@@ -25,7 +24,9 @@ import {
   Monitor,
   Laptop,
   ChevronDown,
-  Printer
+  Printer,
+  Sparkles,
+  Route,
 } from 'lucide-react';
 import CustomNode from '@/components/details/custom-node';
 import { Label } from '../ui/label';
@@ -35,6 +36,8 @@ import { useLocale } from 'next-intl';
 import { Button } from '../ui/button';
 import { useDebounce } from 'use-debounce';
 import { getOsName } from '@/lib/nmap-parser';
+import { useScanStore } from '@/store/use-scan-store';
+import { useRouter } from '@/navigation';
 
 const nodeTypes = {
   custom: CustomNode,
@@ -64,16 +67,13 @@ const getServiceIcon = (osName: string = '') => {
     }
 };
 
-const ipToNumber = (ip: string) => {
-  return ip.split('.').reduce((acc, octet, index) => acc + parseInt(octet) * Math.pow(256, 3 - index), 0);
-};
-
 const defaultViewport = { x: 250, y: 100, zoom: 0.75 };
 
 const Graph = ({ hosts }: { hosts: Host[] }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { fitView, getNodes, getEdges } = useReactFlow();
+  const router = useRouter();
   
   const [riskFilter, setRiskFilter] = useState(0);
   const [debouncedRiskFilter] = useDebounce(riskFilter, 500);
@@ -81,10 +81,10 @@ const Graph = ({ hosts }: { hosts: Host[] }) => {
   const [osFilters, setOsFilters] = useState<string[]>([]);
   const [deviceTypeFilters, setDeviceTypeFilters] = useState<string[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
-
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(true);
+  
   const locale = useLocale();
-
+  
   const hostData = useMemo(() => {
     if (!hosts) {
       return [];
@@ -124,6 +124,10 @@ const Graph = ({ hosts }: { hosts: Host[] }) => {
   }, [hostData]);
 
   const onConnect = useCallback((params: any) => setEdges(eds => addEdge(params, eds)), [setEdges]);
+
+  const handleNavigateToAttackPaths = () => {
+    router.push('/details/attack-paths');
+  };
 
   const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     setSelectedNodeId(node.id);
@@ -198,11 +202,11 @@ const Graph = ({ hosts }: { hosts: Host[] }) => {
     const subnetNodes: Node[] = Object.keys(subnets).map((subnetId, i) => ({
       id: subnetId,
       data: { label: `${subnetId.replace('subnet-', '')}.0/24` },
-      position: { x: (i % 2) * 950, y: Math.floor(i / 2) * 500 },
+      position: { x: (i % 2) * 1350, y: Math.floor(i / 2) * 500 },
       className: 'light-bg !bg-muted/50',
       style: {
-        width: 900,
-        height: Math.ceil(subnets[subnetId].count / 4) * 150 + 50,
+        width: 1300,
+        height: Math.ceil(subnets[subnetId].count / 6) * 150 + 50,
       },
       type: 'group',
     }));
@@ -214,34 +218,15 @@ const Graph = ({ hosts }: { hosts: Host[] }) => {
         return {
             ...node,
             position: {
-                x: (indexInSubnet % 4) * 220 + 25,
-                y: Math.floor(indexInSubnet / 4) * 150 + 50,
+                x: (indexInSubnet % 6) * 210 + 25,
+                y: Math.floor(indexInSubnet / 6) * 150 + 50,
             },
         };
     });
-
-    const highRiskHosts = filteredHosts
-      .filter(h => (h.riskScore ?? 0) >= 75)
-      .sort((a,b) => ipToNumber(a.address[0].addr) - ipToNumber(b.address[0].addr));
-      
-    const initialEdges: Edge[] = [];
-    for (let i = 0; i < highRiskHosts.length - 1; i++) {
-        const sourceSubnet = `subnet-${highRiskHosts[i].address[0].addr.substring(0, highRiskHosts[i].address[0].addr.lastIndexOf('.'))}`;
-        const targetSubnet = `subnet-${highRiskHosts[i+1].address[0].addr.substring(0, highRiskHosts[i+1].address[0].addr.lastIndexOf('.'))}`;
-        if (sourceSubnet !== targetSubnet) continue;
-        
-        initialEdges.push({
-            id: `e-${highRiskHosts[i].address[0].addr}-${highRiskHosts[i+1].address[0].addr}`,
-            source: highRiskHosts[i].address[0].addr,
-            target: highRiskHosts[i+1].address[0].addr,
-            animated: true,
-            style: { stroke: '#EF4444', strokeWidth: 2 }
-        });
-    }
     
     return {
         filteredNodes: [...subnetNodes, ...positionedNodes],
-        filteredEdges: initialEdges,
+        filteredEdges: [],
     }
 
   }, [hostData, debouncedRiskFilter, osFilters, deviceTypeFilters]);
@@ -285,7 +270,8 @@ const Graph = ({ hosts }: { hosts: Host[] }) => {
   const riskScoreLabel = locale === 'es' ? 'Puntuación de Riesgo' : 'Risk Score';
   const deviceTypeLabel = locale === 'es' ? 'Tipo de Dispositivo' : 'Device Type';
   const filtersTitle = locale === 'es' ? 'Filtros' : 'Filters';
-
+  const analyzeButtonText = locale === 'es' ? 'Analizar Rutas de Ataque con IA' : 'Analyze Attack Paths with AI';
+  
   const reactFlowStyles = `
     .react-flow__controls button {
         background-color: hsl(var(--card));
@@ -300,86 +286,94 @@ const Graph = ({ hosts }: { hosts: Host[] }) => {
   `;
 
   return (
-    <>
-        <style>{reactFlowStyles}</style>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={handleNodeClick}
-          onPaneClick={handlePaneClick}
-          fitView
-          panOnDrag
-          zoomOnScroll
-          defaultViewport={defaultViewport}
-          className="bg-background"
-          nodeTypes={nodeTypes}
-        >
-          <Controls />
-          <Background gap={12} size={1} />
-           <Panel position="top-left" className="p-4 bg-card border rounded-lg shadow-md space-y-4 max-w-xs max-h-[80vh] overflow-y-auto">
-               <div className="flex justify-between items-center">
-                 <h3 className="font-semibold text-lg">{filtersTitle}</h3>
-                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}>
-                    <ChevronDown className={`h-5 w-5 transition-transform ${isPanelCollapsed ? '-rotate-90' : ''}`} />
-                 </Button>
-               </div>
+    <div className='w-full h-full flex flex-col gap-6'>
+        <ReactFlowProvider>
+            <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onNodeClick={handleNodeClick}
+                onPaneClick={handlePaneClick}
+                fitView
+                panOnDrag
+                zoomOnScroll
+                defaultViewport={defaultViewport}
+                className="bg-background"
+                nodeTypes={nodeTypes}
+                >
+                <style>{reactFlowStyles}</style>
+                <Controls />
+                <Background gap={12} size={1} />
+                <Panel position="top-left" className="p-4 bg-card border rounded-lg shadow-md space-y-4 max-w-xs max-h-[80vh] overflow-y-auto">
+                    <div className="flex justify-between items-center cursor-pointer" onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}>
+                        <h3 className="font-semibold text-lg">{filtersTitle}</h3>
+                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <ChevronDown className={`h-5 w-5 transition-transform ${isPanelCollapsed ? '' : 'rotate-180'}`} />
+                        </Button>
+                    </div>
 
-                {!isPanelCollapsed && (
-                    <>
-                        <div className="space-y-2">
-                            <Label htmlFor="risk-slider">{riskScoreLabel} &gt;= {riskFilter}</Label>
-                            <Slider 
-                                id="risk-slider"
-                                min={0}
-                                max={100}
-                                step={10}
-                                value={[riskFilter]}
-                                onValueChange={(value) => setRiskFilter(value[0])}
-                            />
-                        </div>
-                        
-                        {detectedDeviceTypes.length > 0 && (
-                          <div className="space-y-2">
-                              <Label>{deviceTypeLabel}</Label>
-                              <div className="space-y-1 pr-2">
-                                  {detectedDeviceTypes.map(dt => (
-                                      <div key={dt.id} className="flex items-center space-x-2">
-                                          <Checkbox 
-                                              id={`dt-${dt.id}`} 
-                                              onCheckedChange={(checked) => handleDeviceTypeFilterChange(dt.id, !!checked)} 
-                                              checked={deviceTypeFilters.includes(dt.id)}
-                                          />
-                                          <dt.icon className="h-4 w-4" />
-                                          <label htmlFor={`dt-${dt.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 truncate">{dt.label}</label>
-                                      </div>
-                                  ))}
-                              </div>
-                          </div>
-                        )}
-
-                        <div className="space-y-2">
-                            <Label>{osFilterLabel}</Label>
-                            <div className="space-y-1 max-h-32 overflow-y-auto pr-2">
-                                {uniqueOsTypes.map(os => (
-                                    <div key={os} className="flex items-center space-x-2">
-                                        <Checkbox 
-                                          id={`os-${os}`} 
-                                          onCheckedChange={(checked) => handleOsFilterChange(os, !!checked)} 
-                                          checked={osFilters.includes(os)}
-                                        />
-                                        <label htmlFor={`os-${os}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 truncate">{os}</label>
-                                    </div>
-                                ))}
+                    {!isPanelCollapsed && (
+                        <>
+                            <div className="space-y-2">
+                                <Label htmlFor="risk-slider">{riskScoreLabel} &gt;= {riskFilter}</Label>
+                                <Slider 
+                                    id="risk-slider"
+                                    min={0}
+                                    max={100}
+                                    step={10}
+                                    value={[riskFilter]}
+                                    onValueChange={(value) => setRiskFilter(value[0])}
+                                />
                             </div>
-                        </div>
-                    </>
-                )}
-            </Panel>
-        </ReactFlow>
-    </>
+                            
+                            {detectedDeviceTypes.length > 0 && (
+                            <div className="space-y-2">
+                                <Label>{deviceTypeLabel}</Label>
+                                <div className="space-y-1 pr-2">
+                                    {detectedDeviceTypes.map(dt => (
+                                        <div key={dt.id} className="flex items-center space-x-2">
+                                            <Checkbox 
+                                                id={`dt-${dt.id}`} 
+                                                onCheckedChange={(checked) => handleDeviceTypeFilterChange(dt.id, !!checked)} 
+                                                checked={deviceTypeFilters.includes(dt.id)}
+                                            />
+                                            <dt.icon className="h-4 w-4" />
+                                            <label htmlFor={`dt-${dt.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 truncate">{dt.label}</label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <Label>{osFilterLabel}</Label>
+                                <div className="space-y-1 max-h-32 overflow-y-auto pr-2">
+                                    {uniqueOsTypes.map(os => (
+                                        <div key={os} className="flex items-center space-x-2">
+                                            <Checkbox 
+                                            id={`os-${os}`} 
+                                            onCheckedChange={(checked) => handleOsFilterChange(os, !!checked)} 
+                                            checked={osFilters.includes(os)}
+                                            />
+                                            <label htmlFor={`os-${os}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 truncate">{os}</label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </Panel>
+                <Panel position="top-right">
+                   <Button onClick={handleNavigateToAttackPaths}>
+                        <Route className="mr-2 h-4 w-4" />
+                        {analyzeButtonText}
+                    </Button>
+                </Panel>
+            </ReactFlow>
+        </ReactFlowProvider>
+    </div>
   );
 }
 
@@ -394,13 +388,9 @@ export default function NetworkGraphView({ hosts, pdfMode = false }: { hosts: Ho
 
   return (
     <div className='w-full h-full'>
-      <Card className="h-full flex flex-col">
-        <CardContent className="p-0 relative flex-1">
-          <ReactFlowProvider>
+        <ReactFlowProvider>
             <Graph hosts={hosts} />
-          </ReactFlowProvider>
-        </CardContent>
-      </Card>
+        </ReactFlowProvider>
     </div>
   );
 }

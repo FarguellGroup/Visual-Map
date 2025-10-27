@@ -11,6 +11,7 @@ import { Link, usePathname, useRouter } from '@/navigation';
 import { PlusCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import LanguageSwitcher from './language-switcher';
+import GlobalSearch from './global-search';
 
 export default function AppHeader() {
   const t = useTranslations('Header');
@@ -40,15 +41,17 @@ export default function AppHeader() {
       </div>
 
       <div className="flex flex-1 items-center justify-end space-x-2">
+        {scanResult && <GlobalSearch />}
         {showUploadNew && (
           <>
+            <Separator orientation="vertical" className="h-6" />
             <Button variant="outline" size="sm" onClick={handleUploadNew} className="hover:bg-primary hover:text-primary-foreground">
               <PlusCircle className="mr-2 h-4 w-4" />
               {t('newScan')}
             </Button>
-            <Separator orientation="vertical" className="h-6" />
           </>
         )}
+        <Separator orientation="vertical" className="h-6" />
         <LanguageSwitcher />
         <ThemeToggle />
       </div>

@@ -26,7 +26,12 @@ export default function MainLayout({
   const pathname = usePathname();
   const { scanResult, cveCache } = useScanStore();
   const showSidebar = scanResult || pathname.includes('/details');
-  const hasCves = Array.from(cveCache.values()).some(e => e.status === 'loaded' && e.data && e.data.length > 0);
+  
+  // When rehydrating from localStorage, cveCache is an array of entries, not a Map.
+  // We need to handle both cases.
+  const hasCves = cveCache instanceof Map
+    ? Array.from(cveCache.values()).some(e => e.status === 'loaded' && e.data && e.data.length > 0)
+    : Array.isArray(cveCache) && (cveCache as [string, any][]).some(([, e]) => e.status === 'loaded' && e.data && e.data.length > 0);
 
   return (
     <SidebarProvider defaultOpen={true}>
