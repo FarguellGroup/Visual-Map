@@ -4,7 +4,7 @@
 import { Separator } from "@/components/ui/separator";
 
 export default function AppFooter() {
-  const version = "2.2"; 
+  const version = "2.3"; 
 
   return (
     <footer className="w-full shrink-0">
