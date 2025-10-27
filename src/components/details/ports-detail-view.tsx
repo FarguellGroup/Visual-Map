@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -34,8 +35,7 @@ const ipToNumber = (ip: string) => {
 
 export default function PortsDetailView({ hosts }: { hosts: Host[]}) {
   const t = useTranslations('DetailsPage');
-  const locale = useLocale();
-  const { riskWeights } = useScanStore();
+  const { riskWeights, hostFilter } = useScanStore();
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: SortDirection } | null>({ key: 'riskScore', direction: 'descending' });
   const router = useRouter();
 
@@ -52,8 +52,13 @@ export default function PortsDetailView({ hosts }: { hosts: Host[]}) {
     return ports;
   }, [hosts]);
 
+  const filteredPorts = useMemo(() => {
+      if (!hostFilter) return allPorts;
+      return allPorts.filter(p => p.hostAddress === hostFilter);
+  }, [allPorts, hostFilter]);
+
   const sortedPorts = useMemo(() => {
-    let sortableItems = [...allPorts];
+    let sortableItems = [...filteredPorts];
     if (sortConfig !== null) {
         sortableItems.sort((a, b) => {
             let aValue: string | number;
@@ -102,7 +107,7 @@ export default function PortsDetailView({ hosts }: { hosts: Host[]}) {
         });
     }
     return sortableItems;
-  }, [allPorts, sortConfig, riskWeights]);
+  }, [filteredPorts, sortConfig, riskWeights]);
 
   const requestSort = (key: SortableKeys) => {
     let direction: SortDirection = 'ascending';
@@ -121,14 +126,14 @@ export default function PortsDetailView({ hosts }: { hosts: Host[]}) {
 
   const portDistribution = React.useMemo(() => {
     const counts: { [key: string]: number } = {};
-    allPorts.forEach(p => {
+    filteredPorts.forEach(p => {
         const portId = p.portid;
         counts[portId] = (counts[portId] || 0) + 1;
     });
     return Object.entries(counts).map(([port, count]) => ({ port, count })).sort((a,b) => b.count - a.count).slice(0, 15);
-  }, [allPorts]);
-
-  const riskScoreTitle = locale === 'es' ? 'Puntaje de Riesgo' : 'Risk Score';
+  }, [filteredPorts]);
+  
+  const riskScoreTitle = useTranslations('HostsTable')('riskScore');
 
   const handleRowClick = (hostIp: string) => {
     router.push(`/details/host/${hostIp}`);
@@ -157,7 +162,7 @@ export default function PortsDetailView({ hosts }: { hosts: Host[]}) {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>{t('allPortsTitle', {count: allPorts.length})}</CardTitle>
+          <CardTitle>{t('allPortsTitle', {count: filteredPorts.length})}</CardTitle>
         </CardHeader>
         <CardContent>
             <div className="overflow-x-auto">
