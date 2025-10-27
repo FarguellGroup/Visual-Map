@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -16,7 +15,6 @@ import { PieChart, Pie, Cell, Legend, Tooltip as RechartsTooltip, ResponsiveCont
 import { Button } from '../ui/button';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { getHostname } from '@/lib/nmap-parser';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const getCveRiskColorClass = (score: number | string | null): string => {
     const numericScore = typeof score === 'string' ? parseFloat(score) : score;
@@ -85,10 +83,10 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
         setScanResult,
         riskWeights,
         apiError,
+        hostFilter,
     } = useScanStore();
     
     const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: SortDirection }>({ key: 'cvssScore', direction: 'descending' });
-    const [selectedHostIp, setSelectedHostIp] = useState<string>('all');
 
     const handleFetchAllCves = () => {
         fetchCvesForHost(hosts, locale);
@@ -165,8 +163,8 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     const sortedCves = useMemo(() => {
         let sortableItems = [...allCves];
 
-        if (selectedHostIp !== 'all') {
-            sortableItems = sortableItems.filter(item => item.host.address[0].addr === selectedHostIp);
+        if (hostFilter) {
+            sortableItems = sortableItems.filter(item => item.host.address[0].addr === hostFilter);
         }
 
         if (sortConfig !== null) {
@@ -207,7 +205,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
             });
         }
         return sortableItems;
-    }, [allCves, sortConfig, selectedHostIp]);
+    }, [allCves, sortConfig, hostFilter]);
 
     const requestSort = (key: SortableKeys) => {
         let direction: SortDirection = 'ascending';
@@ -263,23 +261,6 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
                     <CardDescription>{cvesDescription}</CardDescription>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                    {affectedHostOptions.length > 0 && (
-                        <div className="w-full sm:w-auto sm:min-w-[200px]">
-                            <Select value={selectedHostIp} onValueChange={setSelectedHostIp}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder={t('filterByHost')} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">{allHostsText}</SelectItem>
-                                    {affectedHostOptions.map(option => (
-                                        <SelectItem key={option.value} value={option.value}>
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
                     {showGlobalScanButton && (
                         <Button onClick={handleFetchAllCves} size="sm">
                             <Search className="mr-2 h-4 w-4" />
@@ -444,3 +425,4 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
   );
 }
 
+    
