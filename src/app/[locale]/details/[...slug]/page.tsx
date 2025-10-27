@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useParams } from 'next/navigation';
@@ -20,6 +21,8 @@ import { Check, ChevronsUpDown } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { getHostname } from '@/lib/nmap-parser';
 import { cn } from '@/lib/utils';
+import ExecutiveSummaryView from '@/components/details/executive-summary-view';
+import AttackPathsView from '@/components/details/attack-paths-view';
 
 const NetworkGraphView = dynamic(() => import('@/components/details/network-graph-view'), { ssr: false });
 
@@ -27,7 +30,7 @@ export default function DetailsPage() {
   const params = useParams();
   const slug = (params.slug || []) as string[];
   const page = slug[0] || 'hosts';
-  const { scanResult, setSelectedHost, hostFilter, setHostFilter, cveCache } = useScanStore();
+  const { scanResult, setSelectedHost, hostFilter, setHostFilter, cveCache, attackPathsCache } = useScanStore();
   const router = useRouter();
   const t = useTranslations('DetailsPage');
   const locale = useLocale();
@@ -47,33 +50,46 @@ export default function DetailsPage() {
 
   const hostOptions = useMemo(() => {
     if (!scanResult) return [];
-
+  
     let hostsToShow = scanResult.hosts;
-    
+    let affectedHostIps = new Set<string>();
+
     if (page === 'vulnerabilities' || page === 'remediations') {
-        const affectedHostIps = new Set<string>();
-        hostsToShow.forEach(host => {
-            const entry = cveCache.get(host.address[0].addr);
-            if (entry?.status === 'loaded' && entry.data && entry.data.length > 0) {
-                affectedHostIps.add(host.address[0].addr);
-            }
-        });
-        hostsToShow = scanResult.hosts.filter(h => affectedHostIps.has(h.address[0].addr));
+      hostsToShow.forEach(host => {
+        const entry = cveCache.get(host.address[0].addr);
+        if (entry?.status === 'loaded' && entry.data && entry.data.length > 0) {
+          affectedHostIps.add(host.address[0].addr);
+        }
+      });
+    } else if (page === 'attack-paths') {
+        const attackPathsEntry = attackPathsCache.get(`attack-path-${locale}`);
+        if (attackPathsEntry?.status === 'loaded' && attackPathsEntry.data?.paths) {
+            attackPathsEntry.data.paths.forEach(path => {
+                affectedHostIps.add(path.source);
+                affectedHostIps.add(path.target);
+            });
+        }
+    }
+    
+    if (affectedHostIps.size > 0) {
+       hostsToShow = scanResult.hosts.filter(h => affectedHostIps.has(h.address[0].addr));
     }
     
     const options = hostsToShow.map(h => {
-        const hostname = getHostname(h);
-        const label = hostname !== 'N/A'
-          ? `${hostname} (${h.address[0].addr})`
-          : h.address[0].addr;
-        return { value: h.address[0].addr, label };
+      const hostname = getHostname(h);
+      const label = hostname !== 'N/A'
+        ? `${hostname} (${h.address[0].addr})`
+        : h.address[0].addr;
+      return { value: h.address[0].addr, label };
     }).sort((a, b) => a.label.localeCompare(b.label));
     
-    options.unshift({ value: 'all', label: locale === 'es' ? 'Todos los hosts' : 'All hosts' });
+    if (options.length > 0) {
+      options.unshift({ value: 'all', label: locale === 'es' ? 'Todos los hosts' : 'All hosts' });
+    }
     return options;
-  }, [scanResult, cveCache, page, locale]);
+  }, [scanResult, cveCache, attackPathsCache, page, locale]);
 
-  const showFilter = ['hosts', 'ports', 'services', 'vulnerabilities', 'remediations'].includes(page) && hostOptions.length > 1;
+  const showFilter = ['hosts', 'ports', 'services', 'vulnerabilities', 'remediations', 'attack-paths'].includes(page) && hostOptions.length > 1;
 
   const getPageTitle = () => {
     // Hardcoding titles as requested to fix translation key issue.
@@ -85,6 +101,12 @@ export default function DetailsPage() {
     }
     if (page === 'remediations') {
         return locale === 'es' ? 'Remediaciones' : 'Remediations';
+    }
+    if (page === 'executive-summary') {
+        return locale === 'es' ? 'Resumen Ejecutivo' : 'Executive Summary';
+    }
+    if (page === 'attack-paths') {
+        return locale === 'es' ? 'Rutas de Ataque' : 'Attack Paths';
     }
 
     const pageTitles: { [key: string]: string } = {
@@ -119,6 +141,10 @@ export default function DetailsPage() {
             return <div className="h-full"><NetworkGraphView hosts={scanResult!.hosts} /></div>;
         case 'api':
             return <ApiPage />;
+        case 'executive-summary':
+            return <ExecutiveSummaryView />;
+        case 'attack-paths':
+            return <AttackPathsView />;
         default:
             return <p>{t('pageNotFound')}</p>;
     }
