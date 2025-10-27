@@ -141,19 +141,19 @@ Usa el menú lateral para navegar por las distintas secciones y profundizar en l
 ### Hosts descubiertos
 Un listado de todos los hosts descubiertos en el escaneo de Nmap, incluyendo la IP, nombre del host, sistema operativo, puertos abiertos y puntaje de crédito.
 
-<img width="3456" height="1860" alt="VM - Hosts" src="https://github.com/user-attachments/assets/4138c030-399a-40dc-a9ba-f4e4388cf607" />
+<img width="3838" height="1854" alt="VM - Hosts" src="https://github.com/user-attachments/assets/e139dcda-3812-4fd3-8dd3-0f6879ec6cef" />
 
 <a id="puertos-abiertos"></a>
 ### Puertos abiertos
 Consulta todos los puertos abiertos en el objetivo, con una gráfica de los 15 puertos abiertos más comunes.
 
-<img width="3456" height="1854" alt="VM - Puertos" src="https://github.com/user-attachments/assets/9ea568e9-4eef-48a9-a6a4-0c64bb7fbc23" />
+<img width="3840" height="1852" alt="VM - Puertos" src="https://github.com/user-attachments/assets/e77cbbbe-2028-42e9-a6cb-9c2a7b42b22c" />
 
 <a id="servicios-expuestos"></a>
 ### Servicios expuestos
 Consulta todos los servicios expuestos en la infraestructura, con una gráfica de distribución de servicios.
 
-<img width="3456" height="1856" alt="Vm - Servicios" src="https://github.com/user-attachments/assets/8a08e1b7-5a22-48ca-88ad-1565a387f4dd" />
+<img width="3840" height="1854" alt="VM - Servicios" src="https://github.com/user-attachments/assets/410eda0e-c612-4397-9601-6503d394d265" />
 
 <a id="hosts-mas-vulnerables"></a>
 ### Hosts más vulnerables
@@ -165,15 +165,14 @@ Visualiza de manera rápida los hosts más vulnerables de una infraestructura, c
 ### CVEs y Vulnerabilidades
 Escanea todos los servicios expuestos y detecta todos los CVEs asociados, con su puntuación CVSS. Puedes iniciar la búsqueda de CVEs para todos los hosts desde esta vista y filtrar por cada host que tenga CVEs asociados.
 
-<img width="3456" height="1856" alt="VM - CVEs" src="https://github.com/user-attachments/assets/4663b0ef-09f2-4b43-8c93-1d66ca0a9976" />
+<img width="3840" height="1852" alt="VM - CVEs" src="https://github.com/user-attachments/assets/b6878791-9588-4ba6-9fe9-e9e57517cafd" />
 
 <a id="remediaciones"></a>
 ### Remediaciones
 Después de escanear los CVEs en esta sección podrás generar remediaciones para todos los CVEs con IA. Estas remediaciones aparecerán en los informes HTML y PDF.
 
-<img width="3454" height="1442" alt="VM - Remediaciones 1" src="https://github.com/user-attachments/assets/f1b0069e-e331-4074-91ba-6d538d4eb4f2" />
-<img width="3456" height="1858" alt="VM - Remediaciones 2" src="https://github.com/user-attachments/assets/ce42a197-e892-427c-97cd-36778fa59957" />
-
+<img width="3840" height="1850" alt="VM - Remediaciones 1" src="https://github.com/user-attachments/assets/15f710f0-b959-4de8-9b4b-8983fe5d0a1f" />
+<img width="3840" height="1856" alt="VM - Remediaciones 2" src="https://github.com/user-attachments/assets/13620858-189f-4f80-9fa7-72eb967cbbff" />
 
 <a id="grafo-de-red"></a>
 ### Grafo de red
