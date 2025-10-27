@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -5,7 +6,7 @@ import type { Host, Port } from '@/types/nmap';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { ArrowUpDown } from 'lucide-react';
 import { calculatePortRiskScore } from '@/lib/risk-scorer';
 import { useScanStore } from '@/store/use-scan-store';
@@ -38,8 +39,7 @@ const getRiskColorClass = (score: number): string => {
 
 export default function ServicesDetailView({ hosts }: { hosts: Host[] }) {
   const t = useTranslations('DetailsPage');
-  const locale = useLocale();
-  const { riskWeights } = useScanStore();
+  const { riskWeights, hostFilter } = useScanStore();
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: SortDirection } | null>({ key: 'riskScore', direction: 'descending' });
   const router = useRouter();
   
@@ -62,8 +62,13 @@ export default function ServicesDetailView({ hosts }: { hosts: Host[] }) {
     return services;
   }, [hosts]);
 
+  const filteredServices = useMemo(() => {
+    if (!hostFilter) return allServices;
+    return allServices.filter(s => s.hostAddress === hostFilter);
+  }, [allServices, hostFilter]);
+
   const sortedServices = useMemo(() => {
-    let sortableItems = [...allServices];
+    let sortableItems = [...filteredServices];
     if (sortConfig !== null) {
       sortableItems.sort((a, b) => {
         let aValue: string | number;
@@ -108,7 +113,7 @@ export default function ServicesDetailView({ hosts }: { hosts: Host[] }) {
       });
     }
     return sortableItems;
-  }, [allServices, sortConfig, riskWeights]);
+  }, [filteredServices, sortConfig, riskWeights]);
 
   const requestSort = (key: SortableKeys) => {
     let direction: SortDirection = 'ascending';
@@ -127,14 +132,14 @@ export default function ServicesDetailView({ hosts }: { hosts: Host[] }) {
 
   const serviceDistribution = React.useMemo(() => {
     const counts: { [key: string]: number } = {};
-    allServices.forEach(s => {
+    filteredServices.forEach(s => {
         counts[s.name] = (counts[s.name] || 0) + 1;
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value).slice(0, 10).reverse();
-  }, [allServices]);
+  }, [filteredServices]);
   
-  const riskScoreTitle = locale === 'es' ? 'Puntaje de Riesgo' : 'Risk Score';
-  const numberOfHostsTitle = locale === 'es' ? 'Número de Hosts' : 'Number of Hosts';
+  const riskScoreTitle = useTranslations('HostsTable')('riskScore');
+  const numberOfHostsTitle = t('numberOfHosts');
 
   const handleRowClick = (hostIp: string) => {
     router.push(`/details/host/${hostIp}`);
@@ -168,7 +173,7 @@ export default function ServicesDetailView({ hosts }: { hosts: Host[] }) {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>{t('allServicesTitle', {count: allServices.length})}</CardTitle>
+          <CardTitle>{t('allServicesTitle', {count: filteredServices.length})}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
