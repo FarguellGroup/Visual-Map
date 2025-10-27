@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -59,8 +60,7 @@ export default function ApiPage() {
     setAiModel, 
     apiKey: storedApiKey, 
     setApiKey,
-    isUsingEnvVar,
-    _hydrated
+    isUsingEnvVar
   } = useScanStore();
   
   const [localApiKey, setLocalApiKey] = useState('');
@@ -69,17 +69,7 @@ export default function ApiPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const modelsPerPage = 10;
   const [isChecking, setIsChecking] = useState(false);
-
-  useEffect(() => {
-    // Only check connection on mount if a key exists (from env or localStorage)
-    if (_hydrated && storedApiKey) {
-      checkApiConnection(storedApiKey);
-    } else if (_hydrated && !storedApiKey) {
-        setApiStatus('error');
-        setError(t('noKey'));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [_hydrated]);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
     // Sync local input with store if it's not from env var
@@ -87,6 +77,18 @@ export default function ApiPage() {
       setLocalApiKey(storedApiKey || '');
     }
   }, [storedApiKey, isUsingEnvVar]);
+  
+  useEffect(() => {
+    // Only check connection on mount if a key exists (from env or localStorage)
+    if (storedApiKey) {
+      checkApiConnection(storedApiKey);
+    } else {
+        setApiStatus('error');
+        setError(t('noKey'));
+        setIsInitialLoad(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const checkApiConnection = async (key?: string) => {
     const keyToCheck = key || storedApiKey;
@@ -100,6 +102,7 @@ export default function ApiPage() {
       setApiStatus('error');
       setError(t('noKey'));
       setIsChecking(false);
+      setIsInitialLoad(false);
       return false;
     }
     
@@ -169,19 +172,18 @@ export default function ApiPage() {
       setModels(availableModels);
       setApiStatus('success');
       setError(null);
-      setIsChecking(false);
-      return true;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : t('invalidKey');
       setApiStatus('error');
       setError(errorMessage);
+    } finally {
       setIsChecking(false);
-      return false;
+      setIsInitialLoad(false);
     }
   };
 
   const getStatusContent = () => {
-    if (!_hydrated && !isUsingEnvVar) {
+    if (isInitialLoad && !isUsingEnvVar) {
         return (
              <div className="flex items-center text-muted-foreground">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
