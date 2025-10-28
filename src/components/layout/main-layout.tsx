@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -30,26 +29,24 @@ export default function MainLayout({
   const showSidebar = scanResult || pathname.includes('/details');
   const isHomePageWithoutScan = pathname === '/' && !scanResult;
   
-  // When rehydrating from localStorage, cveCache is an array of entries, not a Map.
-  // We need to handle both cases.
   const hasCves = cveCache instanceof Map
     ? Array.from(cveCache.values()).some(e => e.status === 'loaded' && e.data && e.data.length > 0)
     : Array.isArray(cveCache) && (cveCache as [string, any][]).some(([, e]) => e.status === 'loaded' && e.data && e.data.length > 0);
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="flex w-full h-screen bg-background text-foreground">
+      <div className="flex flex-1 overflow-hidden">
         {showSidebar && (
           <Sidebar side="left" collapsible="icon">
             <AppSidebar />
           </Sidebar>
         )}
-        <div className="flex-1 flex flex-col h-screen">
+        <div className="flex flex-1 flex-col">
           <AppHeader />
-          <main className="flex-1 flex flex-col overflow-y-auto">
-            <div className={cn("flex-grow flex flex-col", !isHomePageWithoutScan && "px-6 py-8")}>
-              {children}
-            </div>
+          <main className="flex-1 overflow-y-auto">
+             <div className={cn(!isHomePageWithoutScan && "p-6 sm:p-8")}>
+                {children}
+             </div>
           </main>
           <AppFooter />
         </div>
