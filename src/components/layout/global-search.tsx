@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -9,6 +8,7 @@ import { useRouter } from '@/navigation';
 import { Button } from '../ui/button';
 import { Search, Server, Shield, Skull } from 'lucide-react';
 import { getHostname } from '@/lib/nmap-parser';
+import { cn } from '@/lib/utils';
 
 type SearchResult = {
   type: 'host' | 'service' | 'cve';
@@ -81,21 +81,23 @@ export default function GlobalSearch() {
     });
 
     // Search CVEs
-    Array.from(cveCache.entries()).forEach(([hostIp, entry]) => {
-      if (entry.status === 'loaded' && entry.data) {
-        entry.data.forEach(cveItem => {
-          if (cveItem.cve.cveId.toLowerCase().includes(lowerCaseQuery)) {
-            results.push({
-              type: 'cve',
-              id: `cve-${hostIp}-${cveItem.cve.cveId}`,
-              label: `${cveItem.cve.cveId} (CVSS: ${cveItem.cve.cvssScore ?? 'N/A'})`,
-              description: `${cveOnHostText} ${hostIp}`,
-              hostIp: hostIp,
-            });
-          }
-        });
-      }
-    });
+    if (cveCache instanceof Map) {
+      Array.from(cveCache.entries()).forEach(([hostIp, entry]) => {
+        if (entry.status === 'loaded' && entry.data) {
+          entry.data.forEach(cveItem => {
+            if (cveItem.cve.cveId.toLowerCase().includes(lowerCaseQuery)) {
+              results.push({
+                type: 'cve',
+                id: `cve-${hostIp}-${cveItem.cve.cveId}`,
+                label: `${cveItem.cve.cveId} (CVSS: ${cveItem.cve.cvssScore ?? 'N/A'})`,
+                description: `${cveOnHostText} ${hostIp}`,
+                hostIp: hostIp,
+              });
+            }
+          });
+        }
+      });
+    }
     
     // Remove duplicates
     return Array.from(new Map(results.map(item => [item.id, item])).values());
@@ -156,12 +158,15 @@ export default function GlobalSearch() {
                         key={result.id}
                         onSelect={() => handleSelect(result.hostIp)}
                         value={`${result.label} ${result.description}`}
+                        className="aria-selected:text-accent-foreground group"
                     >
                          {result.type === 'host' && <Server className="mr-2 h-4 w-4" />}
                          {result.type === 'service' && <Shield className="mr-2 h-4 w-4" />}
                          {result.type === 'cve' && <Skull className="mr-2 h-4 w-4" />}
                         <span>{result.label}</span>
-                        <span className="ml-2 text-xs text-muted-foreground">{result.description}</span>
+                        <span className="ml-2 text-xs text-muted-foreground group-aria-selected:text-accent-foreground">
+                            {result.description}
+                        </span>
                     </CommandItem>
                 ))}
             </CommandGroup>

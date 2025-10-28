@@ -87,7 +87,7 @@ export const CveDetailsInputSchema = z.object({
     .describe('JSON string with host information like OS.'),
   portInfo: z
     .string()
-    .describe('JSON string with port information like port number, protocol, service name, version, and NSE script outputs.'),
+    .describe('JSON string with an array of services, each with port, protocol, name, product, and version.'),
   locale: z
     .string()
     .describe('The language for the response ("en" or "es").'),
@@ -101,8 +101,14 @@ const CveInfoSchema = z.object({
   cvssScore: z.number().nullable().describe('The CVSS v3.x base score, if available.'),
 });
 
+const ServiceCveSchema = z.object({
+  portId: z.string().describe('The port ID of the service (e.g., "8080").'),
+  service: z.string().describe('The name of the service (e.g., "http").'),
+  cves: z.array(CveInfoSchema).describe('A list of CVEs found for this service. The list should contain a maximum of the 3 most critical CVEs.'),
+});
+
 export const CveDetailsOutputSchema = z.object({
-  cves: z.array(CveInfoSchema).describe('A list of CVEs found for the specified service and version. The list should contain a maximum of the 3 most critical CVEs.'),
+  cves: z.array(ServiceCveSchema).describe('An array of services with their associated CVEs.'),
 });
 export type CveDetailsOutput = z.infer<typeof CveDetailsOutputSchema>;
 

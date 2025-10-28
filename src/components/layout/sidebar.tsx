@@ -279,7 +279,7 @@ export default function AppSidebar() {
   const tRiskRanking = useTranslations('RiskRanking');
   const tApi = useTranslations('ApiPage');
   
-  const { scanResult, riskWeights, setRiskWeights, setScanResult, cveCache, remediationCache } = useScanStore();
+  const { scanResult, riskWeights, setRiskWeights, setScanResult, cveCache, remediationCache, executiveSummaryCache } = useScanStore();
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingHtml, setIsExportingHtml] = useState(false);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
@@ -334,55 +334,63 @@ export default function AppSidebar() {
 
     try {
         const zip = new JSZip();
+        
+        const toCsvRow = (items: (string | number)[]) => {
+            return items.map(item => {
+                const str = String(item ?? '').replace(/"/g, '""');
+                // Quote fields containing commas, double quotes, or newlines
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return `"${str}"`;
+                }
+                return str;
+            }).join(',') + '\r\n';
+        };
 
         // 1. Hosts CSV
         const hostsHeader = ["ipAddress", "hostname", "osName", "openPortsCount", "riskScore"];
-        const hostsRows = currentScanResult.hosts.map(h => [
-            h.address[0].addr,
-            getHostname(h),
-            getOsName(h),
-            getOpenPortsCount(h),
-            h.riskScore?.toFixed(0) ?? '0'
-        ]);
-        let hostsCsv = hostsHeader.join(',') + '\n';
-        hostsRows.forEach(row => {
-            hostsCsv += row.join(',') + '\n';
+        let hostsCsv = toCsvRow(hostsHeader);
+        currentScanResult.hosts.forEach(h => {
+            hostsCsv += toCsvRow([
+                h.address[0].addr,
+                getHostname(h),
+                getOsName(h),
+                getOpenPortsCount(h),
+                h.riskScore?.toFixed(0) ?? '0'
+            ]);
         });
         zip.file("hosts.csv", hostsCsv);
         
         // 2. Ports CSV
         const portsHeader = ["hostIp", "portId", "protocol", "serviceName", "product", "version"];
-        let portsCsv = portsHeader.join(',') + '\n';
+        let portsCsv = toCsvRow(portsHeader);
         currentScanResult.hosts.forEach(host => {
             const ports = Array.isArray(host.ports.port) ? host.ports.port : (host.ports.port ? [host.ports.port] : []);
             ports.filter(p => p.state.state === 'open').forEach(p => {
-                const row = [
+                portsCsv += toCsvRow([
                     host.address[0].addr,
                     p.portid,
                     p.protocol,
                     p.service?.name || '',
                     p.service?.product || '',
                     p.service?.version || ''
-                ];
-                portsCsv += row.map(item => `"${item.toString().replace(/"/g, '""')}"`).join(',') + '\n';
+                ]);
             });
         });
         zip.file("ports.csv", portsCsv);
 
         // 3. Services CSV
         const servicesHeader = ["hostIp", "portId", "serviceName", "product", "version"];
-        let servicesCsv = servicesHeader.join(',') + '\n';
+        let servicesCsv = toCsvRow(servicesHeader);
         currentScanResult.hosts.forEach(host => {
             const ports = Array.isArray(host.ports.port) ? host.ports.port : (host.ports.port ? [host.ports.port] : []);
             ports.filter(p => p.state.state === 'open' && p.service).forEach(p => {
-                const row = [
+                servicesCsv += toCsvRow([
                     host.address[0].addr,
                     p.portid,
                     p.service!.name,
                     p.service!.product || '',
                     p.service!.version || ''
-                ];
-                servicesCsv += row.map(item => `"${item.toString().replace(/"/g, '""')}"`).join(',') + '\n';
+                ]);
             });
         });
         zip.file("services.csv", servicesCsv);
@@ -394,18 +402,25 @@ export default function AppSidebar() {
 
         if (allCves.length > 0) {
             const cvesHeader = ["cveId", "cvssScore", "description", "service", "version", "portId", "hostIp"];
-            let cvesCsv = cvesHeader.join(',') + '\n';
-            allCves.forEach(cveItem => {
-                 const row = [
+            let cvesCsv = toCsvRow(cvesHeader);
+            
+            const cveItems = Array.from(currentCveCache.entries()).flatMap(([hostIp, entry]) => {
+                if (entry.status === 'loaded' && entry.data) {
+                    return entry.data.map(cveItem => ({ ...cveItem, hostIp }));
+                }
+                return [];
+            });
+
+            cveItems.forEach(cveItem => {
+                 cvesCsv += toCsvRow([
                     cveItem.cve.cveId,
                     cveItem.cve.cvssScore ?? 'N/A',
                     cveItem.cve.description,
                     cveItem.service.product || cveItem.service.name,
                     cveItem.service.version || '',
                     cveItem.portId,
-                    currentScanResult.hosts.find(h => h.cves?.some(c => c.cve.cveId === cveItem.cve.cveId))?.address[0].addr || ''
-                ];
-                cvesCsv += row.map(item => `"${item.toString().replace(/"/g, '""')}"`).join(',') + '\n';
+                    cveItem.hostIp
+                ]);
             });
             zip.file("cves.csv", cvesCsv);
         }
@@ -450,7 +465,7 @@ export default function AppSidebar() {
   };
 
   const handleExportHtml = useCallback(async () => {
-    const { scanResult: currentScanResult, cveCache: currentCveCache, remediationCache: currentRemediationCache } = useScanStore.getState();
+    const { scanResult: currentScanResult, cveCache: currentCveCache, remediationCache: currentRemediationCache, executiveSummaryCache: currentExecutiveSummaryCache } = useScanStore.getState();
     if (!currentScanResult) return;
     
     if (currentScanResult.hosts.length > 50) {
@@ -478,6 +493,10 @@ export default function AppSidebar() {
         const threatsChart = allCves.length > 0 
             ? await captureChartAsBase64('pdf-threat-service-dist-chart', { backgroundColor: reportBgColor })
             : null;
+        
+        const summaryCacheKey = `summary-${locale}`;
+        const executiveSummaryEntry = currentExecutiveSummaryCache.get(summaryCacheKey);
+        const executiveSummary = executiveSummaryEntry?.status === 'loaded' ? executiveSummaryEntry.data : null;
 
         const topVulnerableHosts = [...hosts]
             .filter(h => (h.riskScore ?? 0) >= 70)
@@ -502,12 +521,17 @@ export default function AppSidebar() {
             return 'badge-green';
         }
 
+        const formatFinding = (text: string = '') => {
+            return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        };
+
         const visualizationsTitle = locale === 'es' ? 'Visualizaciones' : 'Visualizations';
         const osTitle = tDetails('os');
-        const summaryTitle = tSummary('totalHosts').includes('Total') ? 'Summary' : 'Resumen';
+        const summaryTitle = locale === 'es' ? 'Resumen' : 'Summary';
         const cvesTitle = locale === 'es' ? 'CVEs Descubiertos' : 'Discovered CVEs';
         const cvssTitle = locale === 'es' ? 'Puntaje CVSS' : 'CVSS Score';
         const remediationsTitle = locale === 'es' ? 'Remediaciones' : 'Remediations';
+        const executiveSummaryTitle = locale === 'es' ? 'Resumen Ejecutivo' : 'Executive Summary';
 
         const chartNotAvailableText = locale === 'es' ? 'Gráfico no disponible. Navegue a la página correspondiente para incluirlo en el informe.' : 'Chart not available. Navigate to the corresponding page to include it in the report.';
         
@@ -668,6 +692,7 @@ export default function AppSidebar() {
                     <nav>
                         <ul>
                             <li><a href="#summary">${summaryTitle}</a></li>
+                            ${executiveSummary ? `<li><a href="#executive-summary">${executiveSummaryTitle}</a></li>` : ''}
                             ${topVulnerableHosts.length > 0 ? `<li><a href="#vulnerable-hosts">${tRiskRanking('title')}</a></li>` : ''}
                             <li><a href="#all-hosts">${tHostsTable('title')}</a></li>
                             <li><a href="#visualizations">${visualizationsTitle}</a></li>
@@ -704,6 +729,24 @@ export default function AppSidebar() {
                         </div>
                     </section>
                     
+                    ${executiveSummary ? `
+                    <section id="executive-summary">
+                        <h2>${executiveSummaryTitle}</h2>
+                        <div class="card">
+                            <h3>${locale === 'es' ? 'Evaluación General' : 'Overall Assessment'}</h3>
+                            <p class="prose">${formatFinding(executiveSummary.overallAssessment)}</p>
+                            <h3 style="margin-top: 20px;">${locale === 'es' ? 'Hallazgos Críticos' : 'Critical Findings'}</h3>
+                            <ul class="prose">
+                                ${executiveSummary.criticalFindings.map(f => `<li>${formatFinding(f)}</li>`).join('')}
+                            </ul>
+                            <h3 style="margin-top: 20px;">${locale === 'es' ? 'Recomendaciones Estratégicas' : 'Strategic Recommendations'}</h3>
+                             <ul class="prose">
+                                ${executiveSummary.strategicRecommendations.map(r => `<li>${formatFinding(r)}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </section>
+                    ` : ''}
+
                     ${topVulnerableHostsData.length > 0 ? `
                     <section id="vulnerable-hosts">
                         <h2>${tRiskRanking('title')}</h2>
@@ -814,7 +857,7 @@ export default function AppSidebar() {
   }, [locale, tDetails, tSummary, tHostsTable, tRiskRanking, resolvedTheme, toast]);
 
   const handleExportPdf = useCallback(async () => {
-    const { scanResult: currentScanResult, cveCache: currentCveCache, remediationCache: currentRemediationCache } = useScanStore.getState();
+    const { scanResult: currentScanResult, cveCache: currentCveCache, remediationCache: currentRemediationCache, executiveSummaryCache: currentExecutiveSummaryCache } = useScanStore.getState();
     if (!currentScanResult) return;
   
     if (currentScanResult.hosts.length > 50) {
@@ -944,6 +987,90 @@ export default function AppSidebar() {
             styles: { font: 'Helvetica', cellPadding: 8 }
         });
         yPos = doc.lastAutoTable.finalY + 30;
+
+        // -- Executive Summary --
+        const summaryCacheKey = `summary-${locale}`;
+        const executiveSummaryEntry = currentExecutiveSummaryCache.get(summaryCacheKey);
+        const executiveSummary = executiveSummaryEntry?.status === 'loaded' ? executiveSummaryEntry.data : null;
+        
+        const formatPdfText = (text: string, currentY: number) => {
+            const lines = text.split(/(\*\*.*?\*\*)/g).filter(part => part);
+            let x = margin;
+            lines.forEach(part => {
+                const isBold = part.startsWith('**') && part.endsWith('**');
+                const cleanPart = part.replace(/\*\*/g, '');
+                doc.setFont('Helvetica', isBold ? 'bold' : 'normal');
+                doc.text(cleanPart, x, currentY);
+                x += doc.getStringUnitWidth(cleanPart) * 11 / doc.internal.scaleFactor;
+            });
+        };
+
+        if (executiveSummary) {
+          if (yPos > pageHeight - 120) { doc.addPage(); yPos = margin; }
+          const execSummaryTitle = locale === 'es' ? 'Resumen Ejecutivo' : 'Executive Summary';
+          doc.setFontSize(22);
+          doc.setFont('Helvetica', 'bold');
+          doc.text(execSummaryTitle, margin, yPos);
+          yPos += 25;
+          
+          doc.setFontSize(14);
+          doc.setFont('Helvetica', 'bold');
+          const assessmentTitle = locale === 'es' ? 'Evaluación General' : 'Overall Assessment';
+          doc.text(assessmentTitle, margin, yPos);
+          yPos += 15;
+
+          doc.setFontSize(11);
+          const assessmentLines = doc.splitTextToSize(executiveSummary.overallAssessment, pageWidth - (margin * 2));
+          assessmentLines.forEach((line: string) => {
+              formatPdfText(line, yPos);
+              yPos += 12;
+          });
+          yPos += 3;
+
+          if (yPos > pageHeight - 80) { doc.addPage(); yPos = margin; }
+          doc.setFontSize(14);
+          doc.setFont('Helvetica', 'bold');
+          const findingsTitle = locale === 'es' ? 'Hallazgos Críticos' : 'Critical Findings';
+          doc.text(findingsTitle, margin, yPos);
+          yPos += 15;
+
+          doc.setFontSize(11);
+          executiveSummary.criticalFindings.forEach(finding => {
+            const findingLines = doc.splitTextToSize(finding, pageWidth - (margin * 2) - 5);
+            yPos += 5;
+            formatPdfText(`• `, yPos);
+            let lineY = yPos;
+            findingLines.forEach((line: string, index: number) => {
+                const lineX = index === 0 ? margin + 5 : margin + 10;
+                const textToDraw = index === 0 ? line : line.substring(2);
+                formatPdfText(line.substring(index === 0 ? 0 : 2), lineY);
+                lineY += 12;
+            });
+             yPos = lineY;
+            if (yPos > pageHeight - 40) { doc.addPage(); yPos = margin; }
+          });
+          
+          yPos += 10;
+          if (yPos > pageHeight - 80) { doc.addPage(); yPos = margin; }
+          doc.setFontSize(14);
+          doc.setFont('Helvetica', 'bold');
+          const recommendationsTitle = locale === 'es' ? 'Recomendaciones Estratégicas' : 'Strategic Recommendations';
+          doc.text(recommendationsTitle, margin, yPos);
+          yPos += 15;
+
+          doc.setFontSize(11);
+          executiveSummary.strategicRecommendations.forEach(rec => {
+            const recLines = doc.splitTextToSize(`• ${rec}`, pageWidth - (margin * 2) - 5);
+            recLines.forEach((line: string) => {
+              formatPdfText(line, yPos);
+              yPos += 12;
+            });
+            yPos += 5;
+            if (yPos > pageHeight - 40) { doc.addPage(); yPos = margin; }
+          });
+
+          yPos += 20;
+        }
 
         // -- Top Vulnerable Hosts --
         const topVulnerableHosts = [...currentScanResult.hosts]
@@ -1434,7 +1561,7 @@ export default function AppSidebar() {
                                 </Button>
                                 <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={isAnyExportRunning} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
                                     {isExportingCsv ? <Loader2 className="animate-spin" /> : <Download />}
-                                    {tSidebar('exportCsv')}
+                                    {locale === 'es' ? 'Exportar CSV' : 'Export CSV'}
                                 </Button>
                             </div>
                         </AccordionContent>
@@ -1447,3 +1574,4 @@ export default function AppSidebar() {
   );
 }
 
+    

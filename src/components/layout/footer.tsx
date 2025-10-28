@@ -2,7 +2,7 @@
 'use client';
 
 import { Separator } from "@/components/ui/separator";
-import { Github, Instagram, Youtube } from "lucide-react";
+import { Github, Instagram, Youtube, Globe } from "lucide-react";
 
 export default function AppFooter() {
   const version = "2.3"; 
@@ -23,6 +23,10 @@ export default function AppFooter() {
               </a>
             </p>
             <div className="flex items-center gap-4">
+                <a href="https://h4ckercademy.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+                    <Globe className="h-5 w-5" />
+                    <span className="sr-only">Website</span>
+                </a>
                 <a href="https://github.com/afsh4ck" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
                     <Github className="h-5 w-5" />
                     <span className="sr-only">GitHub</span>

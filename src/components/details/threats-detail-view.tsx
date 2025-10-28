@@ -84,6 +84,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
         riskWeights,
         apiError,
         hostFilter,
+        remainingHostsToScan,
     } = useScanStore();
     
     const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: SortDirection }>({ key: 'cvssScore', direction: 'descending' });
@@ -97,7 +98,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     };
 
     const handleResumeScan = () => {
-      fetchCvesForHost(hosts, locale);
+      fetchCvesForHost(remainingHostsToScan.length > 0 ? remainingHostsToScan : hosts, locale);
     }
 
     const { allCves, serviceDistribution, hasUnscannedHosts, uniqueCveCount, affectedHostOptions } = useMemo(() => {
@@ -235,7 +236,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     const noCvesFound = locale === 'es' ? 'No se encontraron CVEs para los servicios detectados en este escaneo.' : 'No CVEs found for the detected services in this scan.';
     const vulnerableServicesDistributionTitle = locale === 'es' ? 'Distribución de Servicios Vulnerables' : 'Vulnerable Services Distribution';
     const analyzingText = cveScanProgress?.total > 0 
-        ? (locale === 'es' ? `Analizando servicios expuestos... ${cveScanProgress.processed} de ${cveScanProgress.total}` : `Analyzing exposed services... ${cveScanProgress.processed} of ${cveScanProgress.total}`)
+        ? (locale === 'es' ? `Analizando hosts... ${cveScanProgress.processed} de ${cveScanProgress.total}` : `Analyzing hosts... ${cveScanProgress.processed} of ${cveScanProgress.total}`)
         : (locale === 'es' ? 'Preparando análisis...' : 'Preparing analysis...');
     
     const isRateLimitError = apiError?.toLowerCase().includes('rate limit') || false;
@@ -424,5 +425,3 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     </div>
   );
 }
-
-    
