@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -9,6 +10,7 @@ import AppSidebar from '@/components/layout/sidebar';
 import AppFooter from '@/components/layout/footer';
 import ApiErrorToast from '@/components/api-error-toast';
 import dynamic from 'next/dynamic';
+import { cn } from '@/lib/utils';
 
 const VulnerabilitiesDetailView = dynamic(() => import('@/components/details/vulnerabilities-detail-view'));
 const PortsDetailView = dynamic(() => import('@/components/details/ports-detail-view'));
@@ -26,6 +28,7 @@ export default function MainLayout({
   const pathname = usePathname();
   const { scanResult, cveCache } = useScanStore();
   const showSidebar = scanResult || pathname.includes('/details');
+  const isHomePageWithoutScan = pathname === '/' && !scanResult;
   
   // When rehydrating from localStorage, cveCache is an array of entries, not a Map.
   // We need to handle both cases.
@@ -41,14 +44,14 @@ export default function MainLayout({
             <AppSidebar />
           </Sidebar>
         )}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col h-screen">
           <AppHeader />
           <main className="flex-1 flex flex-col overflow-y-auto">
-            <div className="flex-1 px-6 py-8">
+            <div className={cn("flex-grow flex flex-col", !isHomePageWithoutScan && "px-6 py-8")}>
               {children}
             </div>
-            <AppFooter />
           </main>
+          <AppFooter />
         </div>
         <ApiErrorToast />
         {/* Container for off-screen rendering for exports */}
