@@ -43,10 +43,8 @@ export default function MainLayout({
         )}
         <div className="flex flex-1 flex-col">
           <AppHeader />
-          <main className="flex-1 overflow-y-auto">
-             <div className={cn(!isHomePageWithoutScan && "p-6 sm:p-8")}>
-                {children}
-             </div>
+          <main className={cn("flex-1 overflow-y-auto", !isHomePageWithoutScan && "p-6 sm:p-8")}>
+            {children}
           </main>
           <AppFooter />
         </div>
