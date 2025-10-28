@@ -48,6 +48,10 @@ export default function DetailsPage() {
     setSelectedHost(null);
   }, [page, setSelectedHost]);
 
+  const attackPathsEntry = useMemo(() => attackPathsCache.get(`attack-path-${locale}`), [attackPathsCache, locale]);
+  const hasAttackPaths = useMemo(() => attackPathsEntry?.status === 'loaded' && attackPathsEntry.data?.paths && attackPathsEntry.data.paths.length > 0, [attackPathsEntry]);
+
+
   const hostOptions = useMemo(() => {
     if (!scanResult) return [];
   
@@ -61,14 +65,11 @@ export default function DetailsPage() {
           affectedHostIps.add(host.address[0].addr);
         }
       });
-    } else if (page === 'attack-paths') {
-        const attackPathsEntry = attackPathsCache.get(`attack-path-${locale}`);
-        if (attackPathsEntry?.status === 'loaded' && attackPathsEntry.data?.paths) {
-            attackPathsEntry.data.paths.forEach(path => {
-                affectedHostIps.add(path.source);
-                affectedHostIps.add(path.target);
-            });
-        }
+    } else if (page === 'attack-paths' && hasAttackPaths) {
+      attackPathsEntry!.data!.paths.forEach(path => {
+          affectedHostIps.add(path.source);
+          affectedHostIps.add(path.target);
+      });
     }
     
     if (affectedHostIps.size > 0) {
@@ -87,9 +88,9 @@ export default function DetailsPage() {
       options.unshift({ value: 'all', label: locale === 'es' ? 'Todos los hosts' : 'All hosts' });
     }
     return options;
-  }, [scanResult, cveCache, attackPathsCache, page, locale]);
+  }, [scanResult, cveCache, page, locale, hasAttackPaths, attackPathsEntry]);
 
-  const showFilter = ['hosts', 'ports', 'services', 'vulnerabilities', 'remediations', 'attack-paths'].includes(page) && hostOptions.length > 1;
+  const showFilter = (['hosts', 'ports', 'services', 'vulnerabilities', 'remediations'].includes(page) || (page === 'attack-paths' && hasAttackPaths)) && hostOptions.length > 1;
 
   const getPageTitle = () => {
     // Hardcoding titles as requested to fix translation key issue.
