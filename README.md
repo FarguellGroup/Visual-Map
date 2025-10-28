@@ -17,7 +17,7 @@ Visual Map es una plataforma web Next.js que te permite subir escaneos XML de Nm
   - [1. Sube tu Escaneo](#1-sube-tu-escaneo)
   - [2. Dashboard Principal](#2-dashboard-principal)
   - [3. Vistas Detalladas](#3-vistas-detalladas)
-    - [Resumen Ejecutivo (IA)](#resumen-ejecutivo)
+    - [Resumen Ejecutivo con IA](#resumen-ejecutivo)
     - [Hosts descubiertos](#hosts-descubiertos)
     - [Puertos y Servicios](#puertos-y-servicios)
     - [Hosts Vulnerables y CVEs](#hosts-vulnerables-y-cves)
@@ -137,7 +137,7 @@ Una vez procesado, obtendrás una vista general con tarjetas resumen y una tabla
 Usa el menú lateral para navegar por las distintas secciones y profundizar en la información de tu escaneo.
 
 <a id="resumen-ejecutivo"></a>
-### Resumen Ejecutivo (IA)
+### Resumen Ejecutivo con IA
 Genera un informe de alto nivel con IA que resume la postura de seguridad, los hallazgos críticos y las recomendaciones estratégicas. Una vez generado se incluirá en los informes HTML y PDF.
 
 ![VM - Resumen Ejecutivo](https://github.com/user-attachments/assets/b8a2f942-f48d-4485-95f6-5c0d211aa166)
