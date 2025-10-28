@@ -24,6 +24,7 @@ import { getHostname, getOsName } from '@/lib/nmap-parser';
 import { useToast } from '@/hooks/use-toast';
 import { VmLogo } from '../icons';
 import JSZip from 'jszip';
+import * as XLSX from 'xlsx';
 
 
 // Extend jsPDF with autoTable
@@ -282,7 +283,7 @@ export default function AppSidebar() {
   const { scanResult, riskWeights, setRiskWeights, setScanResult, cveCache, remediationCache, executiveSummaryCache } = useScanStore();
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingHtml, setIsExportingHtml] = useState(false);
-  const [isExportingCsv, setIsExportingCsv] = useState(false);
+  const [isExportingXlsx, setIsExportingXlsx] = useState(false);
   const [localWeights, setLocalWeights] = useState<RiskWeights>(riskWeights);
   const { state, setOpen } = useSidebar();
   const [openAccordion, setOpenAccordion] = useState('');
@@ -326,123 +327,150 @@ export default function AppSidebar() {
     link.click();
   }, []);
 
-  const handleExportCsv = useCallback(async () => {
+  const handleExportXlsx = useCallback(async () => {
     const { scanResult: currentScanResult, cveCache: currentCveCache } = useScanStore.getState();
     if (!currentScanResult) return;
 
-    setIsExportingCsv(true);
+    setIsExportingXlsx(true);
 
     try {
-        const zip = new JSZip();
-        
-        const toCsvRow = (items: (string | number)[]) => {
-            return items.map(item => {
-                const str = String(item ?? '').replace(/"/g, '""');
-                // Quote fields containing commas, double quotes, or newlines
-                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-                    return `"${str}"`;
-                }
-                return str;
-            }).join(',') + '\r\n';
+        const wb = XLSX.utils.book_new();
+        const getRiskColor = (score: number) => {
+            if (score >= 90) return "FF0000"; // Red
+            if (score >= 75) return "FFA500"; // Orange
+            if (score >= 40) return "FFFF00"; // Yellow
+            if (score > 0) return "00B050";   // Green
+            return "D3D3D3"; // Light Gray
+        };
+        const getCveRiskColor = (score: number | null) => {
+            if (score === null || isNaN(score)) return "D3D3D3";
+            if (score >= 9.0) return "FF0000";
+            if (score >= 7.0) return "FFA500";
+            if (score >= 4.0) return "FFFF00";
+            return "00B050";
         };
 
-        // 1. Hosts CSV
+        // --- Hoja de Hosts ---
         const hostsHeader = ["ipAddress", "hostname", "osName", "openPortsCount", "riskScore"];
-        let hostsCsv = toCsvRow(hostsHeader);
-        currentScanResult.hosts.forEach(h => {
-            hostsCsv += toCsvRow([
-                h.address[0].addr,
-                getHostname(h),
-                getOsName(h),
-                getOpenPortsCount(h),
-                h.riskScore?.toFixed(0) ?? '0'
-            ]);
-        });
-        zip.file("hosts.csv", hostsCsv);
+        const hostsData = currentScanResult.hosts.map(h => ({
+            ipAddress: h.address[0].addr,
+            hostname: getHostname(h),
+            osName: getOsName(h),
+            openPortsCount: getOpenPortsCount(h),
+            riskScore: h.riskScore ?? 0,
+        }));
+
+        const hostsWs = XLSX.utils.json_to_sheet(hostsData, { header: hostsHeader });
+        hostsWs['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(hostsWs['!ref']!)) };
         
-        // 2. Ports CSV
+        hostsData.forEach((row, index) => {
+            const cellRef = `E${index + 2}`;
+            if (hostsWs[cellRef]) {
+                 hostsWs[cellRef].s = {
+                    fill: { fgColor: { rgb: getRiskColor(row.riskScore) } }
+                };
+            }
+        });
+
+        const hostsColWidths = hostsHeader.map(key => ({
+            wch: Math.max(...hostsData.map(row => (row[key as keyof typeof row] ?? '').toString().length), key.length) + 2
+        }));
+        hostsWs['!cols'] = hostsColWidths;
+
+        XLSX.utils.book_append_sheet(wb, hostsWs, "Hosts");
+
+        // --- Hoja de Puertos ---
         const portsHeader = ["hostIp", "portId", "protocol", "serviceName", "product", "version"];
-        let portsCsv = toCsvRow(portsHeader);
-        currentScanResult.hosts.forEach(host => {
-            const ports = Array.isArray(host.ports.port) ? host.ports.port : (host.ports.port ? [host.ports.port] : []);
-            ports.filter(p => p.state.state === 'open').forEach(p => {
-                portsCsv += toCsvRow([
-                    host.address[0].addr,
-                    p.portid,
-                    p.protocol,
-                    p.service?.name || '',
-                    p.service?.product || '',
-                    p.service?.version || ''
-                ]);
-            });
-        });
-        zip.file("ports.csv", portsCsv);
+        const portsData = currentScanResult.hosts.flatMap(host => {
+            const hostPorts = Array.isArray(host.ports.port) ? host.ports.port : (host.ports.port ? [host.ports.port] : []);
+            return hostPorts.filter(p => p.state.state === 'open').map(p => ({
+                hostIp: host.address[0].addr,
+                portId: p.portid,
+                protocol: p.protocol,
+                serviceName: p.service?.name || '',
+                product: p.service?.product || '',
+                version: p.service?.version || ''
+            }));
+        }).sort((a,b) => ipToNumber(a.hostIp) - ipToNumber(b.hostIp));
+        const portsWs = XLSX.utils.json_to_sheet(portsData, { header: portsHeader });
+        portsWs['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(portsWs['!ref']!)) };
+        portsWs['!cols'] = portsHeader.map(key => ({
+            wch: Math.max(...portsData.map(row => (row[key as keyof typeof row] ?? '').toString().length), key.length) + 2
+        }));
+        XLSX.utils.book_append_sheet(wb, portsWs, "Ports");
 
-        // 3. Services CSV
+
+        // --- Hoja de Servicios ---
         const servicesHeader = ["hostIp", "portId", "serviceName", "product", "version"];
-        let servicesCsv = toCsvRow(servicesHeader);
-        currentScanResult.hosts.forEach(host => {
-            const ports = Array.isArray(host.ports.port) ? host.ports.port : (host.ports.port ? [host.ports.port] : []);
-            ports.filter(p => p.state.state === 'open' && p.service).forEach(p => {
-                servicesCsv += toCsvRow([
-                    host.address[0].addr,
-                    p.portid,
-                    p.service!.name,
-                    p.service!.product || '',
-                    p.service!.version || ''
-                ]);
-            });
-        });
-        zip.file("services.csv", servicesCsv);
+        const servicesData = currentScanResult.hosts.flatMap(host => {
+            const hostPorts = Array.isArray(host.ports.port) ? host.ports.port : (host.ports.port ? [host.ports.port] : []);
+            return hostPorts.filter(p => p.state.state === 'open' && p.service).map(p => ({
+                hostIp: host.address[0].addr,
+                portId: p.portid,
+                serviceName: p.service!.name,
+                product: p.service!.product || '',
+                version: p.service!.version || ''
+            }));
+        }).sort((a,b) => ipToNumber(a.hostIp) - ipToNumber(b.hostIp));
+        const servicesWs = XLSX.utils.json_to_sheet(servicesData, { header: servicesHeader });
+        servicesWs['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(servicesWs['!ref']!)) };
+        servicesWs['!cols'] = servicesHeader.map(key => ({
+            wch: Math.max(...servicesData.map(row => (row[key as keyof typeof row] ?? '').toString().length), key.length) + 2
+        }));
+        XLSX.utils.book_append_sheet(wb, servicesWs, "Services");
 
-        // 4. CVEs CSV
-        const allCves = Array.from(currentCveCache.values())
-            .filter(entry => entry.status === 'loaded' && entry.data)
-            .flatMap(entry => entry.data!);
+        // --- Hoja de CVEs ---
+        const allCves = Array.from(currentCveCache.entries()).flatMap(([hostIp, entry]) => {
+            if (entry.status === 'loaded' && entry.data) {
+                return entry.data.map(cveItem => ({ ...cveItem, hostIp }));
+            }
+            return [];
+        });
 
         if (allCves.length > 0) {
             const cvesHeader = ["cveId", "cvssScore", "description", "service", "version", "portId", "hostIp"];
-            let cvesCsv = toCsvRow(cvesHeader);
-            
-            const cveItems = Array.from(currentCveCache.entries()).flatMap(([hostIp, entry]) => {
-                if (entry.status === 'loaded' && entry.data) {
-                    return entry.data.map(cveItem => ({ ...cveItem, hostIp }));
-                }
-                return [];
+            const cvesData = allCves.map(item => ({
+                cveId: item.cve.cveId,
+                cvssScore: item.cve.cvssScore ?? 'N/A',
+                description: item.cve.description,
+                service: item.service.product || item.service.name,
+                version: item.service.version || '',
+                portId: item.portId,
+                hostIp: item.hostIp
+            }));
+
+            const cvesWs = XLSX.utils.json_to_sheet(cvesData, { header: cvesHeader });
+            cvesWs['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(cvesWs['!ref']!)) };
+             
+            cvesData.forEach((row, index) => {
+              const cellRef = `B${index + 2}`;
+              const score = typeof row.cvssScore === 'number' ? row.cvssScore : parseFloat(row.cvssScore);
+              if (cvesWs[cellRef]) {
+                  cvesWs[cellRef].s = { fill: { fgColor: { rgb: getCveRiskColor(score) } } };
+              }
             });
 
-            cveItems.forEach(cveItem => {
-                 cvesCsv += toCsvRow([
-                    cveItem.cve.cveId,
-                    cveItem.cve.cvssScore ?? 'N/A',
-                    cveItem.cve.description,
-                    cveItem.service.product || cveItem.service.name,
-                    cveItem.service.version || '',
-                    cveItem.portId,
-                    cveItem.hostIp
-                ]);
-            });
-            zip.file("cves.csv", cvesCsv);
+            cvesWs['!cols'] = cvesHeader.map(key => ({
+                wch: Math.max(...cvesData.map(row => (row[key as keyof typeof row] ?? '').toString().length), key.length) + 2
+            }));
+
+            XLSX.utils.book_append_sheet(wb, cvesWs, "CVEs");
         }
 
-        const content = await zip.generateAsync({ type: "blob" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(content);
-        link.download = `visual-map-csv-export-${getFormattedTimestamp()}.zip`;
-        link.click();
-        URL.revokeObjectURL(link.href);
+        XLSX.writeFile(wb, `visual-map-report-${getFormattedTimestamp()}.xlsx`);
 
     } catch (error) {
-        console.error("Error exporting to CSV:", error);
+        console.error("Error exporting to XLSX:", error);
         toast({
             variant: 'destructive',
-            title: 'CSV Export Failed',
-            description: locale === 'es' ? 'Ocurrió un error al generar los archivos CSV.' : 'An error occurred while generating the CSV files.',
+            title: 'XLSX Export Failed',
+            description: locale === 'es' ? 'Ocurrió un error al generar el archivo XLSX.' : 'An error occurred while generating the XLSX file.',
         });
     } finally {
-        setIsExportingCsv(false);
+        setIsExportingXlsx(false);
     }
   }, [locale, toast]);
+
 
   const captureChartAsBase64 = async (elementId: string, options?: { backgroundColor?: string | null }) => {
     const element = document.getElementById(elementId) as HTMLElement;
@@ -1326,7 +1354,7 @@ export default function AppSidebar() {
   const executiveSummaryTitle = locale === 'es' ? 'Resumen Ejecutivo' : 'Executive Summary';
   const attackPathsTitle = locale === 'es' ? 'Rutas de Ataque' : 'Attack Paths';
   
-  const isAnyExportRunning = isExportingPdf || isExportingHtml || isExportingCsv;
+  const isAnyExportRunning = isExportingPdf || isExportingHtml || isExportingXlsx;
   
   return (
     <TooltipProvider>
@@ -1559,9 +1587,9 @@ export default function AppSidebar() {
                                     {isExportingPdf ? <Loader2 className="animate-spin" /> : <Download />}
                                     {tSidebar('exportPdf')}
                                 </Button>
-                                <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={isAnyExportRunning} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
-                                    {isExportingCsv ? <Loader2 className="animate-spin" /> : <Download />}
-                                    {locale === 'es' ? 'Exportar CSV' : 'Export CSV'}
+                                <Button variant="outline" size="sm" onClick={handleExportXlsx} disabled={isAnyExportRunning} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
+                                    {isExportingXlsx ? <Loader2 className="animate-spin" /> : <Download />}
+                                    {locale === 'es' ? 'Exportar XLSX' : 'Export XLSX'}
                                 </Button>
                             </div>
                         </AccordionContent>
