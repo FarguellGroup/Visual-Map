@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -38,7 +39,7 @@ const ipToNumber = (ip: string) => {
 
 const ResumeScanButton = () => {
     const locale = useLocale();
-    const { fetchCvesForHost, remainingHostsToScan } = useScanStore();
+    const { fetchCves, remainingServicesToScan } = useScanStore();
     const [countdown, setCountdown] = useState(60);
 
     useEffect(() => {
@@ -49,8 +50,8 @@ const ResumeScanButton = () => {
     }, [countdown]);
 
     const handleResume = () => {
-        if (remainingHostsToScan.length > 0) {
-            fetchCvesForHost(remainingHostsToScan, locale);
+        if (remainingServicesToScan.length > 0) {
+            fetchCves(locale);
         }
     };
     
@@ -74,7 +75,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     
     const { 
         cveCache, 
-        fetchCvesForHost, 
+        fetchCves, 
         pauseCveScan,
         cveScanProgress,
         isCveScanRunning,
@@ -84,13 +85,13 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
         riskWeights,
         apiError,
         hostFilter,
-        remainingHostsToScan,
+        remainingServicesToScan,
     } = useScanStore();
     
     const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: SortDirection }>({ key: 'cvssScore', direction: 'descending' });
 
     const handleFetchAllCves = () => {
-        fetchCvesForHost(hosts, locale);
+        fetchCves(locale);
     };
 
     const handleConfigureApi = () => {
@@ -98,7 +99,7 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     };
 
     const handleResumeScan = () => {
-      fetchCvesForHost(remainingHostsToScan.length > 0 ? remainingHostsToScan : hosts, locale);
+      fetchCves(locale);
     }
 
     const { allCves, serviceDistribution, hasUnscannedHosts, uniqueCveCount, affectedHostOptions } = useMemo(() => {
@@ -112,8 +113,8 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
 
         hosts.forEach(host => {
             const cveEntry = cveCache.get(host.address[0].addr);
-            if (cveEntry?.status === 'loaded' && cveEntry.data) {
-                if (cveEntry.data.length > 0 && !affectedHosts.has(host.address[0].addr)) {
+            if (cveEntry?.status === 'loaded' && cveEntry.data && cveEntry.data.length > 0) {
+                if (!affectedHosts.has(host.address[0].addr)) {
                      affectedHosts.set(host.address[0].addr, {
                         value: host.address[0].addr,
                         label: `${getHostname(host)} (${host.address[0].addr})`
@@ -236,14 +237,14 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     const noCvesFound = locale === 'es' ? 'No se encontraron CVEs para los servicios detectados en este escaneo.' : 'No CVEs found for the detected services in this scan.';
     const vulnerableServicesDistributionTitle = locale === 'es' ? 'Distribución de Servicios Vulnerables' : 'Vulnerable Services Distribution';
     const analyzingText = cveScanProgress?.total > 0 
-        ? (locale === 'es' ? `Analizando hosts... ${cveScanProgress.processed} de ${cveScanProgress.total}` : `Analyzing hosts... ${cveScanProgress.processed} of ${cveScanProgress.total}`)
+        ? (locale === 'es' ? `Escaneando servicios expuestos... ${cveScanProgress.processed} de ${cveScanProgress.total}` : `Scanning exposed services... ${cveScanProgress.processed} of ${cveScanProgress.total}`)
         : (locale === 'es' ? 'Preparando análisis...' : 'Preparing analysis...');
     
     const isRateLimitError = apiError?.toLowerCase().includes('rate limit') || false;
     const showConfigureApiButton = apiError && !isRateLimitError;
     const showResumeFromRateLimit = isCveScanPaused && isRateLimitError;
 
-    const showGlobalScanButton = hasUnscannedHosts && !isCveScanRunning && !apiError && !isCveScanPaused;
+    const showGlobalScanButton = !isCveScanRunning && !isCveScanPaused;
     const showPauseButton = isCveScanRunning && !isCveScanPaused;
     const showResumeButton = isCveScanPaused && !isRateLimitError;
 
@@ -425,3 +426,5 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     </div>
   );
 }
+
+    
