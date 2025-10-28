@@ -150,6 +150,7 @@ async function callGemini<T_in, T_out>(prompt: string, signal: AbortSignal): Pro
         const response = await result.response;
         let text = response.text();
         
+        // Find the first '{' and the last '}' to extract the JSON object.
         const firstBrace = text.indexOf('{');
         const lastBrace = text.lastIndexOf('}');
 
@@ -420,7 +421,10 @@ export const useScanStore = create<ScanState>()(
             servicesToScan = get().remainingServicesToScan;
         } else {
             servicesToScan = getScannableServices(scanResult.hosts);
-            set({ cveScanProgress: { processed: 0, total: servicesToScan.length, isComplete: false } });
+            set({ 
+                cveCache: new Map(), // Clear previous results before a new full scan
+                cveScanProgress: { processed: 0, total: servicesToScan.length, isComplete: false } 
+            });
         }
 
         if (servicesToScan.length === 0) {
@@ -461,7 +465,7 @@ export const useScanStore = create<ScanState>()(
             };
 
             const outputSchema = { cves: [{ portId: "port", service: "service name", cves: [{ cveId: "CVE-...", description: "...", cvssScore: 0.0 }] }] };
-            const prompt = `You are a cybersecurity expert. For the single service in the provided list, identify potential CVEs. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema, with no extra text: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\` For the service, list the top 3 most critical CVEs. If no CVEs are found for a service, return an empty 'cves' array. Host Info: \`\`\`json\n${input.hostInfo}\`\`\`\nServices Info:\`\`\`json\n${input.portInfo}\`\`\``;
+            const prompt = `You are a cybersecurity expert. For the single service in the provided list, identify potential CVEs. Respond in ${input.locale}. Ensure all text in the output, especially the 'description' field, is in the specified locale (${input.locale}). The output must be a single, valid JSON object that strictly adheres to this Zod schema, with no extra text: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\` For the service, list the top 3 most critical CVEs. If no CVEs are found, return an empty 'cves' array. Host Info: \`\`\`json\n${input.hostInfo}\`\`\`\nServices Info:\`\`\`json\n${input.portInfo}\`\`\``;
             
             const result = await callGemini<CveDetailsInput, CveDetailsOutput>(prompt, controller.signal);
             
@@ -495,6 +499,14 @@ export const useScanStore = create<ScanState>()(
                         cveCache: new Map(state.cveCache).set(hostIp, { status: 'loaded', data: combinedData })
                     };
                   });
+                } else {
+                   // Even if no CVEs are found, mark the host as 'loaded' to prevent re-scanning.
+                    set(state => {
+                      if (!state.cveCache.has(hostIp)) {
+                         return { cveCache: new Map(state.cveCache).set(hostIp, { status: 'loaded', data: [] }) };
+                      }
+                      return state;
+                    });
                 }
             }
             
@@ -781,5 +793,3 @@ export const useScanStore = create<ScanState>()(
     }
   )
 );
-
-    
