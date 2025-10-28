@@ -1455,9 +1455,11 @@ export default function AppSidebar() {
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarGroup>
-            <SidebarSeparator className="my-4" />
+            
+            <SidebarSeparator className="my-2" />
+
             <SidebarGroup>
-                <SidebarMenu>
+                 <SidebarMenu>
                     <SidebarMenuItem>
                         <Link href="/details/api" className='w-full'>
                             <SidebarMenuButton isActive={pathname.startsWith('/details/api')} tooltip={sidebarTooltip(tApi('title'))}>
@@ -1468,138 +1470,130 @@ export default function AppSidebar() {
                             </SidebarMenuButton>
                         </Link>
                     </SidebarMenuItem>
-                </SidebarMenu>
-            </SidebarGroup>
-            <SidebarSeparator className="my-4" />
-            <Accordion type="single" collapsible className="w-full" value={openAccordion} onValueChange={setOpenAccordion}>
-                <SidebarGroup>
-                    <AccordionItem value="risk-weighting" className="border-none">
-                       {state === 'collapsed' ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <AccordionTrigger onClick={handleAccordionTriggerClick} className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180">
-                                        <SlidersHorizontal className="h-4 w-4" />
-                                    </AccordionTrigger>
-                                </TooltipTrigger>
-                                <TooltipContent side="right" align="center">
-                                    <p>{tSidebar('riskWeighting')}</p>
-                                </TooltipContent>
-                            </Tooltip>
-                       ) : (
-                          <AccordionTrigger 
-                              onClick={handleAccordionTriggerClick}
-                              className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180"
-                          >
-                            <div className='flex items-center justify-between w-full'>
-                                <div className='flex items-center gap-2'>
-                                    <SlidersHorizontal className="h-4 w-4" />
-                                    <span className="group-data-[collapsible=icon]:hidden">{tSidebar('riskWeighting')}</span>
-                                </div>
-                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden" />
-                            </div>
-                          </AccordionTrigger>
-                       )}
-
-                        <AccordionContent>
-                            <Card className="bg-background/50">
-                                <CardContent className="p-4 space-y-4">
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <Label htmlFor="critical-ports-weight" className='text-xs'>
-                                                {locale === 'es' ? 'Puertos Críticos' : 'Critical Ports'}
-                                            </Label>
-                                            <span className="text-xs text-muted-foreground">{localWeights.criticalPorts}/100</span>
-                                        </div>
-                                        <Slider value={[localWeights.criticalPorts]} max={100} step={1} onValueChange={(v) => handleWeightChange('criticalPorts', v)} onValueCommit={(v) => commitWeightChange('criticalPorts', v)} id="critical-ports-weight"/>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <Label htmlFor="cve-weight" className='text-xs'>{tDetails('vulnerabilities')}</Label>
-                                            <span className="text-xs text-muted-foreground">{localWeights.cveScore}/100</span>
-                                        </div>
-                                        <Slider value={[localWeights.cveScore]} max={100} step={1} onValueChange={(v) => handleWeightChange('cveScore', v)} onValueCommit={(v) => commitWeightChange('cveScore', v)} id="cve-weight"/>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <Label htmlFor="vuln-scripts-weight" className='text-xs'>{tSidebar('nseScripts')}</Label>
-                                            <span className="text-xs text-muted-foreground">{localWeights.vulnScripts}/100</span>
-                                        </div>
-                                        <Slider value={[localWeights.vulnScripts]} max={100} step={1} onValueChange={(v) => handleWeightChange('vulnScripts', v)} onValueCommit={(v) => commitWeightChange('vulnScripts', v)} id="vuln-scripts-weight"/>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <Label htmlFor="service-version-weight" className='text-xs'>{tSidebar('serviceVersions')}</Label>
-                                            <span className="text-xs text-muted-foreground">{localWeights.serviceVersions}/100</span>
-                                        </div>
-                                        <Slider value={[localWeights.serviceVersions]} max={100} step={1} onValueChange={(v) => handleWeightChange('serviceVersions', v)} onValueCommit={(v) => commitWeightChange('serviceVersions', v)} id="service-version-weight" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <Label htmlFor="open-ports-weight" className='text-xs'>{tSidebar('openPorts')}</Label>
-                                            <span className="text-xs text-muted-foreground">{localWeights.openPortsCount}/100</span>
-                                        </div>
-                                        <Slider value={[localWeights.openPortsCount]} max={100} step={1} onValueChange={(v) => handleWeightChange('openPortsCount', v)} onValueCommit={(v) => commitWeightChange('openPortsCount', v)} id="open-ports-weight"/>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </AccordionContent>
-                    </AccordionItem>
-                </SidebarGroup>
-                <SidebarGroup>
-                    <AccordionItem value="export" className="border-none">
-                         {state === 'collapsed' ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                  <AccordionTrigger 
-                                      onClick={handleAccordionTriggerClick}
-                                      className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180"
-                                  >
-                                    <Download className="h-4 w-4" />
-                                  </AccordionTrigger>
-                              </TooltipTrigger>
-                              <TooltipContent side="right" align="center"><p>{tSidebar('export')}</p></TooltipContent>
-                            </Tooltip>
-                         ) : (
+                     <Accordion type="single" collapsible className="w-full" value={openAccordion} onValueChange={setOpenAccordion}>
+                        <AccordionItem value="risk-weighting" className="border-none">
+                        {state === 'collapsed' ? (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <AccordionTrigger onClick={handleAccordionTriggerClick} className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180">
+                                            <SlidersHorizontal className="h-4 w-4" />
+                                        </AccordionTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" align="center">
+                                        <p>{tSidebar('riskWeighting')}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                        ) : (
                             <AccordionTrigger 
                                 onClick={handleAccordionTriggerClick}
                                 className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180"
                             >
                                 <div className='flex items-center justify-between w-full'>
                                     <div className='flex items-center gap-2'>
-                                        <Download className="h-4 w-4" />
-                                        <span className="group-data-[collapsible=icon]:hidden">{tSidebar('export')}</span>
+                                        <SlidersHorizontal className="h-4 w-4" />
+                                        <span className="group-data-[collapsible=icon]:hidden">{tSidebar('riskWeighting')}</span>
                                     </div>
                                     <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden" />
                                 </div>
                             </AccordionTrigger>
-                         )}
-                        <AccordionContent>
-                            <div className="mt-4 flex flex-col items-center justify-center gap-2">
-                                <Button variant="outline" size="sm" onClick={handleExportJson} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs" disabled={isAnyExportRunning}>
-                                    <Download />
-                                    {tSidebar('exportJson')}
-                                </Button>
-                                <Button variant="outline" size="sm" onClick={handleExportHtml} disabled={isAnyExportRunning} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
-                                    {isExportingHtml ? <Loader2 className="animate-spin" /> : <Download />}
-                                    {tSidebar('exportHtml')}
-                                </Button>
-                                <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={isAnyExportRunning} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
-                                    {isExportingPdf ? <Loader2 className="animate-spin" /> : <Download />}
-                                    {tSidebar('exportPdf')}
-                                </Button>
-                                <Button variant="outline" size="sm" onClick={handleExportXlsx} disabled={isAnyExportRunning} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
-                                    {isExportingXlsx ? <Loader2 className="animate-spin" /> : <Download />}
-                                    {locale === 'es' ? 'Exportar XLSX' : 'Export XLSX'}
-                                </Button>
-                            </div>
-                        </AccordionContent>
-                    </AccordionItem>
-                </SidebarGroup>
-            </Accordion>
-        
+                        )}
+
+                            <AccordionContent>
+                                <Card className="bg-background/50">
+                                    <CardContent className="p-4 space-y-4">
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <Label htmlFor="critical-ports-weight" className='text-xs'>
+                                                    {locale === 'es' ? 'Puertos Críticos' : 'Critical Ports'}
+                                                </Label>
+                                                <span className="text-xs text-muted-foreground">{localWeights.criticalPorts}/100</span>
+                                            </div>
+                                            <Slider value={[localWeights.criticalPorts]} max={100} step={1} onValueChange={(v) => handleWeightChange('criticalPorts', v)} onValueCommit={(v) => commitWeightChange('criticalPorts', v)} id="critical-ports-weight"/>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <Label htmlFor="cve-weight" className='text-xs'>{tDetails('vulnerabilities')}</Label>
+                                                <span className="text-xs text-muted-foreground">{localWeights.cveScore}/100</span>
+                                            </div>
+                                            <Slider value={[localWeights.cveScore]} max={100} step={1} onValueChange={(v) => handleWeightChange('cveScore', v)} onValueCommit={(v) => commitWeightChange('cveScore', v)} id="cve-weight"/>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <Label htmlFor="vuln-scripts-weight" className='text-xs'>{tSidebar('nseScripts')}</Label>
+                                                <span className="text-xs text-muted-foreground">{localWeights.vulnScripts}/100</span>
+                                            </div>
+                                            <Slider value={[localWeights.vulnScripts]} max={100} step={1} onValueChange={(v) => handleWeightChange('vulnScripts', v)} onValueCommit={(v) => commitWeightChange('vulnScripts', v)} id="vuln-scripts-weight"/>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <Label htmlFor="service-version-weight" className='text-xs'>{tSidebar('serviceVersions')}</Label>
+                                                <span className="text-xs text-muted-foreground">{localWeights.serviceVersions}/100</span>
+                                            </div>
+                                            <Slider value={[localWeights.serviceVersions]} max={100} step={1} onValueChange={(v) => handleWeightChange('serviceVersions', v)} onValueCommit={(v) => commitWeightChange('serviceVersions', v)} id="service-version-weight" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <Label htmlFor="open-ports-weight" className='text-xs'>{tSidebar('openPorts')}</Label>
+                                                <span className="text-xs text-muted-foreground">{localWeights.openPortsCount}/100</span>
+                                            </div>
+                                            <Slider value={[localWeights.openPortsCount]} max={100} step={1} onValueChange={(v) => handleWeightChange('openPortsCount', v)} onValueCommit={(v) => commitWeightChange('openPortsCount', v)} id="open-ports-weight"/>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </AccordionContent>
+                        </AccordionItem>
+                        <AccordionItem value="export" className="border-none">
+                            {state === 'collapsed' ? (
+                                <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <AccordionTrigger 
+                                        onClick={handleAccordionTriggerClick}
+                                        className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180"
+                                    >
+                                        <Download className="h-4 w-4" />
+                                    </AccordionTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" align="center"><p>{tSidebar('export')}</p></TooltipContent>
+                                </Tooltip>
+                            ) : (
+                                <AccordionTrigger 
+                                    onClick={handleAccordionTriggerClick}
+                                    className="px-2 py-1.5 hover:no-underline hover:bg-primary/10 rounded-md group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center text-sm font-medium [&[data-state=open]>div>svg:last-child]:rotate-180"
+                                >
+                                    <div className='flex items-center justify-between w-full'>
+                                        <div className='flex items-center gap-2'>
+                                            <Download className="h-4 w-4" />
+                                            <span className="group-data-[collapsible=icon]:hidden">{tSidebar('export')}</span>
+                                        </div>
+                                        <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden" />
+                                    </div>
+                                </AccordionTrigger>
+                            )}
+                            <AccordionContent>
+                                <div className="mt-4 flex flex-col items-center justify-center gap-2">
+                                    <Button variant="outline" size="sm" onClick={handleExportJson} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs" disabled={isAnyExportRunning}>
+                                        <Download />
+                                        {tSidebar('exportJson')}
+                                    </Button>
+                                    <Button variant="outline" size="sm" onClick={handleExportHtml} disabled={isAnyExportRunning} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
+                                        {isExportingHtml ? <Loader2 className="animate-spin" /> : <Download />}
+                                        {tSidebar('exportHtml')}
+                                    </Button>
+                                    <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={isAnyExportRunning} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
+                                        {isExportingPdf ? <Loader2 className="animate-spin" /> : <Download />}
+                                        {tSidebar('exportPdf')}
+                                    </Button>
+                                    <Button variant="outline" size="sm" onClick={handleExportXlsx} disabled={isAnyExportRunning} className="w-full h-8 hover:bg-primary hover:text-primary-foreground text-xs">
+                                        {isExportingXlsx ? <Loader2 className="animate-spin" /> : <Download />}
+                                        {locale === 'es' ? 'Exportar XLSX' : 'Export XLSX'}
+                                    </Button>
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
+                </SidebarMenu>
+            </SidebarGroup>
       </SidebarContent>
     </TooltipProvider>
   );
 }
-
-    
