@@ -3,7 +3,7 @@
 
 Visual Map es una plataforma web Next.js que te permite subir escaneos XML de Nmap y visualizar hosts, puertos abiertos y servicios de una manera gráfica y amigable. Esta aplicación incluye un módulo de inteligencia artificial con la API de Gemini para priorizar los hosts más vulnerables, facilitar la identificación de riesgos de seguridad, buscar vulnerabilidades (CVEs) y generar resúmenes y recomendaciones de pentesting.
 
-![Visual-Map Banner](https://github.com/user-attachments/assets/2332eaf2-2a16-4e88-ab91-432ec04acaa8)
+![Visual-Map Banner](https://github.com/user-attachments/assets/e4d82a59-1f50-4532-975a-c6be25269651)
 
 ## Índice
 
