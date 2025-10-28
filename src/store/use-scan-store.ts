@@ -147,19 +147,43 @@ async function callGemini<T_in, T_out>(prompt: string, signal: AbortSignal): Pro
         }
         
         const result = await model.generateContent(prompt);
+        
+        if (signal.aborted) {
+            return { aborted: true };
+        }
+
         const response = await result.response;
         let text = response.text();
         
-        // Find the first '{' and the last '}' to extract the JSON object.
-        const firstBrace = text.indexOf('{');
-        const lastBrace = text.lastIndexOf('}');
+        // Find the first '{' and the last '}' that form a balanced pair to extract the JSON object.
+        let firstBrace = -1;
+        let lastBrace = -1;
+        let balance = 0;
+        let startIndex = text.indexOf('{');
+
+        if (startIndex !== -1) {
+            firstBrace = startIndex;
+            for (let i = startIndex; i < text.length; i++) {
+                if (text[i] === '{') {
+                    balance++;
+                } else if (text[i] === '}') {
+                    balance--;
+                    if (balance === 0) {
+                        lastBrace = i;
+                        break; // Found a complete JSON object
+                    }
+                }
+            }
+        }
 
         if (firstBrace !== -1 && lastBrace > firstBrace) {
             text = text.substring(firstBrace, lastBrace + 1);
         } else {
              let errorMessage = 'Invalid JSON response from API. No JSON object found.';
-            if (text.toLowerCase().includes('rate limit') || text.toLowerCase().includes('quota')) {
+            if (response.text().toLowerCase().includes('rate limit') || response.text().toLowerCase().includes('quota')) {
                  errorMessage = 'Rate limit exceeded';
+            } else if (response.text().toLowerCase().includes('api key not valid')) {
+                errorMessage = 'API Key not valid. Please check the key.';
             }
             setApiError(errorMessage);
             return { error: errorMessage };
@@ -169,9 +193,10 @@ async function callGemini<T_in, T_out>(prompt: string, signal: AbortSignal): Pro
             return JSON.parse(text) as T_out;
         } catch(parseError: any) {
             console.error("JSON Parse Error:", parseError);
-            console.error("Raw text from API:", text);
-            setApiError(`Failed to parse API response: ${parseError.message}`);
-            return { error: `Bad JSON format: ${parseError.message}` };
+            console.error("Raw text from API:", response.text());
+            const errorMessage = `Failed to parse API response: ${parseError.message}`;
+            setApiError(errorMessage);
+            return { error: errorMessage };
         }
 
     } catch (error: any) {
@@ -187,12 +212,12 @@ async function callGemini<T_in, T_out>(prompt: string, signal: AbortSignal): Pro
         }
 
         if (errorMessage.toLowerCase().includes('429') || errorMessage.toLowerCase().includes('rate limit') || errorMessage.toLowerCase().includes('quota')) {
-            setApiError('Rate limit exceeded');
+            errorMessage = 'Rate limit exceeded';
         } else if (errorMessage.toLowerCase().includes('api key not valid')) {
-            setApiError('API Key not valid. Please check the key.');
-        } else {
-            setApiError(errorMessage);
+            errorMessage = 'API Key not valid. Please check the key.';
         }
+        
+        setApiError(errorMessage);
         return { error: errorMessage };
     }
 }
@@ -475,13 +500,13 @@ export const useScanStore = create<ScanState>()(
             }
 
             if ('error' in result) {
-                const isRateLimit = result.error.toLowerCase().includes('rate limit');
-                if (isRateLimit) {
-                    get().pauseCveScan();
-                    set({ apiError: result.error, remainingServicesToScan: servicesToScan.slice(i) });
-                    return; 
-                }
-            } else if (result && result.cves) {
+                // Any error should pause the scan
+                get().pauseCveScan();
+                set({ apiError: result.error, remainingServicesToScan: servicesToScan.slice(i) });
+                return; // Exit the loop on any API error
+            } 
+            
+            if (result && result.cves) {
                 const newCvesForHost: CveData[] = result.cves.flatMap(serviceCves => {
                     return serviceCves.cves.map(cve => ({
                         service: port.service!,
