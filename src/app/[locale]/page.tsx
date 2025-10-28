@@ -12,7 +12,7 @@ export default function Home() {
 
   if (!scanResult) {
     return (
-      <div className="flex-grow flex items-center justify-center h-full">
+      <div className="flex flex-grow items-center justify-center">
         <UploadZone />
       </div>
     );
