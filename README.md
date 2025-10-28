@@ -144,13 +144,13 @@ Genera un informe de alto nivel con IA que resume la postura de seguridad, los h
 
 <a id="hosts-descubiertos"></a>
 ### Hosts descubiertos
-Un listado de todos los hosts descubiertos en el escaneo de Nmap, incluyendo la IP, nombre del host, sistema operativo, puertos abiertos y puntaje de crédito.
+Un listado de todos los hosts descubiertos en el escaneo de Nmap, incluyendo la IP, nombre del host, sistema operativo, puertos abiertos y puntaje de riesgo.
 
 ![VM - Hosts](https://github.com/user-attachments/assets/d18b4771-d836-410d-ae52-285ddd4fe85e)
 
 <a id="puertos-abiertos"></a>
 ### Puertos abiertos
-Consulta todos los puertos abiertos en el objetivo, con una gráfica de los 15 puertos abiertos más comunes.
+Consulta todos los puertos abiertos en los objetivos, con una gráfica de los 15 puertos abiertos más comunes.
 
 ![VM - Puertos](https://github.com/user-attachments/assets/bf9ea4ab-78ac-47cd-b969-3a3d40131a6e)
 
@@ -174,7 +174,7 @@ Escanea todos los servicios expuestos y detecta todos los CVEs asociados, con su
 
 <a id="remediaciones"></a>
 ### Remediaciones
-Después de escanear los CVEs en esta sección podrás generar remediaciones para todos los CVEs con IA. Una vez generado se incluirá en los informes HTML y PDF.
+Después de escanear los CVEs, en esta sección podrás generar remediaciones para todos los CVEs con IA. Una vez generado se incluirá en los informes HTML y PDF.
 
 ![VM - Remediaciones](https://github.com/user-attachments/assets/d3243dbf-af0e-474c-9f88-144a9b70557f)
 
