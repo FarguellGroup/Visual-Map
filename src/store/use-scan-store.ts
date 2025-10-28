@@ -61,6 +61,11 @@ type AbortableScan = {
   controller: AbortController;
 };
 
+type ScannableService = {
+  host: Host;
+  port: Port;
+};
+
 type ScanState = {
   scanResult: ScanResult | null;
   selectedHost: Host | null;
@@ -81,7 +86,7 @@ type ScanState = {
   isCveScanRunning: boolean;
   isCveScanPaused: boolean;
   isUsingEnvVar: boolean;
-  remainingHostsToScan: Host[];
+  remainingServicesToScan: ScannableService[];
   abortableCveScan: AbortableScan | null;
   setScanResult: (fileName: string, hosts: Host[], weights?: RiskWeights, resetCaches?: boolean) => void;
   clearScanResult: () => void;
@@ -94,7 +99,7 @@ type ScanState = {
   setAiModel: (model: string) => void;
   setApiKey: (key: string | null) => void;
   setApiError: (error: string | null) => void;
-  fetchCvesForHost: (hosts: Host | Host[], locale: string) => Promise<void>;
+  fetchCves: (locale: string) => Promise<void>;
   fetchRemediation: (cveData: { cve: CveInfo, service: Service, osName: string }, locale: string) => Promise<void>;
   fetchAllRemediations: (cveItems: { cve: CveInfo, service: Service, osName: string }[], locale: string) => Promise<void>;
   pauseCveScan: () => void;
@@ -143,17 +148,29 @@ async function callGemini<T_in, T_out>(prompt: string, signal: AbortSignal): Pro
         
         const result = await model.generateContent(prompt);
         const response = await result.response;
-        const text = response.text();
+        let text = response.text();
         
-        if (text.trim().startsWith('{') && text.trim().endsWith('}')) {
-          return JSON.parse(text) as T_out;
+        const firstBrace = text.indexOf('{');
+        const lastBrace = text.lastIndexOf('}');
+
+        if (firstBrace !== -1 && lastBrace > firstBrace) {
+            text = text.substring(firstBrace, lastBrace + 1);
         } else {
-           let errorMessage = 'Invalid JSON response from API.';
-           if (text.toLowerCase().includes('rate limit') || text.toLowerCase().includes('quota')) {
-                errorMessage = 'Rate limit exceeded';
-           }
-           setApiError(errorMessage);
-           return { error: errorMessage };
+             let errorMessage = 'Invalid JSON response from API. No JSON object found.';
+            if (text.toLowerCase().includes('rate limit') || text.toLowerCase().includes('quota')) {
+                 errorMessage = 'Rate limit exceeded';
+            }
+            setApiError(errorMessage);
+            return { error: errorMessage };
+        }
+
+        try {
+            return JSON.parse(text) as T_out;
+        } catch(parseError: any) {
+            console.error("JSON Parse Error:", parseError);
+            console.error("Raw text from API:", text);
+            setApiError(`Failed to parse API response: ${parseError.message}`);
+            return { error: `Bad JSON format: ${parseError.message}` };
         }
 
     } catch (error: any) {
@@ -203,11 +220,19 @@ const calculateSummary = (hosts: Host[]) => {
   return { hostCount, openPorts, uniqueServices: services.size };
 };
 
-const getOpenPortsWithServices = (host: Host): Port[] => {
-    if (!host || !host.ports || !host.ports.port) return [];
-    const ports = Array.isArray(host.ports.port) ? host.ports.port : [host.ports.port];
-    // A service is scannable if it has a name and version.
-    return ports.filter(p => p.state.state === 'open' && p.service?.name && p.service?.version);
+const getScannableServices = (hosts: Host[]): ScannableService[] => {
+    const services: ScannableService[] = [];
+    hosts.forEach(host => {
+        if (host.ports && host.ports.port) {
+            const ports = Array.isArray(host.ports.port) ? host.ports.port : [host.ports.port];
+            ports
+                .filter(p => p.state.state === 'open' && p.service?.name && p.service?.version)
+                .forEach(port => {
+                    services.push({ host, port });
+                });
+        }
+    });
+    return services;
 }
 
 const getScripts = (item: Port | Host): Script[] => {
@@ -254,7 +279,7 @@ export const useScanStore = create<ScanState>()(
       cveScanProgress: { processed: 0, total: 0, isComplete: false },
       isCveScanRunning: false,
       isCveScanPaused: false,
-      remainingHostsToScan: [],
+      remainingServicesToScan: [],
       abortableCveScan: null,
 
       setScanResult: (fileName, hosts, weights, resetCaches = false) => {
@@ -293,7 +318,7 @@ export const useScanStore = create<ScanState>()(
           newState.isCveScanRunning = false;
           newState.cveScanProgress = { processed: 0, total: 0, isComplete: false };
           newState.isCveScanPaused = false;
-          newState.remainingHostsToScan = [];
+          newState.remainingServicesToScan = [];
           newState.hostFilter = null;
         } else {
             newState.explanationCache = get().explanationCache;
@@ -326,7 +351,7 @@ export const useScanStore = create<ScanState>()(
           apiStatus: 'idle',
           apiError: null,
           isCveScanPaused: false,
-          remainingHostsToScan: [],
+          remainingServicesToScan: [],
         });
       },
 
@@ -368,157 +393,127 @@ export const useScanStore = create<ScanState>()(
       },
 
       pauseCveScan: () => {
-        const { abortableCveScan } = get();
-        if (abortableCveScan) {
-          abortableCveScan.controller.abort();
-          set({ 
-            isCveScanRunning: false, 
-            isCveScanPaused: true, 
-            abortableCveScan: null 
-          });
+        const { abortableCveScan, isCveScanRunning } = get();
+        if (isCveScanRunning && abortableCveScan) {
+            abortableCveScan.controller.abort();
+            set({
+                isCveScanRunning: false,
+                isCveScanPaused: true,
+                abortableCveScan: null,
+            });
         }
       },
 
-      fetchCvesForHost: async (hosts, locale) => {
-        const { apiKey, isCveScanRunning, isCveScanPaused, remainingHostsToScan, cveCache } = get();
+      fetchCves: async (locale) => {
+        const { apiKey, isCveScanRunning, scanResult } = get();
         if (!apiKey) {
-          set({ apiError: 'API key not configured' });
-          return;
+            set({ apiError: 'API key not configured' });
+            return;
         }
-        if (isCveScanRunning && !isCveScanPaused) return;
-        if (get().apiError) set({ apiError: null });
+        if (isCveScanRunning) return;
+        if (!scanResult) return;
 
-        const hostsToProcess = isCveScanPaused && remainingHostsToScan.length > 0
-            ? remainingHostsToScan
-            : Array.isArray(hosts) ? hosts : [hosts];
+        set({ apiError: null });
 
-        const scannableHosts = hostsToProcess.filter(host => {
-            const entry = cveCache.get(host.address[0].addr);
-            return (!entry || entry.status === 'idle' || entry.status === 'error') && getOpenPortsWithServices(host).length > 0;
-        });
+        let servicesToScan: ScannableService[] = [];
+        if (get().isCveScanPaused && get().remainingServicesToScan.length > 0) {
+            servicesToScan = get().remainingServicesToScan;
+        } else {
+            servicesToScan = getScannableServices(scanResult.hosts);
+            set({ cveScanProgress: { processed: 0, total: servicesToScan.length, isComplete: false } });
+        }
 
-        if (scannableHosts.length === 0) {
+        if (servicesToScan.length === 0) {
             set({ isCveScanRunning: false, isCveScanPaused: false, cveScanProgress: { ...get().cveScanProgress, isComplete: true } });
             return;
         }
-
-        const controller = new AbortController();
-        set(state => ({
-          isCveScanRunning: true,
-          isCveScanPaused: false,
-          cveScanProgress: {
-              ...state.cveScanProgress,
-              total: scannableHosts.length,
-              processed: state.cveScanProgress.isComplete ? 0 : state.cveScanProgress.processed,
-              isComplete: false,
-          },
-          abortableCveScan: { controller },
-          remainingHostsToScan: scannableHosts,
-        }));
         
-        const processHost = async (host: Host): Promise<'completed' | 'rate-limited' | 'aborted'> => {
-            const hostIp = host.address[0].addr;
-            set(state => ({ cveCache: new Map(state.cveCache).set(hostIp, { status: 'loading', data: [] }) }));
+        const controller = new AbortController();
+        
+        set({
+            isCveScanRunning: true,
+            isCveScanPaused: false,
+            abortableCveScan: { controller },
+            remainingServicesToScan: servicesToScan,
+        });
 
-            const services = getOpenPortsWithServices(host).map(port => ({
+        for (let i = 0; i < servicesToScan.length; i++) {
+            if (controller.signal.aborted) {
+                set(state => ({ remainingServicesToScan: servicesToScan.slice(i) }));
+                return;
+            }
+
+            const { host, port } = servicesToScan[i];
+            const hostIp = host.address[0].addr;
+            
+            const servicesPayload = [{
                 port: port.portid,
                 protocol: port.protocol,
                 service: port.service!.name,
                 product: port.service!.product || '',
                 version: port.service!.version || '',
-            }));
-
-            if (services.length === 0) {
-                set(state => ({
-                    cveCache: new Map(state.cveCache).set(hostIp, { status: 'loaded', data: [] }),
-                    cveScanProgress: { ...state.cveScanProgress, processed: state.cveScanProgress.processed + 1 }
-                }));
-                return 'completed';
-            }
-
+            }];
+            
             const input: CveDetailsInput = {
                 hostInfo: JSON.stringify({ os: getOsName(host) }),
-                portInfo: JSON.stringify(services),
+                portInfo: JSON.stringify(servicesPayload),
                 locale: locale as 'en' | 'es',
             };
 
             const outputSchema = { cves: [{ portId: "port", service: "service name", cves: [{ cveId: "CVE-...", description: "...", cvssScore: 0.0 }] }] };
-            const prompt = `You are a cybersecurity expert. For each service in the provided list, identify potential CVEs. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema, with no extra text: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\` For each service, list the top 3 most critical CVEs. If no CVEs are found for a service, omit it from the response array. Host Info: \`\`\`json\n${input.hostInfo}\`\`\`\nServices Info:\`\`\`json\n${input.portInfo}\`\`\``;
-
-            const result = await callGemini<CveDetailsInput, CveDetailsOutput>(prompt, controller.signal);
-
-            if (controller.signal.aborted) return 'aborted';
+            const prompt = `You are a cybersecurity expert. For the single service in the provided list, identify potential CVEs. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema, with no extra text: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\` For the service, list the top 3 most critical CVEs. If no CVEs are found for a service, return an empty 'cves' array. Host Info: \`\`\`json\n${input.hostInfo}\`\`\`\nServices Info:\`\`\`json\n${input.portInfo}\`\`\``;
             
-            if ('aborted' in result && result.aborted) return 'aborted';
-            if ('error' in result) {
-                const isRateLimit = result.error.toLowerCase().includes('rate limit');
-                set(state => ({ cveCache: new Map(state.cveCache).set(hostIp, { status: 'error', error: result.error }) }));
-                return isRateLimit ? 'rate-limited' : 'completed'; // Treat non-rate-limit errors as completed for this host
+            const result = await callGemini<CveDetailsInput, CveDetailsOutput>(prompt, controller.signal);
+            
+            if (controller.signal.aborted) {
+                set(state => ({ remainingServicesToScan: servicesToScan.slice(i) }));
+                return;
             }
 
-            if (result.cves) {
-                const allCvesForHost: CveData[] = result.cves.flatMap(serviceCves => {
-                    const port = getOpenPortsWithServices(host).find(p => p.portid === serviceCves.portId);
-                    if (!port) return [];
+            if ('error' in result) {
+                const isRateLimit = result.error.toLowerCase().includes('rate limit');
+                if (isRateLimit) {
+                    get().pauseCveScan();
+                    set({ apiError: result.error, remainingServicesToScan: servicesToScan.slice(i) });
+                    return; 
+                }
+            } else if (result && result.cves) {
+                const newCvesForHost: CveData[] = result.cves.flatMap(serviceCves => {
                     return serviceCves.cves.map(cve => ({
                         service: port.service!,
                         portId: port.portid,
                         cve: cve
                     }));
                 });
-                set(state => ({
-                    cveCache: new Map(state.cveCache).set(hostIp, { status: 'loaded', data: allCvesForHost })
-                }));
-            } else {
-                 set(state => ({ cveCache: new Map(state.cveCache).set(hostIp, { status: 'loaded', data: [] }) }));
+
+                if (newCvesForHost.length > 0) {
+                  set(state => {
+                    const existingCache = state.cveCache.get(hostIp);
+                    const existingData = existingCache?.status === 'loaded' ? existingCache.data : [];
+                    const combinedData = [...(existingData || []), ...newCvesForHost];
+                    return {
+                        cveCache: new Map(state.cveCache).set(hostIp, { status: 'loaded', data: combinedData })
+                    };
+                  });
+                }
             }
             
             set(state => ({
                 cveScanProgress: { ...state.cveScanProgress, processed: state.cveScanProgress.processed + 1 }
             }));
-            
-            return 'completed';
-        };
-
-        const CONCURRENCY_LIMIT = 5;
-        let currentIndex = 0;
-
-        const worker = async () => {
-            while(currentIndex < scannableHosts.length) {
-                if (controller.signal.aborted) break;
-                
-                const host = scannableHosts[currentIndex++];
-                const status = await processHost(host);
-
-                if (status === 'rate-limited') {
-                    set({ isCveScanPaused: true, isCveScanRunning: false });
-                    const remaining = scannableHosts.slice(currentIndex -1);
-                    set({ remainingHostsToScan: remaining });
-                    return; // Stop processing
-                }
-                if (status === 'aborted') {
-                    return; // Stop processing
-                }
-            }
-        };
+        }
         
-        const workers = Array(CONCURRENCY_LIMIT).fill(null).map(worker);
-        await Promise.all(workers);
-        
-        if (!get().isCveScanPaused) {
-            set({
-                cveScanProgress: { ...get().cveScanProgress, isComplete: true },
-                isCveScanRunning: false,
-                isCveScanPaused: false,
-                remainingHostsToScan: [],
-                abortableCveScan: null,
-            });
-            if (!get().apiError) {
-                const { scanResult, riskWeights } = get();
-                if (scanResult) {
-                  get().setScanResult(scanResult.fileName, scanResult.originalHosts, riskWeights, false);
-                }
-            }
+        set({
+            isCveScanRunning: false,
+            isCveScanPaused: false,
+            remainingServicesToScan: [],
+            abortableCveScan: null,
+            cveScanProgress: { ...get().cveScanProgress, isComplete: true },
+        });
+
+        const { scanResult: currentScanResult, riskWeights } = get();
+        if (currentScanResult) {
+            get().setScanResult(currentScanResult.fileName, currentScanResult.originalHosts, riskWeights, false);
         }
       },
       
@@ -761,11 +756,9 @@ export const useScanStore = create<ScanState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           const rehydrateCache = (cacheData: any) => {
-              // Only convert to Map if it's an array of arrays (entries)
               if (Array.isArray(cacheData) && cacheData.every(item => Array.isArray(item) && item.length === 2)) {
                   return new Map(cacheData);
               }
-              // If it's already a Map or some other format, return as is (or an empty map as a fallback)
               return cacheData instanceof Map ? cacheData : new Map();
           };
 
@@ -779,7 +772,7 @@ export const useScanStore = create<ScanState>()(
           
           state.isCveScanRunning = false;
           state.isCveScanPaused = false;
-          state.remainingHostsToScan = [];
+          state.remainingServicesToScan = [];
           state.cveScanProgress = { processed: 0, total: 0, isComplete: get().cveScanProgress?.isComplete || false };
           state.isUsingEnvVar = !!process.env.NEXT_PUBLIC_GOOGLE_GENAI_API_KEY;
           state.apiKey = state.isUsingEnvVar ? process.env.NEXT_PUBLIC_GOOGLE_GENAI_API_KEY : state.apiKey;
@@ -788,3 +781,5 @@ export const useScanStore = create<ScanState>()(
     }
   )
 );
+
+    
