@@ -17,13 +17,13 @@ Visual Map es una plataforma web Next.js que te permite subir escaneos XML de Nm
   - [1. Sube tu Escaneo](#1-sube-tu-escaneo)
   - [2. Dashboard Principal](#2-dashboard-principal)
   - [3. Vistas Detalladas](#3-vistas-detalladas)
+    - [Resumen Ejecutivo (IA)](#resumen-ejecutivo)
     - [Hosts descubiertos](#hosts-descubiertos)
-    - [Puertos abiertos](#puertos-abiertos)
-    - [Servicios expuestos](#servicios-expuestos)
-    - [Hosts más vulnerables](#hosts-mas-vulnerables)
-    - [CVEs y Vulnerabilidades](#cves-y-vulnerabilidades)
+    - [Puertos y Servicios](#puertos-y-servicios)
+    - [Hosts Vulnerables y CVEs](#hosts-vulnerables-y-cves)
     - [Remediaciones](#remediaciones)
-    - [Grafo de red](#grafo-de-red)
+    - [Grafo de Red](#grafo-de-red)
+    - [Rutas de Ataque con IA](#rutas-de-ataque)
   - [4. Profundiza en cada Host](#4-profundiza-en-cada-host)
   - [5. Configuración y exportación](#5-configuracion-y-exportacion)
 
@@ -115,7 +115,7 @@ Esta herramienta utiliza un módulo de inteligencia artificial a través de la A
 
 Para usar la IA, debes proporcionar tu clave API al ejecutar el contenedor de Docker como se muestra en la sección de despliegue. En el apartado "Configuración de la API" podrás verificar el estado de tu clave y seleccionar el modelo de Gemini que prefieras. Si ejecutas la aplicación en modo desarrollo (`npm run dev`), podrás introducir la clave directamente en la interfaz.
 
-<img width="3456" height="1856" alt="VM - API" src="https://github.com/user-attachments/assets/fcda6130-8fcf-4765-8ff3-cb18e3700461" />
+![VM - API](https://github.com/user-attachments/assets/530bc9b6-88be-4ac2-a5a0-785f854e601f)
 
 <a id="como-usar"></a>
 # Cómo Usar
@@ -130,55 +130,65 @@ Arrastra y suelta tu archivo XML de Nmap en la zona de carga, o haz clic para se
 ## 2. Dashboard Principal
 Una vez procesado, obtendrás una vista general con tarjetas resumen y una tabla con todos los dispositivos ordenados por criticidad.
 
-<img width="3456" height="1856" alt="VM - Dashboard" src="https://github.com/user-attachments/assets/4791a3d4-7ac5-4fa4-a4c2-a44b3b7e7df8" />
+![VM - Dashboard](https://github.com/user-attachments/assets/b2e28c0a-9f06-4a79-8031-ce479e883200)
 
 <a id="3-vistas-detalladas"></a>
 ## 3. Vistas Detalladas
 Usa el menú lateral para navegar por las distintas secciones y profundizar en la información de tu escaneo.
 
+<a id="resumen-ejecutivo"></a>
+### Resumen Ejecutivo (IA)
+Genera un informe de alto nivel con IA que resume la postura de seguridad, los hallazgos críticos y las recomendaciones estratégicas. Una vez generado se incluirá en los informes HTML y PDF.
+
+![VM - Resumen Ejecutivo](https://github.com/user-attachments/assets/b8a2f942-f48d-4485-95f6-5c0d211aa166)
 
 <a id="hosts-descubiertos"></a>
 ### Hosts descubiertos
 Un listado de todos los hosts descubiertos en el escaneo de Nmap, incluyendo la IP, nombre del host, sistema operativo, puertos abiertos y puntaje de crédito.
 
-<img width="3838" height="1854" alt="VM - Hosts" src="https://github.com/user-attachments/assets/e139dcda-3812-4fd3-8dd3-0f6879ec6cef" />
+![VM - Hosts](https://github.com/user-attachments/assets/d18b4771-d836-410d-ae52-285ddd4fe85e)
 
 <a id="puertos-abiertos"></a>
 ### Puertos abiertos
 Consulta todos los puertos abiertos en el objetivo, con una gráfica de los 15 puertos abiertos más comunes.
 
-<img width="3840" height="1852" alt="VM - Puertos" src="https://github.com/user-attachments/assets/e77cbbbe-2028-42e9-a6cb-9c2a7b42b22c" />
+![VM - Puertos](https://github.com/user-attachments/assets/bf9ea4ab-78ac-47cd-b969-3a3d40131a6e)
 
 <a id="servicios-expuestos"></a>
 ### Servicios expuestos
 Consulta todos los servicios expuestos en la infraestructura, con una gráfica de distribución de servicios.
 
-<img width="3840" height="1854" alt="VM - Servicios" src="https://github.com/user-attachments/assets/410eda0e-c612-4397-9601-6503d394d265" />
+![VM - Servicios](https://github.com/user-attachments/assets/6c9a0d9b-4727-4251-8c35-486a8c165ac9)
 
 <a id="hosts-mas-vulnerables"></a>
 ### Hosts más vulnerables
 Visualiza de manera rápida los hosts más vulnerables de una infraestructura, con un gráfico de distribución de riesgo.
 
-<img width="3456" height="1856" alt="VM - Vulns" src="https://github.com/user-attachments/assets/44ae4203-8d1b-4917-84f4-700482880eea" />
+![VM - Vulns](https://github.com/user-attachments/assets/a2dc5ec3-d1f0-4bc1-ae17-d4a1564cab95)
 
 <a id="cves-y-vulnerabilidades"></a>
 ### CVEs y Vulnerabilidades
 Escanea todos los servicios expuestos y detecta todos los CVEs asociados, con su puntuación CVSS. Puedes iniciar la búsqueda de CVEs para todos los hosts desde esta vista y filtrar por cada host que tenga CVEs asociados.
 
-<img width="3840" height="1852" alt="VM - CVEs" src="https://github.com/user-attachments/assets/b6878791-9588-4ba6-9fe9-e9e57517cafd" />
+![VM - CVEs](https://github.com/user-attachments/assets/5b899d7d-2ee5-4638-906f-d08c98a1827a)
 
 <a id="remediaciones"></a>
 ### Remediaciones
-Después de escanear los CVEs en esta sección podrás generar remediaciones para todos los CVEs con IA. Estas remediaciones aparecerán en los informes HTML y PDF.
+Después de escanear los CVEs en esta sección podrás generar remediaciones para todos los CVEs con IA. Una vez generado se incluirá en los informes HTML y PDF.
 
-<img width="3840" height="1850" alt="VM - Remediaciones 1" src="https://github.com/user-attachments/assets/15f710f0-b959-4de8-9b4b-8983fe5d0a1f" />
-<img width="3840" height="1856" alt="VM - Remediaciones 2" src="https://github.com/user-attachments/assets/13620858-189f-4f80-9fa7-72eb967cbbff" />
+![VM - Remediaciones](https://github.com/user-attachments/assets/d3243dbf-af0e-474c-9f88-144a9b70557f)
 
 <a id="grafo-de-red"></a>
 ### Grafo de red
 Visualiza un esquema de la red y las relaciones entre los hosts de manera super simple, identificando posibles rutas de pivoting.
 
-<img width="3456" height="1856" alt="VM - Grafo" src="https://github.com/user-attachments/assets/0dfe475c-5ba4-4225-a852-c6871884eea6" />
+![VM - Grafo](https://github.com/user-attachments/assets/8ebeeadc-3b14-465c-9cf5-139d11e75dd2)
+
+<a id="rutas-de-ataque"></a>
+### Rutas de Ataque con IA
+Utiliza la IA para analizar y visualizar posibles rutas de ataque y pivoting entre los hosts de alto riesgo, ayudándote a entender cómo un atacante podría moverse lateralmente por la red.
+
+![VM - Attack Paths](https://github.com/user-attachments/assets/36bdad6a-d2ff-479c-8fe7-04ce2cfcef37)
 
 <a id="4-profundiza-en-cada-host"></a>
 ## 4. Profundiza en cada Host
@@ -188,13 +198,13 @@ Haz clic en cualquier host para acceder a su página de detalle, donde encontrar
 -   Tablas de puertos y scripts NSE.
 -   Resumen de scripts NSE y recomendaciones de pentesting con IA.
 
-<img width="3456" height="1856" alt="VM - Host 1" src="https://github.com/user-attachments/assets/e21fe72c-759b-4f38-bfee-5275f25f7c7e" />
-<img width="3456" height="1816" alt="VM - Host 2" src="https://github.com/user-attachments/assets/89fa35dc-95d7-44de-8f78-83277af2ac04" />
+![VM - Host 1](https://github.com/user-attachments/assets/8f3da569-b858-47af-ac1e-92fdf3f21a19)
+![VM - Host 2](https://github.com/user-attachments/assets/44e8b998-7efc-4bbc-980a-e4d82cee02d5)
 
 <a id="5-configuracion-y-exportacion"></a>
 ## 5. Configuración y exportación
 -   **Ajusta los Pesos de Riesgo**: Modifica la importancia que se le da a cada factor (CVEs, puertos críticos, etc.) en el cálculo del riesgo.
--   **Exporta los Resultados**: Genera informes profesionales en formato JSON, PDF o HTML con un solo clic.
+-   **Exporta los Resultados**: Genera informes profesionales en formato PDF, HTML, JSON o CSV con un solo clic.
 
-<img width="3456" height="1858" alt="VM - Ponderación" src="https://github.com/user-attachments/assets/1fa56c0c-523c-4c27-a086-b1892e9cbd86" />
+![VM - Ponderación](https://github.com/user-attachments/assets/184a5b87-8ddc-45b7-a88d-da406556573c)
 <img width="3456" height="1860" alt="VM - Report HTML" src="https://github.com/user-attachments/assets/e7bbd441-cb9d-4c42-ba41-bb448f3192e6" />
