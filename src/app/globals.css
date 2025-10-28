@@ -66,16 +66,11 @@
     @apply bg-background text-foreground flex flex-col;
   }
   
-  /* Custom Scrollbar Styles */
+  /* Custom Scrollbar Styles for Webkit (Chrome, Safari) */
   ::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
+    width: 8px; /* Slightly wider for better interaction */
+    height: 8px;
     transition: all 0.3s ease;
-  }
-
-  ::-webkit-scrollbar:hover {
-    width: 11px;
-    height: 11px;
   }
 
   ::-webkit-scrollbar-track {
@@ -85,7 +80,7 @@
   ::-webkit-scrollbar-thumb {
     background-color: transparent;
     border-radius: 10px;
-    border: 2px solid transparent;
+    border: 3px solid transparent; /* Creates padding around thumb */
     background-clip: content-box;
   }
 
@@ -98,7 +93,7 @@
     background-color: hsl(var(--primary));
   }
 
-  /* Firefox Scrollbar - visibility on scroll is harder to control */
+  /* Custom Scrollbar Styles for Firefox */
   * {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--primary) / 0.7) transparent;
