@@ -12,7 +12,7 @@ export default function Home() {
 
   if (!scanResult) {
     return (
-      <div className="flex flex-grow items-center justify-center h-full">
+      <div className="flex h-full items-center justify-center">
         <UploadZone />
       </div>
     );
@@ -20,8 +20,10 @@ export default function Home() {
 
   return (
     <>
-      <SummaryCards />
-      <div className="mt-8">
+      <div className="mb-8">
+        <SummaryCards />
+      </div>
+      <div className="mb-8">
         <HostsTable />
       </div>
       <HostDetailDrawer />
