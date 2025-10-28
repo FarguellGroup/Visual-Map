@@ -426,5 +426,3 @@ export default function ThreatsDetailView({ hosts, pdfMode = false, forceId }: {
     </div>
   );
 }
-
-    
