@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -168,7 +169,7 @@ export default function HostDetailPage() {
         </div>
       </div>
       
-      <div className="grid gap-8 lg:grid-cols-3">
+      <div className="grid gap-8 lg:grid-cols-3 lg:items-start">
         <div className="lg:col-span-2 space-y-8">
             <Card>
                 <CardHeader>
@@ -275,29 +276,31 @@ export default function HostDetailPage() {
                 </CardContent>
             </Card>
         </div>
-        <div className="lg:col-span-1 space-y-8">
-            <Card>
-                <CardHeader>
-                    <CardTitle>{t('riskAnalysisTitle')}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex justify-between items-baseline">
-                        <span className="text-sm text-muted-foreground">{t('riskScore')}</span>
-                         <Badge variant="default" className={cn('border-transparent text-lg', getRiskColorClass(riskScore))}>
-                            {(riskScore ?? 0).toFixed(0)} / 100
-                        </Badge>
-                    </div>
-                    <VulnerabilityExplanation host={hostData} />
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle>{tDetails('os')}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm">{osName}</p>
-                </CardContent>
-            </Card>
+        <div className="lg:col-span-1 h-full">
+            <div className="lg:sticky lg:top-8 space-y-8">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{t('riskAnalysisTitle')}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex justify-between items-baseline">
+                            <span className="text-sm text-muted-foreground">{t('riskScore')}</span>
+                            <Badge variant="default" className={cn('border-transparent text-lg', getRiskColorClass(riskScore))}>
+                                {(riskScore ?? 0).toFixed(0)} / 100
+                            </Badge>
+                        </div>
+                        <VulnerabilityExplanation host={hostData} />
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{tDetails('os')}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm">{osName}</p>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
       </div>
     </>
