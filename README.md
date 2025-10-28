@@ -204,7 +204,7 @@ Haz clic en cualquier host para acceder a su página de detalle, donde encontrar
 <a id="5-configuracion-y-exportacion"></a>
 ## 5. Configuración y exportación
 -   **Ajusta los Pesos de Riesgo**: Modifica la importancia que se le da a cada factor (CVEs, puertos críticos, etc.) en el cálculo del riesgo.
--   **Exporta los Resultados**: Genera informes profesionales en formato PDF, HTML, JSON o CSV con un solo clic.
+-   **Exporta los Resultados**: Genera informes profesionales en formato PDF, HTML, JSON o XLSX con un solo clic.
 
 ![VM - Ponderación](https://github.com/user-attachments/assets/184a5b87-8ddc-45b7-a88d-da406556573c)
 <img width="3456" height="1860" alt="VM - Report HTML" src="https://github.com/user-attachments/assets/e7bbd441-cb9d-4c42-ba41-bb448f3192e6" />
