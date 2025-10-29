@@ -643,7 +643,7 @@ export const useScanStore = create<ScanState>()(
             const input: PentestingNextStepsInput = { hostDetails, locale: locale as 'en' | 'es' };
 
             const outputSchema = { steps: [{ title: "...", description: "...", command: "..." }] };
-            const prompt = `You are a world-class penetration tester. Provide actionable next steps for a penetration test based on the Nmap scan results. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema. Replace any placeholders like IP addresses in commands with the actual IP: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nHost Details:\n\`\`\`json\n${input.hostDetails}\`\`\``;
+            const prompt = `You are a world-class penetration tester. Your primary goal is to provide a realistic exploitation command. Based on the Nmap scan results, provide actionable next steps. Prioritize real exploitation tools like Metasploit (msfconsole) or CrackMapExec. Use Nuclei for vulnerability scanning. Use Nmap with NSE only for specific vulnerability *confirmation*, not exploitation. The 'command' field MUST be a pure, copy-pasteable command, with no extra descriptive text. Replace placeholders like IP addresses in commands with the actual IP. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nHost Details:\n\`\`\`json\n${input.hostDetails}\`\`\``;
 
             const result = await callGemini<PentestingNextStepsInput, PentestingNextStepsOutput>(prompt, controller.signal);
             if ('error' in result) { throw new Error(result.error); }
