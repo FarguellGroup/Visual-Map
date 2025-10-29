@@ -277,7 +277,7 @@ export default function HostDetailPage() {
             </Card>
         </div>
         <div className="lg:col-span-1 h-full">
-            <div className="lg:sticky lg:top-8 space-y-8">
+            <div className="lg:sticky lg:top-6 space-y-8">
                 <Card>
                     <CardHeader>
                         <CardTitle>{t('riskAnalysisTitle')}</CardTitle>
