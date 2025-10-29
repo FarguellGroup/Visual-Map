@@ -99,3 +99,20 @@
     scrollbar-color: hsl(var(--primary) / 0.7) transparent;
   }
 }
+
+@layer components {
+    .code-block-container {
+        width: 100%;
+        max-width: calc(100vw - 48px);
+    }
+    @media (min-width: 768px) {
+        .code-block-container {
+            max-width: calc(100vw - 302px);
+        }
+    }
+    @media (min-width: 1024px) {
+        .code-block-container {
+            max-width: calc(100vw - 402px);
+        }
+    }
+}
