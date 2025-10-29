@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import * as React from "react"
@@ -30,7 +29,7 @@ const AccordionTrigger = React.forwardRef<
     <AccordionPrimitive.Trigger
       ref={ref}
       className={cn(
-        "flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline",
+        "flex flex-1 items-center justify-between py-4 font-medium transition-all hover:text-primary data-[state=open]:text-primary",
         className
       )}
       {...props}

@@ -554,62 +554,53 @@ export const useScanStore = create<ScanState>()(
         }
       },
       
+      fetchAllRemediations: async (cveItems, locale) => {
+        const { fetchRemediation } = get();
+        const remediationPromises = cveItems.map(item => fetchRemediation(item, locale));
+        await Promise.all(remediationPromises);
+      },
+
       fetchRemediation: async (cveData, locale) => {
         const cacheKey = `${cveData.cve.cveId}-${locale}`;
         const cache = get().remediationCache;
-        if (cache?.get(cacheKey)?.status === 'loading' || cache?.get(cacheKey)?.status === 'loaded') return;
-
-        const controller = new AbortController();
-        const promise = (async () => {
-            try {
-                const input: RemediationInput = {
-                    cveId: cveData.cve.cveId,
-                    cveDescription: cveData.cve.description,
-                    serviceName: cveData.service.product || cveData.service.name,
-                    serviceVersion: cveData.service.version || 'unknown',
-                    osName: cveData.osName,
-                    locale: locale as 'en' | 'es',
-                };
-
-                const outputSchema = { remediation: "A step-by-step guide..." };
-                const prompt = `You are a cybersecurity remediation expert. Provide a detailed, step-by-step guide to remediate the following vulnerability. Use markdown for formatting: headings (#, ##), bullet points (-), bold text (**text**), and code blocks (\`\`\`lang\ncode\`\`\`). Do not use numbered lists. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nDetails:\n\`\`\`json\n${JSON.stringify(input)}\`\`\``;
-
-                const result = await callGemini<RemediationInput, RemediationOutput>(prompt, controller.signal);
-                if ('error' in result) { throw new Error(result.error); }
-                if ('aborted' in result) { return; }
-
-                set(state => ({
-                    remediationCache: new Map(state.remediationCache).set(cacheKey, { status: 'loaded', data: result as RemediationOutput })
-                }));
-
-            } catch (err) {
-                 set(state => ({
-                    remediationCache: new Map(state.remediationCache).set(cacheKey, { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' })
-                }));
-            }
-        })();
+        if (cache?.get(cacheKey)?.status === 'loading') return;
 
         set(state => ({
-            remediationCache: new Map(state.remediationCache).set(cacheKey, { status: 'loading', promise })
+            remediationCache: new Map(state.remediationCache).set(cacheKey, { status: 'loading' })
         }));
-        await promise;
-      },
-      
-      fetchAllRemediations: async (cveItems, locale) => {
-        const { fetchRemediation } = get();
-        // Do not await each call, let them run in parallel up to a limit
-        const CONCURRENCY_LIMIT = 5;
-        const promises: Promise<void>[] = [];
 
-        for (const cveItem of cveItems) {
-            const promise = fetchRemediation(cveItem, locale);
-            promises.push(promise);
-            if (promises.length >= CONCURRENCY_LIMIT) {
-                await Promise.all(promises);
-                promises.length = 0;
+        const controller = new AbortController();
+
+        try {
+            const input: RemediationInput = {
+                cveId: cveData.cve.cveId,
+                cveDescription: cveData.cve.description,
+                serviceName: cveData.service.product || cveData.service.name,
+                serviceVersion: cveData.service.version || 'unknown',
+                osName: cveData.osName,
+                locale: locale as 'en' | 'es',
+            };
+
+            const outputSchema = { remediation: "A step-by-step guide..." };
+            const prompt = `You are a cybersecurity remediation expert. Provide a detailed, step-by-step guide to remediate the following vulnerability. Use markdown for formatting: headings (#, ##), bullet points (-), bold text (**text**), and code blocks (\`\`\`lang\ncode\`\`\`). Do not use numbered lists. Respond in ${input.locale}. The output must be a single, valid JSON object that strictly adheres to this Zod schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nDetails:\n\`\`\`json\n${JSON.stringify(input)}\`\`\``;
+
+            const result = await callGemini<RemediationInput, RemediationOutput>(prompt, controller.signal);
+            
+            if ('aborted' in result) return;
+
+            if ('error' in result) {
+                throw new Error(result.error);
             }
+
+            set(state => ({
+                remediationCache: new Map(state.remediationCache).set(cacheKey, { status: 'loaded', data: result as RemediationOutput })
+            }));
+
+        } catch (err) {
+             set(state => ({
+                remediationCache: new Map(state.remediationCache).set(cacheKey, { status: 'error', error: err instanceof Error ? err.message : 'Unknown error' })
+            }));
         }
-        await Promise.all(promises);
       },
 
 
@@ -755,8 +746,8 @@ export const useScanStore = create<ScanState>()(
                   
                   const hostsData = JSON.stringify(vulnerableHosts);
                   const input: AttackPathsInput = { hosts: hostsData, locale: locale as 'en' | 'es' };
-                  const outputSchema = { paths: [{ source: "ip_address", target: "ip_address", description: "A detailed step-by-step explanation...", command: "nmap -p..." }] };
-                  const prompt = `You are a security strategist. Analyze the provided network hosts (only high-risk hosts with risk score >= 60 are included) to identify potential attack paths where a compromise of one host could lead to another. Consider open ports, services, and risk scores. Provide a list of the most plausible paths. For each path, provide a detailed step-by-step explanation of how an attacker might move from the source to the target, including specific services, ports, and potential exploits. Also include a relevant, copy-pasteable command if applicable. Respond in ${input.locale}. The output must be a single, valid JSON object adhering to this schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nHosts Data:\n${input.hosts}`;
+                  const outputSchema = { paths: [{ source: "ip_address", target: "ip_address", description: "A detailed step-by-step explanation...", command: "msfconsole -q -x 'use exploit/...'" }] };
+                  const prompt = `You are a security strategist and expert penetration tester. Your primary goal is to provide a realistic exploitation command. Analyze the provided network hosts (only high-risk hosts with risk score >= 60 are included) to identify potential attack paths where a compromise of one host could lead to another. Consider open ports, services, and risk scores. Provide a list of the most plausible paths. For each path, provide a detailed step-by-step explanation of how an attacker might move from the source to the target, including specific services, ports, and potential exploits. For the command, prioritize exploitation tools like Metasploit (msfconsole) over scanning tools like nmap. Respond in ${input.locale}. The output must be a single, valid JSON object adhering to this schema: \`\`\`json\n${JSON.stringify(outputSchema)}\`\`\`\nHosts Data:\n${input.hosts}`;
 
                   const result = await callGemini<AttackPathsInput, AttackPathsOutput>(prompt, controller.signal);
                   if ('error' in result) { throw new Error(result.error); }

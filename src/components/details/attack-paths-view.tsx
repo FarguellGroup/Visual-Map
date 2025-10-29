@@ -5,61 +5,11 @@ import { useScanStore } from '@/store/use-scan-store';
 import { useLocale } from 'next-intl';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
-import { Loader2, Sparkles, AlertTriangle, ShieldX, Link2, Copy, Check, Terminal } from 'lucide-react';
+import { Loader2, Sparkles, AlertTriangle, ShieldX, Link2, Terminal, ArrowDownRight } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { getHostname } from '@/lib/nmap-parser';
-import { useToast } from '@/hooks/use-toast';
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-
-const CommandSnippet = ({ command }: { command: string }) => {
-  const [isCopied, setIsCopied] = useState(false);
-  const { toast } = useToast();
-  const locale = useLocale();
-  
-  const handleCopy = async () => {
-    try {
-        await navigator.clipboard.writeText(command);
-        setIsCopied(true);
-        setTimeout(() => setIsCopied(false), 2000);
-    } catch (err) {
-        console.error("Copy failed: ", err);
-        toast({
-            variant: 'destructive',
-            title: locale === 'es' ? 'Error al copiar' : 'Copy Failed',
-            description: locale === 'es' ? 'No se pudo copiar el comando al portapapeles.' : 'Could not copy command to clipboard.',
-        });
-    }
-  };
-
-  return (
-    <div className="relative mt-4">
-      <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm"><Terminal className="w-4 h-4"/><span>{locale === 'es' ? 'Comando de Explotación' : 'Exploitation Command'}</span></h4>
-      <pre className="rounded-md bg-muted p-3 pr-12 text-sm font-code overflow-x-auto">
-        <code>{command}</code>
-      </pre>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-1/2 right-2 -translate-y-1/2 h-8 w-8"
-              onClick={handleCopy}
-            >
-              {isCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 w-4" />}
-              <span className="sr-only">Copy command</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{locale === 'es' ? 'Copiar al portapapeles' : 'Copy to clipboard'}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </div>
-  );
-};
-
+import { CommandSnippet } from '../ui/command-snippet';
 
 export default function AttackPathsView() {
     const { 
@@ -144,16 +94,28 @@ export default function AttackPathsView() {
                         <Accordion type="single" collapsible className="w-full">
                             {filteredAttackPaths.map((path, index) => (
                                 <AccordionItem value={`path-${index}`} key={index}>
-                                    <AccordionTrigger className='hover:no-underline group rounded-lg px-4 hover:bg-muted/50 data-[state=open]:bg-muted/50'>
-                                        <div className='flex items-center gap-4 text-sm'>
-                                            <span className='font-mono'>{getHostLabel(path.source)}</span>
-                                            <Link2 className='h-4 w-4 text-primary'/>
-                                            <span className='font-mono'>{getHostLabel(path.target)}</span>
+                                    <AccordionTrigger className='hover:no-underline group rounded-lg px-4 hover:bg-muted/50 data-[state=open]:bg-muted/50 w-full text-left'>
+                                        <div className='flex flex-col w-full overflow-hidden text-sm'>
+                                            <span className='font-mono truncate'>{getHostLabel(path.source)}</span>
+                                            <div className='flex items-center gap-2 text-primary'>
+                                                <ArrowDownRight className='h-4 w-4 flex-shrink-0'/>
+                                                <span className='font-mono truncate font-semibold'>{getHostLabel(path.target)}</span>
+                                            </div>
                                         </div>
                                     </AccordionTrigger>
-                                    <AccordionContent className="pt-4 px-4 pb-2">
-                                        <div className="text-sm prose prose-sm dark:prose-invert max-w-full" dangerouslySetInnerHTML={{ __html: path.description.replace(/\n/g, '<br />') }} />
-                                        {path.command && <CommandSnippet command={path.command} />}
+                                    <AccordionContent className="pt-4 px-4 pb-2 w-full">
+                                        <div className="space-y-4">
+                                            <p className="text-sm">{path.description}</p>
+                                            {path.command && (
+                                                <div className="min-w-0 space-y-2">
+                                                    <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm">
+                                                        <Terminal className="w-4 h-4"/>
+                                                        <span>{locale === 'es' ? 'Comando de Explotación' : 'Exploitation Command'}</span>
+                                                    </h4>
+                                                    <CommandSnippet command={path.command} />
+                                                </div>
+                                            )}
+                                        </div>
                                     </AccordionContent>
                                 </AccordionItem>
                             ))}
