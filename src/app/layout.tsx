@@ -1,24 +1,8 @@
 import type { Metadata } from 'next';
-import { Inter, Source_Code_Pro, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
-
-const fontBody = Inter({
-  subsets: ['latin'],
-  variable: '--font-body',
-});
-
-const fontHeadline = Space_Grotesk({
-  subsets: ['latin'],
-  variable: '--font-headline',
-});
-
-const fontCode = Source_Code_Pro({
-  subsets: ['latin'],
-  variable: '--font-code',
-});
 
 export const metadata: Metadata = {
   title: 'Visual Map',
@@ -43,7 +27,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Code+Pro&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
       </head>
-      <body className={cn('font-body antialiased flex flex-col h-screen overflow-hidden', fontBody.variable, fontHeadline.variable, fontCode.variable)} suppressHydrationWarning>
+      <body className={cn('font-body antialiased flex flex-col h-screen overflow-hidden')} suppressHydrationWarning>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
