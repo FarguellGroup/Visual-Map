@@ -208,3 +208,14 @@ Haz clic en cualquier host para acceder a su página de detalle, donde encontrar
 
 ![VM - Ponderación](https://github.com/user-attachments/assets/184a5b87-8ddc-45b7-a88d-da406556573c)
 <img width="3456" height="1860" alt="VM - Report HTML" src="https://github.com/user-attachments/assets/e7bbd441-cb9d-4c42-ba41-bb448f3192e6" />
+
+## Créditos
+- Autor:       afsh4ck 
+- Instagram:   <a href="https://www.instagram.com/afsh4ck">afsh4ck</a>
+- Youtube:     <a href="https://youtube.com/@afsh4ck">afsh4ck</a>
+
+## Soporte
+
+<a href="https://www.buymeacoffee.com/afsh4ck" rel="nofollow"><img width="250" align="left">
+![buy-me-a-coffe](https://github.com/user-attachments/assets/8c8f9e81-334e-469e-b25e-29888cfc9fcc)
+</a>
