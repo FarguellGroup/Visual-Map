@@ -213,6 +213,7 @@ Haz clic en cualquier host para acceder a su página de detalle, donde encontrar
 - Autor:       afsh4ck 
 - Instagram:   <a href="https://www.instagram.com/afsh4ck">afsh4ck</a>
 - Youtube:     <a href="https://youtube.com/@afsh4ck">afsh4ck</a>
+- Linkedin:    <a href="https://linkedin.com/in/afsh4ck">afsh4ck</a>
 
 ## Soporte
 
