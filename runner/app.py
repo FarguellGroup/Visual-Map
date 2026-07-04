@@ -8,6 +8,7 @@ No hay entrada de objetivo libre -> imposible apuntar a terceros desde la app.
 '''
 import asyncio
 import json
+import socket
 from asyncio.subprocess import PIPE, STDOUT
 
 from fastapi import FastAPI, HTTPException
@@ -18,10 +19,10 @@ app = FastAPI(title='AIron Audit Runner')
 # Lista blanca: SOLO activos propios de Farguell
 TARGETS = {
     'audit':    {'label': 'AIron Audit (esta app)', 'url': 'https://audit.178.105.241.12.sslip.io', 'host': 'audit.178.105.241.12.sslip.io'},
-    'audit_fq': {'label': 'audit.farguell.com',      'url': 'https://audit.farguell.com',            'host': 'audit.farguell.com'},
-    'monitor':  {'label': 'Monitor POWER',           'url': 'https://monitor-power.farguell.com',    'host': 'monitor-power.farguell.com'},
     'brain':    {'label': 'AIron Brain',             'url': 'https://brain.farguell.com',            'host': 'brain.farguell.com'},
-    'hub':      {'label': 'Portal Hub',              'url': 'https://hub.farguell.com',              'host': 'hub.farguell.com'},
+    'audit_fq': {'label': 'audit.farguell.com',      'url': 'https://audit.farguell.com',            'host': 'audit.farguell.com'},
+    'monitor':  {'label': 'Monitor POWER (.24/LAN)',  'url': 'https://monitor-power.farguell.com',    'host': 'monitor-power.farguell.com'},
+    'hub':      {'label': 'Portal Hub (.24/LAN)',     'url': 'https://hub.farguell.com',              'host': 'hub.farguell.com'},
 }
 
 # Perfiles de escaneo
@@ -50,6 +51,32 @@ async def run_scan(tid, pid):
     p = PROFILES[pid]
     yield sse('AIron Audit Runner - objetivo: ' + t['label'] + '  (' + t['url'] + ')', 'hdr')
     yield sse('perfil: ' + p['label'] + '  -  solo activos propios autorizados', 'hdr')
+    yield sse('', 'out')
+    # Preflight: resolver DNS + comprobar que responde, para no soltar output confuso
+    host = t['host']
+    yield sse('[preflight] comprobando ' + host + ' ...', 'out')
+    try:
+        ip = socket.gethostbyname(host)
+    except Exception:
+        yield sse('[X] ' + host + ' NO resuelve en DNS accesible desde el runner (.12). No hay nada que escanear.', 'err')
+        yield sse('    Sugerencia: falta el registro DNS publico, o la app solo vive en la LAN .24 -> escanea desde ahi.', 'out')
+        yield sse('=== escaneo completado ===', 'ok')
+        return
+    reachable = False
+    for port in (443, 80):
+        try:
+            s = socket.create_connection((ip, port), timeout=5)
+            s.close()
+            reachable = True
+            break
+        except Exception:
+            pass
+    if reachable:
+        yield sse('[preflight] ' + host + ' -> ' + ip + '  (accesible)', 'ok')
+    else:
+        yield sse('[X] ' + host + ' resuelve a ' + ip + ' pero no responde en 80/443. No hay nada que escanear.', 'err')
+        yield sse('=== escaneo completado ===', 'ok')
+        return
     yield sse('', 'out')
     for tmpl in p['cmds']:
         cmd = [a.format(host=t['host'], url=t['url']) for a in tmpl]
