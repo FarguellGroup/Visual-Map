@@ -1,7 +1,10 @@
 '''
-AIron Audit Runner - Farguell Group
-Backend que ejecuta escaneres (nmap / whatweb / nuclei) contra activos PROPIOS
-(lista blanca) y transmite la salida en vivo a una consola web (SSE).
+AIron Audit Engine - Farguell Group
+Motor headless de auditoria en vivo. Ejecuta escaneres (nmap / whatweb / nuclei)
+contra activos PROPIOS de Farguell (lista blanca) y transmite la salida en vivo por SSE.
+
+La interfaz de usuario vive INTEGRADA en AIron Brain (https://brain.farguell.com),
+que consume esta API same-origin a traves del proxy /audit-api/ de su nginx.
 
 Seguridad: solo se puede escanear un objetivo de la lista blanca TARGETS.
 No hay entrada de objetivo libre -> imposible apuntar a terceros desde la app.
@@ -12,17 +15,47 @@ import socket
 from asyncio.subprocess import PIPE, STDOUT
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 
-app = FastAPI(title='AIron Audit Runner')
+app = FastAPI(title='AIron Audit Engine')
 
-# Lista blanca: SOLO activos propios de Farguell
+# La UI vive integrada en Brain (mismo origen via proxy nginx). CORS acotado por si
+# alguna vista de Brain llamara cross-origin; nunca abierto a terceros.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        'https://brain.farguell.com',
+        'https://brain.178.105.241.12.sslip.io',
+    ],
+    allow_methods=['GET'],
+    allow_headers=['*'],
+)
+
+# ── Lista blanca: SOLO activos propios de Farguell ────────────────────────────
+# Todo el ecosistema (apps + servidores). No hay entrada libre de objetivo.
 TARGETS = {
-    'audit':    {'label': 'AIron Audit (esta app)', 'url': 'https://audit.178.105.241.12.sslip.io', 'host': 'audit.178.105.241.12.sslip.io'},
-    'brain':    {'label': 'AIron Brain',             'url': 'https://brain.farguell.com',            'host': 'brain.farguell.com'},
-    'audit_fq': {'label': 'audit.farguell.com',      'url': 'https://audit.farguell.com',            'host': 'audit.farguell.com'},
-    'monitor':  {'label': 'Monitor POWER (.24/LAN)',  'url': 'https://monitor-power.farguell.com',    'host': 'monitor-power.farguell.com'},
-    'hub':      {'label': 'Portal Hub (.24/LAN)',     'url': 'https://hub.farguell.com',              'host': 'hub.farguell.com'},
+    # Portal y nucleo
+    'hub':    {'group': 'Portal y nucleo', 'label': 'AIron Hub',       'url': 'https://app.farguell.com',   'host': 'app.farguell.com'},
+    'brain':  {'group': 'Portal y nucleo', 'label': 'AIron Brain',     'url': 'https://brain.farguell.com', 'host': 'brain.farguell.com'},
+    'rps':    {'group': 'Portal y nucleo', 'label': 'RPS API Catalog', 'url': 'https://rps.farguell.com',   'host': 'rps.farguell.com'},
+    'stack':  {'group': 'Portal y nucleo', 'label': 'Stack',           'url': 'https://stack.farguell.com', 'host': 'stack.farguell.com'},
+    'ask':    {'group': 'Portal y nucleo', 'label': 'AIron Ask',       'url': 'https://ask.178.105.241.12.sslip.io', 'host': 'ask.178.105.241.12.sslip.io'},
+    # Monitores y paneles
+    'monitor_power':    {'group': 'Monitores y paneles', 'label': 'Monitor Flujo POWER',    'url': 'https://monitor-power.178.105.241.12.sslip.io',   'host': 'monitor-power.178.105.241.12.sslip.io'},
+    'monitor_cierre':   {'group': 'Monitores y paneles', 'label': 'Monitor Cierre de Mes',  'url': 'https://monitor-cierre.178.105.241.12.sslip.io',  'host': 'monitor-cierre.178.105.241.12.sslip.io'},
+    'monitor_vaillant': {'group': 'Monitores y paneles', 'label': 'Monitor Flujo Vaillant', 'url': 'https://qfxzw9csjly5y5cy7hqev87g.178.105.241.12.sslip.io', 'host': 'qfxzw9csjly5y5cy7hqev87g.178.105.241.12.sslip.io'},
+    'direccion':        {'group': 'Monitores y paneles', 'label': 'AIron Direccion',        'url': 'https://planta.178.105.241.12.sslip.io',          'host': 'planta.178.105.241.12.sslip.io'},
+    'pedidos':          {'group': 'Monitores y paneles', 'label': 'Estado Pedidos',         'url': 'https://pedidos.178.105.241.12.sslip.io',         'host': 'pedidos.178.105.241.12.sslip.io'},
+    'tareas':           {'group': 'Monitores y paneles', 'label': 'AIron Tareas',           'url': 'https://tareas.178.105.241.12.sslip.io',          'host': 'tareas.178.105.241.12.sslip.io'},
+    # RFQ y voz
+    'rfq_web': {'group': 'RFQ y voz', 'label': 'RFQ INDRA Web',      'url': 'https://t11zxssdcj6nfk4c5pci7lav.178.105.241.12.sslip.io', 'host': 't11zxssdcj6nfk4c5pci7lav.178.105.241.12.sslip.io'},
+    'token':   {'group': 'RFQ y voz', 'label': 'AIron Token Server', 'url': 'https://airon-token.178.105.241.12.sslip.io',             'host': 'airon-token.178.105.241.12.sslip.io'},
+    # Backend / orquestacion
+    'n8n':     {'group': 'Backend / n8n', 'label': 'n8n backend', 'url': 'https://n8n.farguell.com', 'host': 'n8n.farguell.com'},
+    # Infraestructura (servidores propios)
+    'srv_front': {'group': 'Infraestructura', 'label': 'Servidor Frontend (Hetzner relay)', 'url': 'https://178.105.241.12', 'host': '178.105.241.12'},
+    'srv_back':  {'group': 'Infraestructura', 'label': 'Servidor Backend (Hetzner)',        'url': 'https://178.105.73.190', 'host': '178.105.73.190'},
 }
 
 # Perfiles de escaneo
@@ -49,7 +82,7 @@ def sse(v, c='out'):
 async def run_scan(tid, pid):
     t = TARGETS[tid]
     p = PROFILES[pid]
-    yield sse('AIron Audit Runner - objetivo: ' + t['label'] + '  (' + t['url'] + ')', 'hdr')
+    yield sse('AIron Audit Engine - objetivo: ' + t['label'] + '  (' + t['url'] + ')', 'hdr')
     yield sse('perfil: ' + p['label'] + '  -  solo activos propios autorizados', 'hdr')
     yield sse('', 'out')
     # Preflight: resolver DNS + comprobar que responde, para no soltar output confuso
@@ -58,8 +91,8 @@ async def run_scan(tid, pid):
     try:
         ip = socket.gethostbyname(host)
     except Exception:
-        yield sse('[X] ' + host + ' NO resuelve en DNS accesible desde el runner (.12). No hay nada que escanear.', 'err')
-        yield sse('    Sugerencia: falta el registro DNS publico, o la app solo vive en la LAN .24 -> escanea desde ahi.', 'out')
+        yield sse('[X] ' + host + ' NO resuelve en DNS accesible desde el motor. No hay nada que escanear.', 'err')
+        yield sse('    Sugerencia: falta el registro DNS publico, o el activo solo vive en otra red.', 'out')
         yield sse('=== escaneo completado ===', 'ok')
         return
     reachable = False
@@ -108,7 +141,7 @@ async def health():
 @app.get('/api/targets')
 async def targets():
     return JSONResponse({
-        'targets': [{'id': k, 'label': v['label'], 'url': v['url']} for k, v in TARGETS.items()],
+        'targets': [{'id': k, 'label': v['label'], 'url': v['url'], 'group': v.get('group', 'Activos')} for k, v in TARGETS.items()],
         'profiles': [{'id': k, 'label': v['label']} for k, v in PROFILES.items()],
     })
 
@@ -126,75 +159,11 @@ async def scan(target: str, profile: str):
     )
 
 
-@app.get('/', response_class=HTMLResponse)
+@app.get('/', response_class=PlainTextResponse)
 async def index():
-    return HTML
-
-
-HTML = '''<!doctype html><html lang='es'><head>
-<meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
-<title>AIron Audit Runner</title>
-<style>
-  :root{--bg:#0a0b0d;--panel:#131519;--line:#23262d;--txt:#e5e7eb;--mut:#8b909a;
-        --grn:#34d399;--cyn:#22d3ee;--fux:#e879f9;--amb:#fbbf24;--red:#f87171;}
-  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);
-    font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif}
-  header{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
-  .dot{width:11px;height:11px;border-radius:50%;background:var(--grn);box-shadow:0 0 10px var(--grn)}
-  h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.2px}
-  .sub{font-size:11px;color:var(--mut)}
-  .wrap{max-width:980px;margin:0 auto;padding:16px}
-  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
-  select{background:#0d0f12;color:var(--grn);border:1px solid var(--line);border-radius:8px;
-    padding:9px 10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;min-width:280px}
-  .prof{background:#1b1e24;color:var(--txt);border:1px solid var(--line);border-radius:8px;
-    padding:8px 11px;font-size:12px;cursor:pointer}
-  .prof.active{border-color:var(--grn);background:rgba(52,211,153,.12);color:var(--grn)}
-  #go{margin-left:auto;background:var(--grn);color:#08110c;border:0;border-radius:9px;
-    padding:10px 16px;font-weight:700;cursor:pointer;font-size:13px}
-  #go:disabled{opacity:.5;cursor:not-allowed}
-  #term{background:#000;border:1px solid var(--line);border-radius:12px;padding:12px;
-    height:60vh;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.5}
-  .ln{white-space:pre-wrap;word-break:break-all}
-  .hdr{color:var(--fux)} .cmd{color:#fff;font-weight:600} .ok{color:var(--grn)}
-  .err{color:var(--red)} .out{color:#c7ccd4}
-  .note{color:var(--mut);font-size:11px;margin-top:10px}
-</style></head><body>
-<header><span class='dot'></span>
-  <div><h1>AIron Audit - Runner de escaneo en vivo</h1>
-  <div class='sub'>Escanea activos propios de Farguell - nmap - whatweb - nuclei</div></div>
-</header>
-<div class='wrap'>
-  <div class='controls'>
-    <select id='target'></select>
-    <div id='profiles' style='display:flex;gap:8px;flex-wrap:wrap'></div>
-    <button id='go'>Escanear</button>
-  </div>
-  <pre id='term'><div class='ln out'>Elige un objetivo y un perfil, y pulsa Escanear.</div></pre>
-  <div class='note'>Solo activos propios autorizados (lista blanca). La primera vez, nuclei descarga sus plantillas (~1 min).</div>
-</div>
-<script>
-let profile='web', es=null;
-function line(v,c){const t=document.getElementById('term');const d=document.createElement('div');
-  d.className='ln '+(c||'out');d.textContent=v;t.appendChild(d);t.scrollTop=t.scrollHeight;}
-async function load(){
-  const d=await (await fetch('api/targets')).json();
-  const sel=document.getElementById('target');
-  d.targets.forEach(function(t){const o=document.createElement('option');o.value=t.id;o.textContent=t.label+' - '+t.url;sel.appendChild(o);});
-  const pc=document.getElementById('profiles');
-  d.profiles.forEach(function(p){const b=document.createElement('button');b.className='prof'+(p.id==profile?' active':'');
-    b.textContent=p.label;b.onclick=function(){profile=p.id;document.querySelectorAll('.prof').forEach(function(x){x.classList.remove('active');});b.classList.add('active');};
-    pc.appendChild(b);});
-}
-document.getElementById('go').onclick=function(){
-  if(es)es.close();
-  const go=document.getElementById('go');go.disabled=true;
-  document.getElementById('term').innerHTML='';
-  const target=document.getElementById('target').value;
-  line('Iniciando escaneo...','hdr');
-  es=new EventSource('api/scan?target='+encodeURIComponent(target)+'&profile='+encodeURIComponent(profile));
-  es.onmessage=function(e){const m=JSON.parse(e.data);line(m.v,m.c); if(m.v.indexOf('escaneo completado')>=0){es.close();go.disabled=false;}};
-  es.onerror=function(){line('- conexion cerrada -','ok');es.close();go.disabled=false;};
-};
-load();
-</script></body></html>'''
+    return (
+        'AIron Audit Engine - motor headless (Farguell Group).\n'
+        'La interfaz vive integrada en AIron Brain: https://brain.farguell.com '
+        '(icono "AIron Audit" al fondo de la barra izquierda).\n\n'
+        'API: GET /api/targets - GET /api/scan?target=..&profile=.. (SSE) - GET /health\n'
+    )
