@@ -8,6 +8,7 @@ que consume esta API same-origin a traves del proxy /audit-api/ de su nginx.
 
 Seguridad: solo se puede escanear un objetivo de la lista blanca TARGETS.
 No hay entrada de objetivo libre -> imposible apuntar a terceros desde la app.
+El barrido "TODOS" (target=all) solo recorre esa misma lista blanca.
 '''
 import asyncio
 import json
@@ -79,7 +80,9 @@ def sse(v, c='out'):
     return 'data: ' + json.dumps({'c': c, 'v': v}) + '\n\n'
 
 
-async def run_scan(tid, pid):
+async def _scan_one(tid, pid):
+    '''Escanea UN objetivo y transmite su salida. NO emite el marcador final
+    "escaneo completado" (para poder encadenar varios en el barrido TODOS).'''
     t = TARGETS[tid]
     p = PROFILES[pid]
     yield sse('AIron Audit Engine - objetivo: ' + t['label'] + '  (' + t['url'] + ')', 'hdr')
@@ -93,7 +96,6 @@ async def run_scan(tid, pid):
     except Exception:
         yield sse('[X] ' + host + ' NO resuelve en DNS accesible desde el motor. No hay nada que escanear.', 'err')
         yield sse('    Sugerencia: falta el registro DNS publico, o el activo solo vive en otra red.', 'out')
-        yield sse('=== escaneo completado ===', 'ok')
         return
     reachable = False
     for port in (443, 80):
@@ -108,7 +110,6 @@ async def run_scan(tid, pid):
         yield sse('[preflight] ' + host + ' -> ' + ip + '  (accesible)', 'ok')
     else:
         yield sse('[X] ' + host + ' resuelve a ' + ip + ' pero no responde en 80/443. No hay nada que escanear.', 'err')
-        yield sse('=== escaneo completado ===', 'ok')
         return
     yield sse('', 'out')
     for tmpl in p['cmds']:
@@ -130,7 +131,32 @@ async def run_scan(tid, pid):
         await proc.wait()
         yield sse('[OK] ' + cmd[0] + ' terminado (exit ' + str(proc.returncode) + ')', 'ok')
         yield sse('', 'out')
+
+
+async def run_scan(tid, pid):
+    '''Escaneo de UN objetivo (uso normal). Cierra con el marcador que la consola
+    de Brain reconoce para terminar el stream.'''
+    async for chunk in _scan_one(tid, pid):
+        yield chunk
     yield sse('=== escaneo completado ===', 'ok')
+
+
+async def run_all(pid):
+    '''Barrido TODOS: recorre secuencialmente la lista blanca completa con el mismo
+    perfil, y solo al final emite el marcador de cierre. Sigue siendo lista blanca:
+    imposible apuntar a terceros.'''
+    ids = list(TARGETS.keys())
+    total = len(ids)
+    p = PROFILES[pid]
+    yield sse('==== BARRIDO COMPLETO - ' + str(total) + ' activos - perfil: ' + p['label'] + ' ====', 'hdr')
+    yield sse('Solo activos propios autorizados (lista blanca). Esto puede tardar varios minutos.', 'hdr')
+    for i, tid in enumerate(ids, 1):
+        yield sse('', 'out')
+        yield sse('-------- [' + str(i) + '/' + str(total) + '] ' + TARGETS[tid]['label'] + ' --------', 'hdr')
+        async for chunk in _scan_one(tid, pid):
+            yield chunk
+    yield sse('', 'out')
+    yield sse('=== barrido de ' + str(total) + ' activos: escaneo completado ===', 'ok')
 
 
 @app.get('/health')
@@ -140,18 +166,28 @@ async def health():
 
 @app.get('/api/targets')
 async def targets():
+    real = [{'id': k, 'label': v['label'], 'url': v['url'], 'group': v.get('group', 'Activos')} for k, v in TARGETS.items()]
+    # Objetivo sintetico "TODOS": primero, en su propio grupo -> aparece arriba y
+    # queda seleccionado por defecto en la consola de Brain.
+    todos = {'id': 'all', 'label': 'TODOS los activos (' + str(len(TARGETS)) + ')', 'url': 'barrido secuencial de toda la lista blanca', 'group': 'Barrido completo'}
     return JSONResponse({
-        'targets': [{'id': k, 'label': v['label'], 'url': v['url'], 'group': v.get('group', 'Activos')} for k, v in TARGETS.items()],
+        'targets': [todos] + real,
         'profiles': [{'id': k, 'label': v['label']} for k, v in PROFILES.items()],
     })
 
 
 @app.get('/api/scan')
 async def scan(target: str, profile: str):
-    if target not in TARGETS:
-        raise HTTPException(status_code=403, detail='objetivo no autorizado')
     if profile not in PROFILES:
         raise HTTPException(status_code=400, detail='perfil no valido')
+    if target == 'all':
+        return StreamingResponse(
+            run_all(profile),
+            media_type='text/event-stream',
+            headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no', 'Connection': 'keep-alive'},
+        )
+    if target not in TARGETS:
+        raise HTTPException(status_code=403, detail='objetivo no autorizado')
     return StreamingResponse(
         run_scan(target, profile),
         media_type='text/event-stream',
@@ -166,4 +202,5 @@ async def index():
         'La interfaz vive integrada en AIron Brain: https://brain.farguell.com '
         '(icono "AIron Audit" al fondo de la barra izquierda).\n\n'
         'API: GET /api/targets - GET /api/scan?target=..&profile=.. (SSE) - GET /health\n'
+        'target=all -> barrido de toda la lista blanca.\n'
     )
