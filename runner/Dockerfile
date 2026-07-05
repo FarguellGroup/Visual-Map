@@ -25,4 +25,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py .
 
 EXPOSE 8000
+
+# Healthcheck en la propia imagen (patron estandarizacion repos 2026-07-02)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
+  CMD curl -fsS http://localhost:8000/health || exit 1
+
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
