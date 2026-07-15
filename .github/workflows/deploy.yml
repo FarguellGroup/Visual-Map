@@ -1,0 +1,29 @@
+name: Deploy to Coolify (.24)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-visual-map
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, farguell24]
+    steps:
+      - name: Trigger Coolify deploy (.24)
+        env:
+          UUIDS: "mn4fw0tyjf454qlgugvyfe5z"
+        run: |
+          set -euo pipefail
+          : "${COOLIFY_URL:?falta COOLIFY_URL (revisar .env del runner)}"
+          : "${COOLIFY_TOKEN:?falta COOLIFY_TOKEN (revisar .env del runner)}"
+          rc=0
+          for U in $UUIDS; do
+            code=$(curl -s -o /tmp/d.$U.json -w '%{http_code}' -H "Authorization: Bearer ${COOLIFY_TOKEN}" "${COOLIFY_URL}/api/v1/deploy?uuid=${U}&force=false")
+            echo "uuid=$U HTTP $code"
+            { [ "$code" = "200" ] || [ "$code" = "201" ]; } || rc=1
+          done
+          exit $rc
